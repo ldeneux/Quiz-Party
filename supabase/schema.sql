@@ -145,3 +145,11 @@ create policy "public read teams" on teams for select using (true);
 create policy "public insert teams" on teams for insert with check (true);
 create policy "public read answers" on answers for select using (true);
 create policy "public insert answers" on answers for insert with check (true);
+
+-- ---------------------------------------------------------
+-- Activation du Realtime sur les tables suivies en direct
+-- (indispensable : sans ça, l'écran hôte ne reçoit jamais les
+-- équipes qui rejoignent ni les réponses soumises)
+-- ---------------------------------------------------------
+alter publication supabase_realtime add table teams;
+alter publication supabase_realtime add table answers;

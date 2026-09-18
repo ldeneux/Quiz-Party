@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { scoreClassique } from '@/lib/scoring';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -36,6 +36,7 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
   const [phase, setPhase] = useState<'lobby' | 'question' | 'revealed'>('lobby');
   const [secondsLeft, setSecondsLeft] = useState(QUESTION_TIME_SECONDS);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
+  const currentQuestionIdRef = useRef<string | null>(null);
 
   // Connexion au channel Realtime de la partie
   useEffect(() => {
@@ -45,18 +46,41 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
     };
     loadGame();
 
+    // Charge les équipes déjà présentes (utile si on recharge la page hôte)
+    const loadTeams = async () => {
+      const { data } = await supabase.from('teams').select('*').eq('game_id', gameId);
+      if (data) setTeams(data as Team[]);
+    };
+    loadTeams();
+
     const ch = supabase.channel(`game:${gameId}`, {
       config: { broadcast: { self: false } },
     });
 
-    ch.on('broadcast', { event: 'team:joined' }, ({ payload }) => {
-      setTeams((prev) => [...prev, payload.team]);
-    });
+    // On écoute directement les insertions en base plutôt qu'un broadcast :
+    // fiable même si le canal de l'équipe qui rejoint n'était pas encore
+    // complètement établi au moment de l'envoi.
+    ch.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
+      (payload) => {
+        setTeams((prev) => [...prev, payload.new as Team]);
+      }
+    );
 
-    ch.on('broadcast', { event: 'answer:submitted' }, ({ payload }) => {
-      // On sait juste QUI a répondu, jamais QUOI, avant la révélation
-      setAnsweredTeamIds((prev) => new Set(prev).add(payload.teamId));
-    });
+    // Idem pour les réponses : on écoute l'insertion en base plutôt qu'un
+    // broadcast envoyé depuis l'appareil équipe (même souci de fiabilité).
+    // On affiche seulement "a répondu", jamais le choix, avant révélation.
+    ch.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'answers', filter: `game_id=eq.${gameId}` },
+      (payload) => {
+        const row = payload.new as { team_id: string; question_id: string };
+        if (row.question_id === currentQuestionIdRef.current) {
+          setAnsweredTeamIds((prev) => new Set(prev).add(row.team_id));
+        }
+      }
+    );
 
     ch.subscribe();
     setChannel(ch);
@@ -70,6 +94,7 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
   const startQuestion = useCallback(
     async (q: Question) => {
       setQuestion(q);
+      currentQuestionIdRef.current = q.id;
       setPhase('question');
       setAnsweredTeamIds(new Set());
       setSecondsLeft(QUESTION_TIME_SECONDS);

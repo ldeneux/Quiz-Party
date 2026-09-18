@@ -27,18 +27,19 @@ qui répondent depuis leur tablette/PC/téléphone. Next.js + Supabase Realtime.
 
 1. Crée un projet sur [supabase.com](https://supabase.com)
 2. Dans l'éditeur SQL du projet, exécute dans l'ordre :
-   - `supabase/schema.sql`
+   - `supabase/schema.sql` (active aussi le Realtime sur `teams` et `answers` — indispensable, sans ça l'écran hôte ne voit jamais les équipes rejoindre)
    - `supabase/functions.sql`
-3. Copie `.env.example` en `.env.local` et remplis avec tes clés Supabase
+3. Vérifie dans **Database → Replication** que `teams` et `answers` apparaissent bien cochées dans la publication `supabase_realtime` (normalement automatique via le script SQL ci-dessus)
+4. Copie `.env.example` en `.env.local` et remplis avec tes clés Supabase
    (Project Settings → API)
-4. Installe les dépendances et lance le serveur de dev :
+5. Installe les dépendances et lance le serveur de dev :
 
 ```bash
 npm install
 npm run dev
 ```
 
-5. Ouvre `http://localhost:3000` — clique "Nouveau jeu" sur un écran (le PC
+6. Ouvre `http://localhost:3000` — clique "Nouveau jeu" sur un écran (le PC
    qui sera projeté), et "Rejoindre une partie" sur les appareils des équipes.
 
 ## Ajouter des questions de test
