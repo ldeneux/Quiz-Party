@@ -69,6 +69,16 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
       }
     );
 
+    // Déconnexion d'une équipe (déclenchée côté hôte ou côté tablette équipe)
+    ch.on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
+      (payload) => {
+        const removedId = (payload.old as { id: string }).id;
+        setTeams((prev) => prev.filter((t) => t.id !== removedId));
+      }
+    );
+
     // Idem pour les réponses : on écoute l'insertion en base plutôt qu'un
     // broadcast envoyé depuis l'appareil équipe (même souci de fiabilité).
     // On affiche seulement "a répondu", jamais le choix, avant révélation.
@@ -167,6 +177,13 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
             {teams.map((t) => (
               <div key={t.id} style={{ ...styles.teamChip, borderColor: t.color }}>
                 <span style={{ fontSize: 20 }}>{t.avatar}</span> {t.name}
+                <button
+                  onClick={() => supabase.from('teams').delete().eq('id', t.id).then()}
+                  title="Déconnecter l'équipe"
+                  style={styles.disconnectBtn}
+                >
+                  ✕
+                </button>
               </div>
             ))}
           </div>
@@ -315,7 +332,28 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#6c7bf7',
   },
   teamsGrid: { display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '24px 0' },
-  teamChip: { border: '2px solid', borderRadius: 999, padding: '6px 14px', fontWeight: 700, fontSize: 14 },
+  teamChip: {
+    border: '2px solid',
+    borderRadius: 999,
+    padding: '6px 8px 6px 14px',
+    fontWeight: 700,
+    fontSize: 14,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  disconnectBtn: {
+    border: 'none',
+    background: 'rgba(0,0,0,0.06)',
+    borderRadius: '50%',
+    width: 20,
+    height: 20,
+    fontSize: 11,
+    lineHeight: '20px',
+    cursor: 'pointer',
+    color: '#7a819c',
+    padding: 0,
+  },
   startBtn: {
     background: '#6c7bf7',
     color: '#fff',

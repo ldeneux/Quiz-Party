@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   const visualTheme = body.visualTheme ?? 'espace';
   const levelIds = body.levelIds ?? ['CM1'];
   const categoryIds = body.categoryIds ?? [];
+  const mode = body.mode ?? 'classique';
 
   const joinCode = generateJoinCode();
 
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
       visual_theme: visualTheme,
       level_ids: levelIds,
       category_ids: categoryIds,
+      mode,
       status: 'lobby',
     })
     .select()

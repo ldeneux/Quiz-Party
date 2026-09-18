@@ -120,6 +120,13 @@ export default function PlayScreen({ params }: { params: { gameId: string } }) {
     );
   }
 
+  const leaveTeam = async () => {
+    if (!team) return;
+    await supabase.from('teams').delete().eq('id', team.id);
+    setTeam(null);
+    setQuestion(null);
+  };
+
   // --- Écran 2 : en attente de question ---
   if (!question) {
     return (
@@ -127,6 +134,21 @@ export default function PlayScreen({ params }: { params: { gameId: string } }) {
         <div style={{ fontSize: 36 }}>{team.preset.avatar}</div>
         <h2 style={{ fontWeight: 800 }}>{team.preset.name}</h2>
         <p style={{ color: '#7a819c' }}>En attente du démarrage…</p>
+        <button
+          onClick={leaveTeam}
+          style={{
+            marginTop: 20,
+            background: 'none',
+            border: '1px solid #eaedf6',
+            borderRadius: 999,
+            padding: '8px 18px',
+            color: '#ff7a68',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Quitter la partie
+        </button>
       </main>
     );
   }
