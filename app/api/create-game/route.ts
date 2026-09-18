@@ -20,7 +20,8 @@ function generateJoinCode(): string {
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const visualTheme = body.visualTheme ?? 'espace';
-  const gameProfileId = body.gameProfileId ?? null;
+  const levelIds = body.levelIds ?? ['CM1'];
+  const categoryIds = body.categoryIds ?? [];
 
   const joinCode = generateJoinCode();
 
@@ -29,7 +30,8 @@ export async function POST(request: Request) {
     .insert({
       join_code: joinCode,
       visual_theme: visualTheme,
-      game_profile_id: gameProfileId,
+      level_ids: levelIds,
+      category_ids: categoryIds,
       status: 'lobby',
     })
     .select()

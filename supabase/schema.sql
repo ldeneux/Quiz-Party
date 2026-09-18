@@ -75,6 +75,8 @@ create table games (
   id uuid primary key default gen_random_uuid(),
   join_code text unique not null,     -- code à 4-6 caractères pour rejoindre
   game_profile_id uuid references game_profiles(id),
+  level_ids text[] default array['CM1'],       -- niveaux sélectionnés pour cette partie
+  category_ids uuid[] default array[]::uuid[], -- catégories sélectionnées ([] = toutes)
   status text not null default 'lobby', -- lobby | question | revealed | finished
   current_round int default 0,
   current_question_id uuid references questions(id),

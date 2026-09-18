@@ -36,6 +36,7 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
   const [phase, setPhase] = useState<'lobby' | 'question' | 'revealed'>('lobby');
   const [secondsLeft, setSecondsLeft] = useState(QUESTION_TIME_SECONDS);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const currentQuestionIdRef = useRef<string | null>(null);
 
   // Connexion au channel Realtime de la partie
@@ -170,8 +171,20 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
             ))}
           </div>
 
+          {loadError && (
+            <p style={{ color: '#ff7a68', fontSize: 14, margin: '12px 0', maxWidth: 420, marginInline: 'auto' }}>
+              {loadError}
+            </p>
+          )}
+
           {teams.length > 0 && (
-            <button style={styles.startBtn} onClick={() => loadNextQuestion(gameId, startQuestion)}>
+            <button
+              style={styles.startBtn}
+              onClick={() => {
+                setLoadError(null);
+                loadNextQuestion(gameId, startQuestion, setLoadError);
+              }}
+            >
               Démarrer la partie ({teams.length} équipes)
             </button>
           )}
@@ -223,9 +236,20 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
           </div>
 
           {phase === 'revealed' && (
-            <button style={styles.startBtn} onClick={() => loadNextQuestion(gameId, startQuestion)}>
-              Question suivante
-            </button>
+            <>
+              {loadError && (
+                <p style={{ color: '#ff7a68', fontSize: 14, marginBottom: 12 }}>{loadError}</p>
+              )}
+              <button
+                style={styles.startBtn}
+                onClick={() => {
+                  setLoadError(null);
+                  loadNextQuestion(gameId, startQuestion, setLoadError);
+                }}
+              >
+                Question suivante
+              </button>
+            </>
           )}
         </div>
       )}
@@ -233,25 +257,35 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
   );
 }
 
-// Charge une question au hasard parmi le pack sélectionné pour le profil de jeu
-async function loadNextQuestion(gameId: string, startQuestion: (q: Question) => void) {
-  const { data: game } = await supabase.from('games').select('game_profile_id').eq('id', gameId).single();
+// Charge une question au hasard parmi les niveaux/catégories configurés pour la partie
+async function loadNextQuestion(
+  gameId: string,
+  startQuestion: (q: Question) => void,
+  onError: (msg: string) => void
+) {
+  const { data: game } = await supabase.from('games').select('level_ids, category_ids').eq('id', gameId).single();
 
   let query = supabase.from('questions').select('*').eq('validated', true);
 
-  if (game?.game_profile_id) {
-    const { data: profile } = await supabase
-      .from('game_profiles')
-      .select('*')
-      .eq('id', game.game_profile_id)
-      .single();
-    if (profile) {
-      query = query.in('level_id', profile.level_ids).in('category_id', profile.category_ids);
-    }
+  if (game?.level_ids?.length) {
+    query = query.in('level_id', game.level_ids);
+  }
+  if (game?.category_ids?.length) {
+    query = query.in('category_id', game.category_ids);
   }
 
-  const { data: pool } = await query;
-  if (!pool || pool.length === 0) return;
+  const { data: pool, error } = await query;
+
+  if (error) {
+    onError(`Erreur lors du chargement des questions : ${error.message}`);
+    return;
+  }
+  if (!pool || pool.length === 0) {
+    onError(
+      "Aucune question disponible pour ce niveau/ces catégories. Ajoute des questions validées (validated = true) dans la table `questions` — voir le README."
+    );
+    return;
+  }
 
   const randomQuestion = pool[Math.floor(Math.random() * pool.length)];
   startQuestion(randomQuestion as Question);
