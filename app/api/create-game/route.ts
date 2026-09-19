@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   const levelIds = body.levelIds ?? ['CM1'];
   const categoryIds = body.categoryIds ?? [];
   const mode = body.mode ?? 'classique';
+  const profileId = body.profileId ?? null;
 
   const joinCode = generateJoinCode();
 
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
       level_ids: levelIds,
       category_ids: categoryIds,
       mode,
+      profile_id: profileId,
       status: 'lobby',
     })
     .select()

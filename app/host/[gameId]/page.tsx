@@ -288,24 +288,47 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
   );
 }
 
-// Charge une question au hasard parmi les niveaux/catégories configurés pour la partie
+// Charge une question au hasard :
+// - si la partie a un profil (profile_id) : parmi l'union des packs de ce profil
+// - sinon : repli sur level_ids/category_ids directement sur la partie (compat V1)
 async function loadNextQuestion(
   gameId: string,
   startQuestion: (q: Question) => void,
   onError: (msg: string) => void
 ) {
-  const { data: game } = await supabase.from('games').select('level_ids, category_ids').eq('id', gameId).single();
+  const { data: game } = await supabase
+    .from('games')
+    .select('level_ids, category_ids, profile_id')
+    .eq('id', gameId)
+    .single();
 
-  let query = supabase.from('questions').select('*').eq('validated', true);
+  let pool: any[] | null = null;
+  let error: any = null;
 
-  if (game?.level_ids?.length) {
-    query = query.in('level_id', game.level_ids);
+  if (game?.profile_id) {
+    const { data: profilePacks } = await supabase
+      .from('quiz_profile_packs')
+      .select('pack_id')
+      .eq('profile_id', game.profile_id);
+
+    const packIds = (profilePacks ?? []).map((pp) => pp.pack_id);
+
+    if (packIds.length === 0) {
+      onError("Le profil sélectionné n'a aucun pack associé. Ajoute des packs à ce profil dans Paramétrage.");
+      return;
+    }
+
+    const res = await supabase.from('questions').select('*').eq('validated', true).in('pack_id', packIds);
+    pool = res.data;
+    error = res.error;
+  } else {
+    let query = supabase.from('questions').select('*').eq('validated', true);
+    if (game?.level_ids?.length) query = query.in('level_id', game.level_ids);
+    if (game?.category_ids?.length) query = query.in('category_id', game.category_ids);
+    const res = await query;
+    pool = res.data;
+    error = res.error;
   }
-  if (game?.category_ids?.length) {
-    query = query.in('category_id', game.category_ids);
-  }
-
-  const { data: pool, error } = await query;
 
   if (error) {
     onError(`Erreur lors du chargement des questions : ${error.message}`);
@@ -313,7 +336,7 @@ async function loadNextQuestion(
   }
   if (!pool || pool.length === 0) {
     onError(
-      "Aucune question disponible pour ce niveau/ces catégories. Ajoute des questions validées (validated = true) dans la table `questions` — voir le README."
+      "Aucune question disponible. Va dans Paramétrage pour créer des packs (Gemini) et un profil, ou vérifie que la table `questions` contient des lignes validées."
     );
     return;
   }

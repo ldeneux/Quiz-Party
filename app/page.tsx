@@ -12,6 +12,7 @@ const MODES = [
 ];
 
 type Team = { id: string; name: string; avatar: string; color: string };
+type Profile = { id: string; name: string };
 
 export default function ConsolePage() {
   const router = useRouter();
@@ -23,10 +24,17 @@ export default function ConsolePage() {
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
   const [showInvite, setShowInvite] = useState(false);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const prevTeamsCount = useRef(0);
 
   useEffect(() => {
     setOrigin(window.location.origin);
+    supabase
+      .from('quiz_profiles')
+      .select('id, name')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setProfiles((data as Profile[]) ?? []));
   }, []);
 
   // Reprend une session en cours si on recharge la page
@@ -109,7 +117,13 @@ export default function ConsolePage() {
     const res = await fetch('/api/create-game', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: activeMode, visualTheme: 'espace', levelIds: ['CM1'], categoryIds: [] }),
+      body: JSON.stringify({
+        mode: activeMode,
+        visualTheme: 'espace',
+        levelIds: ['CM1'],
+        categoryIds: [],
+        profileId: selectedProfileId || null,
+      }),
     });
     const data = await res.json();
 
@@ -145,7 +159,30 @@ export default function ConsolePage() {
           background: '#f4f6fb',
         }}
       >
-        <h1 style={{ fontSize: 19, fontWeight: 800, marginBottom: 24 }}>Choisis un mode de jeu</h1>
+        <h1 style={{ fontSize: 19, fontWeight: 800, marginBottom: 16 }}>Choisis un mode de jeu</h1>
+
+        <select
+          value={selectedProfileId}
+          onChange={(e) => setSelectedProfileId(e.target.value)}
+          disabled={!!gameId}
+          style={{
+            width: '100%',
+            padding: 8,
+            borderRadius: 10,
+            border: '1px solid #eaedf6',
+            marginBottom: 20,
+            fontSize: 13,
+            fontWeight: 700,
+            color: '#1f2440',
+          }}
+        >
+          <option value="">Profil : par défaut (CM1)</option>
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginBottom: 32 }}>
           {MODES.map((m) => (
