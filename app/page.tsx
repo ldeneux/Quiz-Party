@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import GameArea from '@/components/GameArea';
 
 const MODES = [
   { id: 'classique', label: 'Classique', emoji: '🎯' },
@@ -15,7 +15,6 @@ type Team = { id: string; name: string; avatar: string; color: string };
 type Profile = { id: string; name: string; is_favorite: boolean; is_default: boolean };
 
 export default function ConsolePage() {
-  const router = useRouter();
   const [activeMode, setActiveMode] = useState('classique');
   const [gameId, setGameId] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
@@ -26,6 +25,7 @@ export default function ConsolePage() {
   const [showInvite, setShowInvite] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
+  const [gameStarted, setGameStarted] = useState(false);
   const prevTeamsCount = useRef(0);
 
   useEffect(() => {
@@ -131,6 +131,7 @@ export default function ConsolePage() {
     setTeams([]);
     setShowInvite(false);
     setError(null);
+    setGameStarted(false);
   };
 
   const inviteTeams = async () => {
@@ -192,7 +193,7 @@ export default function ConsolePage() {
   };
 
   const startGame = () => {
-    if (gameId) router.push(`/host/${gameId}`);
+    if (gameId) setGameStarted(true);
   };
 
   return (
@@ -355,7 +356,7 @@ export default function ConsolePage() {
               </button>
             )}
 
-            {teams.length > 0 && (
+            {teams.length > 0 && !gameStarted && (
               <button
                 onClick={startGame}
                 style={{
@@ -394,6 +395,12 @@ export default function ConsolePage() {
             </a>
           </div>
         </header>
+
+        {gameStarted && gameId && (
+          <div style={{ marginTop: 28 }}>
+            <GameArea gameId={gameId} />
+          </div>
+        )}
       </section>
 
       {/* Fenêtre d'invitation : se ferme seule dès qu'une équipe rejoint,

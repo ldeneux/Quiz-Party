@@ -302,10 +302,10 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
           <p style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.4, marginBottom: 20, textAlign: 'center' }}>
             {question.prompt}
           </p>
-          <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gap: 12 }} key={question.id}>
             {(['a', 'b', 'c', 'd'] as const).map((letter) => (
               <button
-                key={letter}
+                key={`${question.id}-${letter}`}
                 onClick={() => submitAnswer(letter)}
                 style={{
                   padding: 20,
