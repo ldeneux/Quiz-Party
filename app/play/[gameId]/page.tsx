@@ -154,19 +154,28 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     });
   };
 
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const submitAnswer = async (choice: 'a' | 'b' | 'c' | 'd') => {
     if (!team || !question || hasAnswered) return;
-    setHasAnswered(true);
+    setSubmitError(null);
 
     const responseTimeMs = questionStartedAt ? Date.now() - questionStartedAt : null;
 
-    await supabase.from('answers').insert({
+    const { error } = await supabase.from('answers').insert({
       game_id: gameId,
       question_id: question.id,
       team_id: team.id,
       choice,
       response_time_ms: responseTimeMs,
     });
+
+    if (error) {
+      setSubmitError(`Échec de l'envoi (${error.message}). Réessaie.`);
+      return; // hasAnswered reste false : le bouton reste cliquable
+    }
+
+    setHasAnswered(true);
 
     const channel = supabase.channel(`game:${gameId}`);
     await channel.subscribe();
@@ -281,6 +290,10 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       <p style={{ textAlign: 'center', color: '#7a819c', marginBottom: 20 }}>
         {team.preset.avatar} {team.preset.name}
       </p>
+
+      {submitError && (
+        <p style={{ textAlign: 'center', color: '#ff7a68', fontSize: 13, marginBottom: 12 }}>{submitError}</p>
+      )}
 
       {hasAnswered ? (
         <p style={{ textAlign: 'center', fontWeight: 800, fontSize: 18 }}>Réponse envoyée ✓</p>
