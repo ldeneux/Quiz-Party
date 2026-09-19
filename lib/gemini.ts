@@ -1,15 +1,21 @@
 // Génération de questions via l'API Gemini.
 //
 // Choix de coûts (cf. discussion) :
-// - Modèle par défaut : gemini-2.0-flash, le plus économique pour ce
-//   type de tâche factuelle. Configurable via GEMINI_MODEL si besoin.
+// - Modèle par défaut : gemini-3.5-flash-lite — le plus économique disponible
+//   pour ce type de tâche factuelle (~0.30 $/M tokens en entrée, 2.50 $/M en
+//   sortie). gemini-2.0-flash, utilisé initialement, a été retiré par Google
+//   mi-2026 ; gemini-3.6-flash existe aussi mais coûte nettement plus cher
+//   (~1.50 $/M entrée, 7.50 $/M sortie) pour ce cas d'usage simple — inutile
+//   ici. Si gemini-3.5-flash-lite venait à son tour à disparaître, vérifie
+//   le modèle le moins cher du moment sur https://ai.google.dev/gemini-api/docs/pricing
+//   et mets à jour GEMINI_MODEL dans .env.local (pas besoin de toucher au code).
 // - Génération en BATCH : un seul appel génère tout le pack d'un coup
 //   (ex. 3 ou 10 questions), jamais un appel par question ni par joueur.
 // - Les questions générées sont ensuite stockées en base et réutilisées
 //   à volonté sans nouvel appel — le coût est donc figé une fois pour
 //   toutes à la création du pack, jamais pendant une partie.
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite';
 
 export type GeneratedQuestion = {
   prompt: string;
