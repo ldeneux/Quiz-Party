@@ -219,39 +219,7 @@ export default function ParametragePage() {
         <p style={{ color: '#ff7a68', fontSize: 13, marginBottom: 16, maxWidth: 600 }}>{loadNotice}</p>
       )}
 
-      {/* ---- Catégories ---- */}
-      <section style={card}>
-        <h2 style={sectionTitle}>Catégories ({categories.length})</h2>
-
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <input
-            value={newCatEmoji}
-            onChange={(e) => setNewCatEmoji(e.target.value)}
-            style={{ width: 50, padding: 8, borderRadius: 10, border: '1px solid #eaedf6', textAlign: 'center' }}
-          />
-          <input
-            value={newCatName}
-            onChange={(e) => setNewCatName(e.target.value)}
-            placeholder="Nouvelle catégorie…"
-            style={{ flex: 1, padding: 8, borderRadius: 10, border: '1px solid #eaedf6' }}
-          />
-          <button onClick={createCategory} style={primaryBtnSmall}>Ajouter</button>
-        </div>
-
-        <div style={{ ...chipsWrap, maxHeight: 260, overflowY: 'auto', padding: 4 }}>
-          {categories.map((c) => (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button onClick={() => toggleCategory(c.id)} style={chip(selectedCategories.includes(c.id))}>
-                {c.emoji} {c.name}
-              </button>
-              <button onClick={() => editCategory(c)} title="Modifier" style={iconBtn}>✏️</button>
-              <button onClick={() => deleteCategory(c.id)} title="Supprimer" style={iconBtn}>✕</button>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ---- Création de packs ---- */}
+      {/* ---- Création de packs (avec ajout de catégorie intégré) ---- */}
       <section style={card}>
         <h2 style={sectionTitle}>Créer des packs de questions</h2>
         <p style={{ color: '#7a819c', fontSize: 13, marginBottom: 16 }}>
@@ -275,15 +243,35 @@ export default function ParametragePage() {
 
         <div style={{ marginBottom: 16 }}>
           <div style={rowHeader}>
-            <strong style={{ fontSize: 13.5 }}>Catégories à utiliser</strong>
+            <strong style={{ fontSize: 13.5 }}>Catégories à utiliser ({categories.length})</strong>
             <span style={selectAllLink} onClick={() => setSelectedCategories(categories.map((c) => c.id))}>Tout sélectionner</span>
             <span style={selectAllLink} onClick={() => setSelectedCategories([])}>Tout désélectionner</span>
           </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input
+              value={newCatEmoji}
+              onChange={(e) => setNewCatEmoji(e.target.value)}
+              style={{ width: 44, padding: 8, borderRadius: 10, border: '1px solid #eaedf6', textAlign: 'center' }}
+            />
+            <input
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              placeholder="Ajouter une catégorie…"
+              style={{ flex: 1, padding: 8, borderRadius: 10, border: '1px solid #eaedf6', fontSize: 13 }}
+            />
+            <button onClick={createCategory} style={primaryBtnSmall}>Ajouter</button>
+          </div>
+
           <div style={{ ...chipsWrap, maxHeight: 220, overflowY: 'auto', padding: 4 }}>
             {categories.map((c) => (
-              <button key={c.id} onClick={() => toggleCategory(c.id)} style={chip(selectedCategories.includes(c.id))}>
-                {c.emoji} {c.name}
-              </button>
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <button onClick={() => toggleCategory(c.id)} style={chip(selectedCategories.includes(c.id))}>
+                  {c.emoji} {c.name}
+                </button>
+                <button onClick={() => editCategory(c)} title="Modifier" style={iconBtn}>✏️</button>
+                <button onClick={() => deleteCategory(c.id)} title="Supprimer" style={iconBtn}>✕</button>
+              </div>
             ))}
           </div>
         </div>
