@@ -171,7 +171,9 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
         <div style={styles.lobbyCard}>
           <h1 style={{ fontSize: 24, fontWeight: 800 }}>Rejoignez la partie</h1>
           <div style={styles.joinCode}>{joinCode}</div>
-          <p style={{ color: '#7a819c' }}>Sur votre appareil : quiz-party.app/join</p>
+          <p style={{ color: '#7a819c' }}>
+            Sur votre appareil : {typeof window !== 'undefined' ? window.location.origin : ''}/join
+          </p>
 
           <div style={styles.teamsGrid}>
             {teams.map((t) => (
