@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { scoreClassique } from '@/lib/scoring';
+import { scoreClassique, scoreSurvie } from '@/lib/scoring';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type Team = {
@@ -11,6 +11,7 @@ type Team = {
   avatar: string;
   color: string;
   score: number;
+  lives: number;
 };
 
 type Question = {
@@ -37,6 +38,7 @@ const CHOICE_COLORS: Record<'a' | 'b' | 'c' | 'd', string> = {
 
 export default function GameArea({ gameId, onRestart }: { gameId: string; onRestart?: () => void }) {
   const [joinCode, setJoinCode] = useState<string>('');
+  const [mode, setMode] = useState<string>('classique');
   const [teams, setTeams] = useState<Team[]>([]);
   const [answeredTeamIds, setAnsweredTeamIds] = useState<Set<string>>(new Set());
   const [question, setQuestion] = useState<Question | null>(null);
@@ -52,7 +54,10 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
   useEffect(() => {
     const loadGame = async () => {
       const { data: game } = await supabase.from('games').select('*').eq('id', gameId).single();
-      if (game) setJoinCode(game.join_code);
+      if (game) {
+        setJoinCode(game.join_code);
+        setMode(game.mode ?? 'classique');
+      }
     };
     loadGame();
 
@@ -145,13 +150,14 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
 
   useEffect(() => {
     if (phase !== 'question') return;
-    if (secondsLeft <= 0 || answeredTeamIds.size === teams.length) {
+    const activeTeamsCount = mode === 'survie' ? teams.filter((t) => (t.lives ?? 3) > 0).length : teams.length;
+    if (secondsLeft <= 0 || answeredTeamIds.size === activeTeamsCount) {
       reveal();
       return;
     }
     const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
-  }, [phase, secondsLeft, answeredTeamIds, teams.length]);
+  }, [phase, secondsLeft, answeredTeamIds, teams, mode]);
 
   const reveal = useCallback(async () => {
     if (!question) return;
@@ -176,6 +182,34 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
     });
     setRevealedInfo(infoMap);
 
+    if (mode === 'survie') {
+      const currentLives: Record<string, number> = {};
+      teams.forEach((t) => (currentLives[t.id] = t.lives ?? 3));
+      const eliminatedBefore = teams.filter((t) => (t.lives ?? 3) <= 0).length;
+
+      const survieResults = scoreSurvie(submitted as any, question.correct_choice, currentLives, eliminatedBefore);
+
+      for (const r of survieResults) {
+        await supabase.from('teams').update({ lives: r.livesRemaining }).eq('id', r.teamId);
+        if (r.points > 0) {
+          await supabase.rpc('increment_team_score', { p_team_id: r.teamId, p_points: r.points });
+        }
+      }
+
+      channel?.send({ type: 'broadcast', event: 'answers:revealed', payload: { results: survieResults } });
+
+      const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
+      if (refreshedTeams) {
+        setTeams(refreshedTeams as Team[]);
+        // Fin de partie : une seule équipe (ou aucune) encore en vie
+        const stillAlive = (refreshedTeams as Team[]).filter((t) => (t.lives ?? 0) > 0);
+        if (stillAlive.length <= 1) {
+          setTimeout(() => setPhase('finished'), 50);
+        }
+      }
+      return;
+    }
+
     const results = scoreClassique(submitted as any, question.correct_choice);
 
     for (const r of results) {
@@ -186,7 +220,7 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
 
     const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
     if (refreshedTeams) setTeams(refreshedTeams as Team[]);
-  }, [question, channel, gameId, teams]);
+  }, [question, channel, gameId, teams, mode]);
 
   // --- Écran : partie terminée (plus de questions disponibles) ---
   if (phase === 'finished') {
@@ -287,6 +321,11 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
                   }}
                 >
                   <span>{t.avatar}</span> {t.name}
+                  {mode === 'survie' && (
+                    <span style={{ marginLeft: 6, fontSize: 12 }}>
+                      {(t.lives ?? 3) > 0 ? '❤️'.repeat(t.lives ?? 3) : '💀'}
+                    </span>
+                  )}
                   {phase === 'revealed' && (
                     <strong style={{ marginLeft: 6 }}>
                       {info?.choice

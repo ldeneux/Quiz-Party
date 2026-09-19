@@ -50,7 +50,123 @@ export function scoreClassique(
 
 export const CLASSIQUE_TARGET_SCORE = 150;
 
-// --- Emplacements prêts pour les prochains modes ---
-// export function scoreDefi(...) { ... }
-// export function scoreSurvie(...) { ... }
-// export function scoreParticipatif(...) { ... }
+/**
+ * Mode DÉFI
+ * - L'équipe qui défie (challengerTeamId) choisit le thème ET répond aussi
+ * - Elle gagne +3 pts par bonne réponse, mais ne perd jamais de points sur
+ *   son propre défi (mauvaise réponse = 0, jamais de malus)
+ * - Chaque adversaire qui répond juste : neutre (ni gain ni perte)
+ * - Chaque adversaire qui se trompe : -2 pts, reversés à l'équipe qui a lancé le défi
+ *
+ * NOTE : suppose un tour par tour (une équipe = challenger sur cette question).
+ * Nécessite un écran dédié pour désigner le challenger à chaque round.
+ */
+export function scoreDefi(
+  answers: SubmittedAnswer[],
+  correctChoice: 'a' | 'b' | 'c' | 'd',
+  challengerTeamId: string
+): ScoreResult[] {
+  let challengerBonus = 0;
+
+  const opponentResults = answers
+    .filter((a) => a.teamId !== challengerTeamId)
+    .map((a) => {
+      const isCorrect = a.choice === correctChoice;
+      if (!isCorrect) {
+        challengerBonus += 2; // volé à l'adversaire, reversé au challenger
+        return { teamId: a.teamId, isCorrect, points: -2 };
+      }
+      return { teamId: a.teamId, isCorrect, points: 0 };
+    });
+
+  const challengerAnswer = answers.find((a) => a.teamId === challengerTeamId);
+  const challengerCorrect = challengerAnswer?.choice === correctChoice;
+  const challengerPoints = (challengerCorrect ? 3 : 0) + challengerBonus;
+
+  return [
+    { teamId: challengerTeamId, isCorrect: challengerCorrect, points: challengerPoints },
+    ...opponentResults,
+  ];
+}
+
+/**
+ * Mode SURVIE
+ * - 3 vies par équipe au départ (stockées sur teams.lives)
+ * - Mauvaise réponse ou absence de réponse = perte d'une vie
+ * - Points aux équipes éliminées CE round = (nb d'équipes déjà éliminées
+ *   avant ce round) + 1, appliqué à toutes les équipes éliminées ce round
+ * - Les équipes déjà éliminées (lives <= 0) ne répondent plus
+ */
+export type SurvieResult = {
+  teamId: string;
+  isCorrect: boolean | null; // null = équipe déjà éliminée, n'a pas joué ce round
+  livesRemaining: number;
+  justEliminated: boolean;
+  points: number;
+};
+
+export function scoreSurvie(
+  answers: SubmittedAnswer[],
+  correctChoice: 'a' | 'b' | 'c' | 'd',
+  currentLives: Record<string, number>,
+  eliminatedBeforeThisRound: number
+): SurvieResult[] {
+  const results: SurvieResult[] = [];
+  let newlyEliminatedCount = 0;
+
+  for (const teamId of Object.keys(currentLives)) {
+    const livesBefore = currentLives[teamId];
+
+    if (livesBefore <= 0) {
+      results.push({ teamId, isCorrect: null, livesRemaining: 0, justEliminated: false, points: 0 });
+      continue;
+    }
+
+    const answer = answers.find((a) => a.teamId === teamId);
+    const isCorrect = answer?.choice === correctChoice;
+    const livesRemaining = isCorrect ? livesBefore : livesBefore - 1;
+    const justEliminated = livesRemaining <= 0;
+
+    if (justEliminated) newlyEliminatedCount++;
+
+    results.push({ teamId, isCorrect, livesRemaining: Math.max(livesRemaining, 0), justEliminated, points: 0 });
+  }
+
+  // Les points ne peuvent être calculés qu'une fois tous les éliminés du
+  // round connus (même formule pour tous ceux éliminés ce round-ci)
+  const pointsThisRound = eliminatedBeforeThisRound + 1;
+  return results.map((r) => (r.justEliminated ? { ...r, points: pointsThisRound } : r));
+}
+
+/**
+ * Mode PARTICIPATIF
+ * - Cagnotte commune, part = nombre total d'équipes
+ * - Elle double à chaque bonne réponse en chaîne (un seul joueur répond
+ *   par tour, à tour de rôle)
+ * - Dès qu'une équipe se trompe, la cagnotte accumulée est divisée par le
+ *   nombre TOTAL d'équipes (pas seulement celles qui ont joué) et
+ *   redistribuée à toutes
+ * - Continue jusqu'à ce que chaque équipe ait joué 3 fois
+ *
+ * NOTE : suppose un tour par tour. Nécessite un écran dédié.
+ */
+export type ParticipatifState = {
+  pot: number;
+  teamCount: number;
+};
+
+export function scoreParticipatifTurn(
+  isCorrect: boolean,
+  state: ParticipatifState
+): { newState: ParticipatifState; payout: Record<string, number> | null } {
+  if (isCorrect) {
+    return { newState: { ...state, pot: state.pot * 2 }, payout: null };
+  }
+
+  // Échec : on redistribue la cagnotte accumulée à toutes les équipes
+  const share = state.pot / state.teamCount;
+  return {
+    newState: { pot: state.teamCount, teamCount: state.teamCount }, // reset à la mise de départ
+    payout: { share } as any, // le caller distribue `share` à chaque équipe
+  };
+}
