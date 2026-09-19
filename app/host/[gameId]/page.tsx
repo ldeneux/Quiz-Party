@@ -37,6 +37,7 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
   const [secondsLeft, setSecondsLeft] = useState(QUESTION_TIME_SECONDS);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [autoAttempted, setAutoAttempted] = useState(false);
   const currentQuestionIdRef = useRef<string | null>(null);
 
   // Connexion au channel Realtime de la partie
@@ -124,6 +125,15 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
     [channel, gameId]
   );
 
+  // Arrivée avec des équipes déjà enrôlées (depuis la console) : on tente
+  // de démarrer directement, sans repasser par l'écran de code redondant.
+  useEffect(() => {
+    if (!autoAttempted && channel && phase === 'lobby' && teams.length > 0) {
+      setAutoAttempted(true);
+      loadNextQuestion(gameId, startQuestion, setLoadError);
+    }
+  }, [autoAttempted, channel, phase, teams.length, gameId, startQuestion]);
+
   // Timer local (le vrai départage de rapidité se fait côté serveur sur les timestamps d'insertion)
   useEffect(() => {
     if (phase !== 'question') return;
@@ -167,6 +177,8 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
 
   return (
     <main style={styles.page}>
+      <a href="/" style={styles.backLink}>← Retour</a>
+
       {phase === 'lobby' && (
         <div style={styles.lobbyCard}>
           <h1 style={{ fontSize: 24, fontWeight: 800 }}>Rejoignez la partie</h1>
@@ -316,6 +328,16 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#f4f6fb',
     minHeight: '100vh',
     padding: 32,
+  },
+  backLink: {
+    position: 'fixed',
+    top: 20,
+    left: 24,
+    color: '#7a819c',
+    fontWeight: 700,
+    fontSize: 14,
+    textDecoration: 'none',
+    zIndex: 20,
   },
   lobbyCard: {
     maxWidth: 600,
