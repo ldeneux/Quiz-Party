@@ -12,7 +12,7 @@ const MODES = [
 ];
 
 type Team = { id: string; name: string; avatar: string; color: string };
-type Profile = { id: string; name: string };
+type Profile = { id: string; name: string; is_favorite: boolean };
 
 export default function ConsolePage() {
   const router = useRouter();
@@ -32,9 +32,14 @@ export default function ConsolePage() {
     setOrigin(window.location.origin);
     supabase
       .from('quiz_profiles')
-      .select('id, name')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => setProfiles((data as Profile[]) ?? []));
+      .select('id, name, is_favorite')
+      .then(({ data }) => {
+        const sorted = ((data as Profile[]) ?? []).sort((a, b) => {
+          if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+        setProfiles(sorted);
+      });
   }, []);
 
   // Reprend une session en cours si on recharge la page
@@ -141,7 +146,12 @@ export default function ConsolePage() {
   };
 
   const removeTeam = async (teamId: string) => {
-    await supabase.from('teams').delete().eq('id', teamId);
+    const { error } = await supabase.from('teams').delete().eq('id', teamId);
+    if (error) {
+      setError(
+        `Impossible de déconnecter l'équipe (${error.message}). As-tu bien exécuté la migration qui autorise la suppression d'équipe (migration-003) ?`
+      );
+    }
   };
 
   const startGame = () => {
@@ -159,30 +169,7 @@ export default function ConsolePage() {
           background: '#f4f6fb',
         }}
       >
-        <h1 style={{ fontSize: 19, fontWeight: 800, marginBottom: 16 }}>Choisis un mode de jeu</h1>
-
-        <select
-          value={selectedProfileId}
-          onChange={(e) => setSelectedProfileId(e.target.value)}
-          disabled={!!gameId}
-          style={{
-            width: '100%',
-            padding: 8,
-            borderRadius: 10,
-            border: '1px solid #eaedf6',
-            marginBottom: 20,
-            fontSize: 13,
-            fontWeight: 700,
-            color: '#1f2440',
-          }}
-        >
-          <option value="">Profil : par défaut (CM1)</option>
-          {profiles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <h1 style={{ fontSize: 19, fontWeight: 800, marginBottom: 24 }}>Choisis un mode de jeu</h1>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginBottom: 32 }}>
           {MODES.map((m) => (
@@ -279,6 +266,28 @@ export default function ConsolePage() {
           <div style={{ fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 22 }}>🎯</span> Quiz Party
           </div>
+
+          <select
+            value={selectedProfileId}
+            onChange={(e) => setSelectedProfileId(e.target.value)}
+            disabled={!!gameId}
+            style={{
+              padding: '10px 14px',
+              borderRadius: 999,
+              border: '1px solid #eaedf6',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#1f2440',
+              background: '#fff',
+            }}
+          >
+            <option value="">Profil : par défaut (CM1)</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.is_favorite ? '⭐ ' : ''}{p.name}
+              </option>
+            ))}
+          </select>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {teams.length > 0 && (

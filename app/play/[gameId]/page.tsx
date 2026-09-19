@@ -21,10 +21,32 @@ export default function PlayScreen({ params }: { params: { gameId: string } }) {
   const [question, setQuestion] = useState<Question | null>(null);
   const [hasAnswered, setHasAnswered] = useState(false);
   const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
+  const [kicked, setKicked] = useState(false);
 
   useEffect(() => {
     setPresets(getRandomPresets('espace', 12));
   }, []);
+
+  // Détecte si l'hôte supprime cette équipe pendant la partie
+  useEffect(() => {
+    if (!team) return;
+
+    const kickChannel = supabase.channel(`team-watch:${team.id}`);
+    kickChannel.on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'teams', filter: `id=eq.${team.id}` },
+      () => {
+        setKicked(true);
+        setTeam(null);
+        setQuestion(null);
+      }
+    );
+    kickChannel.subscribe();
+
+    return () => {
+      supabase.removeChannel(kickChannel);
+    };
+  }, [team]);
 
   useEffect(() => {
     if (!team) return;
@@ -88,6 +110,31 @@ export default function PlayScreen({ params }: { params: { gameId: string } }) {
       payload: { teamId: team.id }, // jamais le choix : pas de fuite avant révélation
     });
   };
+
+  // --- Écran : équipe expulsée par l'hôte ---
+  if (kicked) {
+    return (
+      <main style={{ textAlign: 'center', marginTop: 100, fontFamily: 'Inter, sans-serif', padding: 24 }}>
+        <div style={{ fontSize: 36 }}>👋</div>
+        <h2 style={{ fontWeight: 800 }}>Votre équipe a été retirée du jeu</h2>
+        <p style={{ color: '#7a819c', marginBottom: 20 }}>L'hôte vous a déconnecté. Vous pouvez rejoindre à nouveau si besoin.</p>
+        <button
+          onClick={() => setKicked(false)}
+          style={{
+            background: '#6c7bf7',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 999,
+            padding: '10px 24px',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Choisir une nouvelle équipe
+        </button>
+      </main>
+    );
+  }
 
   // --- Écran 1 : choix du nom d'équipe ---
   if (!team) {

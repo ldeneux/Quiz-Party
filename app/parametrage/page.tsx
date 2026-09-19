@@ -15,12 +15,13 @@ const LEVELS = [
 
 type Category = { id: string; name: string; emoji: string };
 type Pack = { id: string; name: string; level_id: string; category_id: string; questionCount?: number };
-type Profile = { id: string; name: string; packIds?: string[] };
+type Profile = { id: string; name: string; is_favorite: boolean; packIds?: string[] };
 
 export default function ParametragePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [packs, setPacks] = useState<Pack[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loadNotice, setLoadNotice] = useState<string | null>(null);
 
   const [selectedLevels, setSelectedLevels] = useState<string[]>(['CM1']);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -29,12 +30,26 @@ export default function ParametragePage() {
   const [genProgress, setGenProgress] = useState('');
   const [genError, setGenError] = useState<string | null>(null);
 
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatEmoji, setNewCatEmoji] = useState('❓');
+
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfilePackIds, setNewProfilePackIds] = useState<string[]>([]);
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
 
   const loadAll = async () => {
-    const { data: cats } = await supabase.from('categories').select('*').order('name');
+    setLoadNotice(null);
+
+    const { data: cats, error: catError } = await supabase.from('categories').select('*').order('name');
+    if (catError) {
+      setLoadNotice(`Erreur de chargement des catégories : ${catError.message}`);
+    }
     setCategories((cats as Category[]) ?? []);
+    if (!catError && (!cats || cats.length === 0)) {
+      setLoadNotice(
+        "Aucune catégorie trouvée. Si tu as déjà exécuté le script de seed, essaie 'Restart project' dans Supabase (Project Settings), sinon crée-en une ci-dessous."
+      );
+    }
 
     const { data: packRows } = await supabase.from('question_packs').select('*').order('created_at', { ascending: false });
     const { data: questionCounts } = await supabase.from('questions').select('pack_id');
@@ -44,11 +59,9 @@ export default function ParametragePage() {
       if (q.pack_id) countByPack[q.pack_id] = (countByPack[q.pack_id] ?? 0) + 1;
     });
 
-    setPacks(
-      ((packRows as Pack[]) ?? []).map((p) => ({ ...p, questionCount: countByPack[p.id] ?? 0 }))
-    );
+    setPacks(((packRows as Pack[]) ?? []).map((p) => ({ ...p, questionCount: countByPack[p.id] ?? 0 })));
 
-    const { data: profileRows } = await supabase.from('quiz_profiles').select('*').order('created_at', { ascending: false });
+    const { data: profileRows } = await supabase.from('quiz_profiles').select('*');
     const { data: profilePackRows } = await supabase.from('quiz_profile_packs').select('*');
 
     const packsByProfile: Record<string, string[]> = {};
@@ -56,7 +69,14 @@ export default function ParametragePage() {
       packsByProfile[pp.profile_id] = [...(packsByProfile[pp.profile_id] ?? []), pp.pack_id];
     });
 
-    setProfiles(((profileRows as Profile[]) ?? []).map((p) => ({ ...p, packIds: packsByProfile[p.id] ?? [] })));
+    const sortedProfiles = ((profileRows as Profile[]) ?? [])
+      .map((p) => ({ ...p, packIds: packsByProfile[p.id] ?? [] }))
+      .sort((a, b) => {
+        if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+    setProfiles(sortedProfiles);
   };
 
   useEffect(() => {
@@ -72,6 +92,33 @@ export default function ParametragePage() {
   const toggleProfilePack = (id: string) =>
     setNewProfilePackIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
 
+  // --- Catégories ---
+  const createCategory = async () => {
+    if (!newCatName.trim()) return;
+    const { error } = await supabase.from('categories').insert({ name: newCatName.trim(), emoji: newCatEmoji || '❓' });
+    if (error) {
+      setLoadNotice(`Erreur création catégorie : ${error.message}`);
+      return;
+    }
+    setNewCatName('');
+    setNewCatEmoji('❓');
+    loadAll();
+  };
+
+  const editCategory = async (cat: Category) => {
+    const newName = window.prompt('Nom de la catégorie', cat.name);
+    if (newName === null) return;
+    const newEmoji = window.prompt('Emoji', cat.emoji) ?? cat.emoji;
+    await supabase.from('categories').update({ name: newName.trim(), emoji: newEmoji }).eq('id', cat.id);
+    loadAll();
+  };
+
+  const deleteCategory = async (id: string) => {
+    await supabase.from('categories').delete().eq('id', id);
+    loadAll();
+  };
+
+  // --- Packs ---
   const generatePacks = async () => {
     setGenError(null);
     if (selectedLevels.length === 0 || selectedCategories.length === 0) {
@@ -100,7 +147,6 @@ export default function ParametragePage() {
 
       if (data.error) {
         setGenError(`Erreur sur ${levelLabel} · ${categoryName} : ${data.error}`);
-        // On continue les combinaisons suivantes plutôt que de tout arrêter
       }
     }
 
@@ -114,28 +160,52 @@ export default function ParametragePage() {
     loadAll();
   };
 
-  const createProfile = async () => {
-    if (!newProfileName.trim() || newProfilePackIds.length === 0) return;
+  // --- Profils ---
+  const startEditProfile = (p: Profile) => {
+    setEditingProfileId(p.id);
+    setNewProfileName(p.name);
+    setNewProfilePackIds(p.packIds ?? []);
+  };
 
-    const { data: profile, error } = await supabase
-      .from('quiz_profiles')
-      .insert({ name: newProfileName.trim() })
-      .select()
-      .single();
-
-    if (error || !profile) return;
-
-    await supabase
-      .from('quiz_profile_packs')
-      .insert(newProfilePackIds.map((packId) => ({ profile_id: profile.id, pack_id: packId })));
-
+  const cancelEditProfile = () => {
+    setEditingProfileId(null);
     setNewProfileName('');
     setNewProfilePackIds([]);
+  };
+
+  const saveProfile = async () => {
+    if (!newProfileName.trim() || newProfilePackIds.length === 0) return;
+
+    if (editingProfileId) {
+      await supabase.from('quiz_profiles').update({ name: newProfileName.trim() }).eq('id', editingProfileId);
+      await supabase.from('quiz_profile_packs').delete().eq('profile_id', editingProfileId);
+      await supabase
+        .from('quiz_profile_packs')
+        .insert(newProfilePackIds.map((packId) => ({ profile_id: editingProfileId, pack_id: packId })));
+    } else {
+      const { data: profile, error } = await supabase
+        .from('quiz_profiles')
+        .insert({ name: newProfileName.trim() })
+        .select()
+        .single();
+      if (error || !profile) return;
+      await supabase
+        .from('quiz_profile_packs')
+        .insert(newProfilePackIds.map((packId) => ({ profile_id: profile.id, pack_id: packId })));
+    }
+
+    cancelEditProfile();
+    loadAll();
+  };
+
+  const toggleFavorite = async (p: Profile) => {
+    await supabase.from('quiz_profiles').update({ is_favorite: !p.is_favorite }).eq('id', p.id);
     loadAll();
   };
 
   const deleteProfile = async (id: string) => {
     await supabase.from('quiz_profiles').delete().eq('id', id);
+    if (editingProfileId === id) cancelEditProfile();
     loadAll();
   };
 
@@ -144,6 +214,42 @@ export default function ParametragePage() {
       <a href="/" style={{ color: '#7a819c', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>← Retour</a>
 
       <h1 style={{ fontSize: 22, fontWeight: 800, margin: '16px 0 24px' }}>⚙️ Paramétrage</h1>
+
+      {loadNotice && (
+        <p style={{ color: '#ff7a68', fontSize: 13, marginBottom: 16, maxWidth: 600 }}>{loadNotice}</p>
+      )}
+
+      {/* ---- Catégories ---- */}
+      <section style={card}>
+        <h2 style={sectionTitle}>Catégories ({categories.length})</h2>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <input
+            value={newCatEmoji}
+            onChange={(e) => setNewCatEmoji(e.target.value)}
+            style={{ width: 50, padding: 8, borderRadius: 10, border: '1px solid #eaedf6', textAlign: 'center' }}
+          />
+          <input
+            value={newCatName}
+            onChange={(e) => setNewCatName(e.target.value)}
+            placeholder="Nouvelle catégorie…"
+            style={{ flex: 1, padding: 8, borderRadius: 10, border: '1px solid #eaedf6' }}
+          />
+          <button onClick={createCategory} style={primaryBtnSmall}>Ajouter</button>
+        </div>
+
+        <div style={{ ...chipsWrap, maxHeight: 260, overflowY: 'auto', padding: 4 }}>
+          {categories.map((c) => (
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button onClick={() => toggleCategory(c.id)} style={chip(selectedCategories.includes(c.id))}>
+                {c.emoji} {c.name}
+              </button>
+              <button onClick={() => editCategory(c)} title="Modifier" style={iconBtn}>✏️</button>
+              <button onClick={() => deleteCategory(c.id)} title="Supprimer" style={iconBtn}>✕</button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ---- Création de packs ---- */}
       <section style={card}>
@@ -155,9 +261,7 @@ export default function ParametragePage() {
         <div style={{ marginBottom: 16 }}>
           <div style={rowHeader}>
             <strong style={{ fontSize: 13.5 }}>Niveaux</strong>
-            <span style={selectAllLink} onClick={() => setSelectedLevels(LEVELS.map((l) => l.id))}>
-              Tout sélectionner
-            </span>
+            <span style={selectAllLink} onClick={() => setSelectedLevels(LEVELS.map((l) => l.id))}>Tout sélectionner</span>
             <span style={selectAllLink} onClick={() => setSelectedLevels([])}>Tout désélectionner</span>
           </div>
           <div style={chipsWrap}>
@@ -171,10 +275,8 @@ export default function ParametragePage() {
 
         <div style={{ marginBottom: 16 }}>
           <div style={rowHeader}>
-            <strong style={{ fontSize: 13.5 }}>Catégories</strong>
-            <span style={selectAllLink} onClick={() => setSelectedCategories(categories.map((c) => c.id))}>
-              Tout sélectionner
-            </span>
+            <strong style={{ fontSize: 13.5 }}>Catégories à utiliser</strong>
+            <span style={selectAllLink} onClick={() => setSelectedCategories(categories.map((c) => c.id))}>Tout sélectionner</span>
             <span style={selectAllLink} onClick={() => setSelectedCategories([])}>Tout désélectionner</span>
           </div>
           <div style={{ ...chipsWrap, maxHeight: 220, overflowY: 'auto', padding: 4 }}>
@@ -200,9 +302,7 @@ export default function ParametragePage() {
 
         {selectedLevels.length > 0 && selectedCategories.length > 0 && (
           <p style={{ color: '#7a819c', fontSize: 12.5, marginBottom: 12 }}>
-            → {selectedLevels.length * selectedCategories.length} pack(s) seront créés (
-            {selectedLevels.length} niveau{selectedLevels.length > 1 ? 'x' : ''} ×{' '}
-            {selectedCategories.length} catégorie{selectedCategories.length > 1 ? 's' : ''}).
+            → {selectedLevels.length * selectedCategories.length} pack(s) seront créés.
           </p>
         )}
 
@@ -236,7 +336,7 @@ export default function ParametragePage() {
 
       {/* ---- Profils ---- */}
       <section style={card}>
-        <h2 style={sectionTitle}>Créer un profil</h2>
+        <h2 style={sectionTitle}>{editingProfileId ? 'Modifier le profil' : 'Créer un profil'}</h2>
         <input
           value={newProfileName}
           onChange={(e) => setNewProfileName(e.target.value)}
@@ -250,7 +350,16 @@ export default function ParametragePage() {
             </button>
           ))}
         </div>
-        <button onClick={createProfile} style={primaryBtn}>Créer le profil</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={saveProfile} style={primaryBtn}>
+            {editingProfileId ? 'Mettre à jour' : 'Créer le profil'}
+          </button>
+          {editingProfileId && (
+            <button onClick={cancelEditProfile} style={{ ...primaryBtn, background: '#eef0f8', color: '#1f2440' }}>
+              Annuler
+            </button>
+          )}
+        </div>
       </section>
 
       <section style={card}>
@@ -261,13 +370,23 @@ export default function ParametragePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {profiles.map((p) => (
               <div key={p.id} style={listRow}>
-                <span>
-                  <strong>{p.name}</strong>{' '}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    onClick={() => toggleFavorite(p)}
+                    title="Favori"
+                    style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 16, padding: 0 }}
+                  >
+                    {p.is_favorite ? '⭐' : '☆'}
+                  </button>
+                  <strong>{p.name}</strong>
                   <span style={{ color: '#7a819c', fontSize: 12.5 }}>
                     ({p.packIds?.length ?? 0} pack{(p.packIds?.length ?? 0) !== 1 ? 's' : ''})
                   </span>
                 </span>
-                <button onClick={() => deleteProfile(p.id)} style={deleteBtn}>✕</button>
+                <span style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => startEditProfile(p)} title="Modifier" style={iconBtn}>✏️</button>
+                  <button onClick={() => deleteProfile(p.id)} style={deleteBtn}>✕</button>
+                </span>
               </div>
             ))}
           </div>
@@ -286,12 +405,9 @@ const card: React.CSSProperties = {
   boxShadow: '0 10px 30px -16px rgba(31,36,64,0.15)',
 };
 
-const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 800, marginBottom: 6 };
-
+const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 800, marginBottom: 10 };
 const rowHeader: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 };
-
 const selectAllLink: React.CSSProperties = { fontSize: 12, color: '#6c7bf7', fontWeight: 700, cursor: 'pointer' };
-
 const chipsWrap: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 8 };
 
 const chip = (active: boolean): React.CSSProperties => ({
@@ -315,6 +431,8 @@ const primaryBtn: React.CSSProperties = {
   cursor: 'pointer',
 };
 
+const primaryBtnSmall: React.CSSProperties = { ...primaryBtn, padding: '8px 16px', fontSize: 13 };
+
 const listRow: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -326,6 +444,17 @@ const listRow: React.CSSProperties = {
 };
 
 const deleteBtn: React.CSSProperties = {
+  border: 'none',
+  background: 'rgba(0,0,0,0.06)',
+  borderRadius: '50%',
+  width: 22,
+  height: 22,
+  fontSize: 11,
+  cursor: 'pointer',
+  color: '#7a819c',
+};
+
+const iconBtn: React.CSSProperties = {
   border: 'none',
   background: 'rgba(0,0,0,0.06)',
   borderRadius: '50%',
