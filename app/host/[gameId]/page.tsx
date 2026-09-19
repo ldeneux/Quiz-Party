@@ -26,6 +26,13 @@ type Question = {
 
 const QUESTION_TIME_SECONDS = 20;
 
+const CHOICE_COLORS: Record<'a' | 'b' | 'c' | 'd', string> = {
+  a: '#6c7bf7',
+  b: '#35c2a3',
+  c: '#ffb648',
+  d: '#ff7a68',
+};
+
 export default function HostScreen({ params }: { params: { gameId: string } }) {
   const { gameId } = params;
 
@@ -38,6 +45,7 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [autoAttempted, setAutoAttempted] = useState(false);
+  const [revealedChoices, setRevealedChoices] = useState<Record<string, string | null>>({});
   const currentQuestionIdRef = useRef<string | null>(null);
 
   // Connexion au channel Realtime de la partie
@@ -109,6 +117,7 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
       currentQuestionIdRef.current = q.id;
       setPhase('question');
       setAnsweredTeamIds(new Set());
+      setRevealedChoices({});
       setSecondsLeft(QUESTION_TIME_SECONDS);
 
       await supabase
@@ -161,6 +170,13 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
       responseTimeMs: a.response_time_ms,
     }));
 
+    const choicesMap: Record<string, string | null> = {};
+    teams.forEach((t) => {
+      const found = submitted.find((s) => s.teamId === t.id);
+      choicesMap[t.id] = found ? found.choice : null;
+    });
+    setRevealedChoices(choicesMap);
+
     const results = scoreClassique(submitted as any, question.correct_choice);
 
     // Met à jour les scores en base
@@ -173,7 +189,7 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
     // Recharge les scores locaux
     const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
     if (refreshedTeams) setTeams(refreshedTeams as Team[]);
-  }, [question, channel, gameId]);
+  }, [question, channel, gameId, teams]);
 
   return (
     <main style={styles.page}>
@@ -251,16 +267,27 @@ export default function HostScreen({ params }: { params: { gameId: string } }) {
           <div style={styles.teamsRow}>
             {teams.map((t) => {
               const hasAnswered = answeredTeamIds.has(t.id);
+              const choice = revealedChoices[t.id];
+              const isCorrect = phase === 'revealed' && choice === question.correct_choice;
+              const choiceColor = choice ? CHOICE_COLORS[choice as 'a' | 'b' | 'c' | 'd'] : null;
+
               return (
                 <div
                   key={t.id}
                   style={{
                     ...styles.teamTile,
                     ...(phase === 'question' && hasAnswered ? styles.teamAnswered : {}),
-                    ...(phase === 'revealed' ? { borderColor: t.color, background: t.color + '22' } : {}),
+                    ...(phase === 'revealed' && choiceColor
+                      ? { borderColor: choiceColor, background: choiceColor + '22' }
+                      : {}),
                   }}
                 >
                   <span>{t.avatar}</span> {t.name} — {t.score} pts
+                  {phase === 'revealed' && (
+                    <strong style={{ marginLeft: 6 }}>
+                      {choice ? `· ${choice.toUpperCase()}${isCorrect ? ' ✓' : ' ✕'}` : '· pas de réponse'}
+                    </strong>
+                  )}
                 </div>
               );
             })}

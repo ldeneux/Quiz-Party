@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { getRandomPresets, TeamPreset } from '@/lib/teamPresets';
 
@@ -13,11 +14,22 @@ type Question = {
   choice_d: string;
 };
 
-export default function PlayScreen({ params }: { params: { gameId: string } }) {
+export default function PlayScreen(props: { params: { gameId: string } }) {
+  return (
+    <Suspense fallback={null}>
+      <PlayScreenInner {...props} />
+    </Suspense>
+  );
+}
+
+function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const { gameId } = params;
+  const searchParams = useSearchParams();
+  const resumeTeamId = searchParams.get('team');
 
   const [team, setTeam] = useState<{ id: string; preset: TeamPreset } | null>(null);
   const [presets, setPresets] = useState<TeamPreset[]>([]);
+  const [takenNames, setTakenNames] = useState<Set<string>>(new Set());
   const [question, setQuestion] = useState<Question | null>(null);
   const [hasAnswered, setHasAnswered] = useState(false);
   const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
@@ -26,6 +38,59 @@ export default function PlayScreen({ params }: { params: { gameId: string } }) {
   useEffect(() => {
     setPresets(getRandomPresets('espace', 12));
   }, []);
+
+  // Reprise directe via un lien de récupération (?team=<id>) — utile si
+  // la page d'une équipe s'est fermée par erreur : cliquer sur sa tuile
+  // dans la console donne un lien qui la reconnecte directement.
+  useEffect(() => {
+    if (!resumeTeamId) return;
+    supabase
+      .from('teams')
+      .select('*')
+      .eq('id', resumeTeamId)
+      .eq('game_id', gameId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setTeam({ id: data.id, preset: { name: data.name, avatar: data.avatar, color: data.color } });
+        }
+      });
+  }, [resumeTeamId, gameId]);
+
+  // Liste des noms déjà pris, pour griser les tuiles correspondantes
+  // sur l'écran de choix — et les tenir à jour en direct.
+  useEffect(() => {
+    if (team) return; // pas besoin une fois l'équipe choisie
+
+    supabase
+      .from('teams')
+      .select('name')
+      .eq('game_id', gameId)
+      .then(({ data }) => setTakenNames(new Set((data ?? []).map((t: any) => t.name))));
+
+    const ch = supabase.channel(`taken-names:${gameId}`);
+    ch.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
+      (payload) => setTakenNames((prev) => new Set(prev).add((payload.new as any).name))
+    );
+    ch.on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
+      (payload) => {
+        setTakenNames((prev) => {
+          const next = new Set(prev);
+          next.delete((payload.old as any).name);
+          return next;
+        });
+      }
+    );
+    ch.subscribe();
+
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [team, gameId]);
 
   // Détecte si l'hôte supprime cette équipe pendant la partie
   useEffect(() => {
@@ -47,6 +112,7 @@ export default function PlayScreen({ params }: { params: { gameId: string } }) {
       supabase.removeChannel(kickChannel);
     };
   }, [team]);
+
 
   useEffect(() => {
     if (!team) return;
@@ -144,24 +210,33 @@ export default function PlayScreen({ params }: { params: { gameId: string } }) {
           Choisissez votre équipe
         </h1>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {presets.map((p) => (
-            <button
-              key={p.name}
-              onClick={() => joinAsTeam(p)}
-              style={{
-                background: p.color + '22',
-                border: `2px solid ${p.color}`,
-                borderRadius: 16,
-                padding: 16,
-                fontWeight: 700,
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ fontSize: 24 }}>{p.avatar}</div>
-              {p.name}
-            </button>
-          ))}
+          {presets.map((p) => {
+            const taken = takenNames.has(p.name);
+            return (
+              <button
+                key={p.name}
+                onClick={() => !taken && joinAsTeam(p)}
+                disabled={taken}
+                style={{
+                  background: taken ? '#f0f1f5' : p.color + '22',
+                  border: `2px solid ${taken ? '#dcdfe8' : p.color}`,
+                  borderRadius: 16,
+                  padding: 16,
+                  fontWeight: 700,
+                  cursor: taken ? 'not-allowed' : 'pointer',
+                  textAlign: 'left',
+                  opacity: taken ? 0.5 : 1,
+                  position: 'relative',
+                }}
+              >
+                <div style={{ fontSize: 24 }}>{p.avatar}</div>
+                {p.name}
+                {taken && (
+                  <div style={{ fontSize: 11, color: '#7a819c', marginTop: 2 }}>Déjà prise</div>
+                )}
+              </button>
+            );
+          })}
         </div>
       </main>
     );

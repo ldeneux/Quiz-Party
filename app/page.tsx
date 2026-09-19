@@ -178,6 +178,19 @@ export default function ConsolePage() {
     }
   };
 
+  const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null);
+
+  const copyTeamLink = async (teamId: string) => {
+    const link = `${origin}/play/${gameId}?team=${teamId}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedTeamId(teamId);
+      setTimeout(() => setCopiedTeamId(null), 2000);
+    } catch {
+      window.prompt('Lien de récupération (copie-le manuellement) :', link);
+    }
+  };
+
   const startGame = () => {
     if (gameId) router.push(`/host/${gameId}`);
   };
@@ -259,8 +272,18 @@ export default function ConsolePage() {
               }}
             >
               <span style={{ fontSize: 16 }}>{t.avatar}</span>
-              <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {t.name}
+              <span
+                onClick={() => copyTeamLink(t.id)}
+                title="Copier le lien de récupération de cette équipe"
+                style={{
+                  flex: 1,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  cursor: 'pointer',
+                }}
+              >
+                {copiedTeamId === t.id ? 'Lien copié ✓' : t.name}
               </span>
               <button
                 onClick={() => removeTeam(t.id)}
