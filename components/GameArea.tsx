@@ -24,6 +24,8 @@ type Question = {
   explanation: string | null;
 };
 
+type RevealInfo = { choice: string | null; timeMs: number | null };
+
 const QUESTION_TIME_SECONDS = 20;
 
 const CHOICE_COLORS: Record<'a' | 'b' | 'c' | 'd', string> = {
@@ -33,17 +35,17 @@ const CHOICE_COLORS: Record<'a' | 'b' | 'c' | 'd', string> = {
   d: '#ff7a68',
 };
 
-export default function GameArea({ gameId }: { gameId: string }) {
+export default function GameArea({ gameId, onRestart }: { gameId: string; onRestart?: () => void }) {
   const [joinCode, setJoinCode] = useState<string>('');
   const [teams, setTeams] = useState<Team[]>([]);
   const [answeredTeamIds, setAnsweredTeamIds] = useState<Set<string>>(new Set());
   const [question, setQuestion] = useState<Question | null>(null);
-  const [phase, setPhase] = useState<'lobby' | 'question' | 'revealed'>('lobby');
+  const [phase, setPhase] = useState<'lobby' | 'question' | 'revealed' | 'finished'>('lobby');
   const [secondsLeft, setSecondsLeft] = useState(QUESTION_TIME_SECONDS);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [autoAttempted, setAutoAttempted] = useState(false);
-  const [revealedChoices, setRevealedChoices] = useState<Record<string, string | null>>({});
+  const [revealedInfo, setRevealedInfo] = useState<Record<string, RevealInfo>>({});
   const askedQuestionIdsRef = useRef<string[]>([]);
   const currentQuestionIdRef = useRef<string | null>(null);
 
@@ -117,7 +119,7 @@ export default function GameArea({ gameId }: { gameId: string }) {
       askedQuestionIdsRef.current = [...askedQuestionIdsRef.current, q.id];
       setPhase('question');
       setAnsweredTeamIds(new Set());
-      setRevealedChoices({});
+      setRevealedInfo({});
       setSecondsLeft(QUESTION_TIME_SECONDS);
 
       await supabase
@@ -137,7 +139,7 @@ export default function GameArea({ gameId }: { gameId: string }) {
   useEffect(() => {
     if (!autoAttempted && channel && phase === 'lobby' && teams.length > 0) {
       setAutoAttempted(true);
-      loadNextQuestion(gameId, startQuestion, setLoadError, askedQuestionIdsRef.current);
+      loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
     }
   }, [autoAttempted, channel, phase, teams.length, gameId, startQuestion]);
 
@@ -167,12 +169,12 @@ export default function GameArea({ gameId }: { gameId: string }) {
       responseTimeMs: a.response_time_ms,
     }));
 
-    const choicesMap: Record<string, string | null> = {};
+    const infoMap: Record<string, RevealInfo> = {};
     teams.forEach((t) => {
       const found = submitted.find((s) => s.teamId === t.id);
-      choicesMap[t.id] = found ? found.choice : null;
+      infoMap[t.id] = { choice: found?.choice ?? null, timeMs: found?.responseTimeMs ?? null };
     });
-    setRevealedChoices(choicesMap);
+    setRevealedInfo(infoMap);
 
     const results = scoreClassique(submitted as any, question.correct_choice);
 
@@ -185,6 +187,32 @@ export default function GameArea({ gameId }: { gameId: string }) {
     const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
     if (refreshedTeams) setTeams(refreshedTeams as Team[]);
   }, [question, channel, gameId, teams]);
+
+  // --- Écran : partie terminée (plus de questions disponibles) ---
+  if (phase === 'finished') {
+    const ranked = [...teams].sort((a, b) => b.score - a.score);
+    return (
+      <div style={styles.mainCard}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🏁 Partie terminée</h2>
+        <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 20 }}>
+          Toutes les questions disponibles ont été posées.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+          {ranked.map((t, i) => (
+            <div key={t.id} style={{ ...styles.teamTile, borderColor: i === 0 ? '#ffb648' : '#eaedf6' }}>
+              {i === 0 ? '🏆 ' : `${i + 1}. `}
+              <span>{t.avatar}</span> {t.name} — <strong>{t.score} pts</strong>
+            </div>
+          ))}
+        </div>
+        {onRestart && (
+          <button style={styles.startBtn} onClick={onRestart}>
+            Nouvelle partie
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -204,7 +232,7 @@ export default function GameArea({ gameId }: { gameId: string }) {
               style={styles.startBtn}
               onClick={() => {
                 setLoadError(null);
-                loadNextQuestion(gameId, startQuestion, setLoadError, askedQuestionIdsRef.current);
+                loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
               }}
             >
               Démarrer la partie ({teams.length} équipes)
@@ -239,12 +267,13 @@ export default function GameArea({ gameId }: { gameId: string }) {
             <div style={styles.explainBox}>{question.explanation}</div>
           )}
 
+          {/* Seules les réponses et temps sont affichés ici — les scores sont sur les tuiles équipes du menu */}
           <div style={styles.teamsRow}>
             {teams.map((t) => {
               const hasAnswered = answeredTeamIds.has(t.id);
-              const choice = revealedChoices[t.id];
-              const isCorrect = phase === 'revealed' && choice === question.correct_choice;
-              const choiceColor = choice ? CHOICE_COLORS[choice as 'a' | 'b' | 'c' | 'd'] : null;
+              const info = revealedInfo[t.id];
+              const isCorrect = phase === 'revealed' && info?.choice === question.correct_choice;
+              const choiceColor = info?.choice ? CHOICE_COLORS[info.choice as 'a' | 'b' | 'c' | 'd'] : null;
 
               return (
                 <div
@@ -257,10 +286,14 @@ export default function GameArea({ gameId }: { gameId: string }) {
                       : {}),
                   }}
                 >
-                  <span>{t.avatar}</span> {t.name} — {t.score} pts
+                  <span>{t.avatar}</span> {t.name}
                   {phase === 'revealed' && (
                     <strong style={{ marginLeft: 6 }}>
-                      {choice ? `· ${choice.toUpperCase()}${isCorrect ? ' ✓' : ' ✕'}` : '· pas de réponse'}
+                      {info?.choice
+                        ? `· ${info.choice.toUpperCase()}${isCorrect ? ' ✓' : ' ✕'}${
+                            info.timeMs ? ` (${(info.timeMs / 1000).toFixed(1)}s)` : ''
+                          }`
+                        : '· pas de réponse'}
                     </strong>
                   )}
                 </div>
@@ -277,7 +310,7 @@ export default function GameArea({ gameId }: { gameId: string }) {
                 style={styles.startBtn}
                 onClick={() => {
                   setLoadError(null);
-                  loadNextQuestion(gameId, startQuestion, setLoadError, askedQuestionIdsRef.current);
+                  loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
                 }}
               >
                 Question suivante
@@ -294,6 +327,7 @@ async function loadNextQuestion(
   gameId: string,
   startQuestion: (q: Question) => void,
   onError: (msg: string) => void,
+  onExhausted: () => void,
   askedQuestionIds: string[] = []
 ) {
   const { data: game } = await supabase
@@ -344,9 +378,8 @@ async function loadNextQuestion(
   const freshPool = pool.filter((q) => !askedQuestionIds.includes(q.id));
 
   if (freshPool.length === 0) {
-    onError(
-      `Toutes les questions disponibles (${pool.length}) ont déjà été posées dans cette partie. Ajoute d'autres packs/questions dans Paramétrage, ou clique sur "Nouvelle partie" pour repartir de zéro.`
-    );
+    // Plus de questions neuves : la partie se termine proprement (pas de répétition).
+    onExhausted();
     return;
   }
 

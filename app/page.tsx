@@ -5,17 +5,53 @@ import { supabase } from '@/lib/supabaseClient';
 import GameArea from '@/components/GameArea';
 
 const MODES = [
-  { id: 'classique', label: 'Classique', emoji: '🎯' },
-  { id: 'defi', label: 'Défi', emoji: '⚔️' },
-  { id: 'survie', label: 'Survie', emoji: '❤️' },
-  { id: 'participatif', label: 'Participatif', emoji: '🤝' },
+  {
+    id: 'classique',
+    label: 'Classique',
+    emoji: '🎯',
+    color: '#6c7bf7',
+    desc: '1 point par bonne réponse, avec un bonus de rapidité pour les 3 premières équipes correctes (+3/+2/+1). Objectif : 150 points.',
+  },
+  {
+    id: 'defi',
+    label: 'Défi',
+    emoji: '⚔️',
+    color: '#a26ce0',
+    desc: "Une équipe choisit le thème et joue : elle gagne 3 pts par bonne réponse sans jamais en perdre. Les adversaires qui se trompent perdent 2 pts, reversés à l'équipe qui a lancé le défi.",
+  },
+  {
+    id: 'survie',
+    label: 'Survie',
+    emoji: '❤️',
+    color: '#ff7a68',
+    desc: '3 vies par équipe. Une mauvaise réponse (ou pas de réponse) coûte une vie. Les points aux équipes éliminées augmentent à chaque manche.',
+  },
+  {
+    id: 'participatif',
+    label: 'Participatif',
+    emoji: '🤝',
+    color: '#35c2a3',
+    desc: 'Une cagnotte commune double à chaque bonne réponse en chaîne. Une erreur la redistribue à toutes les équipes.',
+  },
 ];
 
-type Team = { id: string; name: string; avatar: string; color: string };
+type Team = { id: string; name: string; avatar: string; color: string; score: number };
 type Profile = { id: string; name: string; is_favorite: boolean; is_default: boolean };
+
+const pillLabel: React.CSSProperties = {
+  display: 'inline-block',
+  background: '#e6f5fd',
+  color: '#4fb0e8',
+  fontWeight: 800,
+  fontSize: 12.5,
+  padding: '6px 14px',
+  borderRadius: 999,
+  marginBottom: 18,
+};
 
 export default function ConsolePage() {
   const [activeMode, setActiveMode] = useState('classique');
+  const [infoMode, setInfoMode] = useState<string | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -42,7 +78,6 @@ export default function ConsolePage() {
         });
         setProfiles(sorted);
 
-        // Présélectionne le profil par défaut s'il en existe un ; sinon, rien n'est sélectionné
         const defaultProfile = sorted.find((p) => p.is_default);
         if (defaultProfile && !selectedProfileId) {
           setSelectedProfileId(defaultProfile.id);
@@ -50,7 +85,6 @@ export default function ConsolePage() {
       });
   }, []);
 
-  // Reprend une session en cours si on recharge la page
   useEffect(() => {
     const saved = localStorage.getItem('quiz-party-game-id');
     if (saved) {
@@ -71,7 +105,7 @@ export default function ConsolePage() {
     }
   }, []);
 
-  // Charge + écoute les équipes une fois la partie créée
+  // Charge + écoute les équipes (jointure, départ, ET score en direct)
   useEffect(() => {
     if (!gameId) return;
 
@@ -95,6 +129,14 @@ export default function ConsolePage() {
       { event: 'DELETE', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
       (payload) => setTeams((prev) => prev.filter((t) => t.id !== (payload.old as { id: string }).id))
     );
+    ch.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
+      (payload) => {
+        const updated = payload.new as Team;
+        setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      }
+    );
     ch.subscribe();
 
     return () => {
@@ -102,7 +144,6 @@ export default function ConsolePage() {
     };
   }, [gameId]);
 
-  // Ferme automatiquement la fenêtre d'invitation dès qu'une équipe rejoint
   useEffect(() => {
     if (showInvite && teams.length > prevTeamsCount.current) {
       setShowInvite(false);
@@ -138,7 +179,6 @@ export default function ConsolePage() {
     setError(null);
 
     if (gameId) {
-      // La partie existe déjà : on réaffiche juste le même code
       setShowInvite(true);
       return;
     }
@@ -173,9 +213,7 @@ export default function ConsolePage() {
   const removeTeam = async (teamId: string) => {
     const { error } = await supabase.from('teams').delete().eq('id', teamId);
     if (error) {
-      setError(
-        `Impossible de déconnecter l'équipe (${error.message}). As-tu bien exécuté la migration qui autorise la suppression d'équipe (migration-003) ?`
-      );
+      setError(`Impossible de déconnecter l'équipe (${error.message}).`);
     }
   };
 
@@ -199,63 +237,67 @@ export default function ConsolePage() {
   return (
     <main style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif', background: '#f4f6fb' }}>
       {/* Colonne gauche : modes + invitation + équipes */}
-      <aside
-        style={{
-          width: 260,
-          borderRight: '2px solid #6c7bf7',
-          padding: '32px 24px',
-          background: '#f4f6fb',
-        }}
-      >
-        <h1 style={{ fontSize: 19, fontWeight: 800, marginBottom: 24 }}>Choisis un mode de jeu</h1>
+      <aside style={{ width: 270, background: '#eef0f8', padding: '28px 22px' }}>
+        <div style={pillLabel}>Mode de jeu</div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginBottom: 32 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
           {MODES.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => selectMode(m.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                background: 'none',
-                border: 'none',
-                textAlign: 'left',
-                fontSize: 15,
-                fontWeight: 800,
-                cursor: 'pointer',
-                padding: 0,
-                color: activeMode === m.id ? '#1f2440' : '#9aa1c2',
-              }}
-            >
-              <span style={{ fontSize: 20 }}>{m.emoji}</span> {m.label}
-              {activeMode === m.id && <span style={{ marginLeft: 'auto', color: '#6c7bf7' }}>●</span>}
-            </button>
+            <div key={m.id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  onClick={() => selectMode(m.id)}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 14px',
+                    borderRadius: 999,
+                    border: activeMode === m.id ? `2px solid ${m.color}` : '2px solid transparent',
+                    background: activeMode === m.id ? m.color + '18' : '#fff',
+                    fontWeight: 700,
+                    fontSize: 13.5,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    color: activeMode === m.id ? '#1f2440' : '#7a819c',
+                  }}
+                >
+                  <span style={{ fontSize: 17 }}>{m.emoji}</span> {m.label}
+                </button>
+                <button
+                  onClick={() => setInfoMode(infoMode === m.id ? null : m.id)}
+                  title="Règles du mode"
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    color: '#9aa1c2',
+                    cursor: 'pointer',
+                    fontSize: 15,
+                    width: 22,
+                    flexShrink: 0,
+                  }}
+                >
+                  ⓘ
+                </button>
+              </div>
+              {infoMode === m.id && (
+                <p style={{ fontSize: 12, color: '#7a819c', lineHeight: 1.5, margin: '6px 4px 0' }}>{m.desc}</p>
+              )}
+            </div>
           ))}
         </div>
 
         <button
           onClick={inviteTeams}
           disabled={creating}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            fontWeight: 800,
-            fontSize: 14,
-            textAlign: 'left',
-            color: '#1f2440',
-            cursor: 'pointer',
-            textDecoration: 'underline',
-            marginBottom: 18,
-          }}
+          style={{ ...pillLabel, border: 'none', cursor: 'pointer', font: 'inherit' }}
         >
-          {creating ? 'Création…' : 'Inviter une équipe à rejoindre le jeu'}
+          {creating ? 'Création…' : 'Rejoindre le jeu'}
         </button>
 
-        {error && <p style={{ color: '#ff7a68', fontSize: 13, marginBottom: 12 }}>{error}</p>}
+        {error && <p style={{ color: '#ff7a68', fontSize: 12.5, marginBottom: 12 }}>{error}</p>}
 
-        {/* Équipes déjà enrôlées */}
+        {/* Équipes déjà enrôlées, avec leur score */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {teams.map((t) => (
             <div
@@ -286,6 +328,9 @@ export default function ConsolePage() {
               >
                 {copiedTeamId === t.id ? 'Lien copié ✓' : t.name}
               </span>
+              {gameStarted && (
+                <span style={{ color: '#7a819c', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>{t.score} pts</span>
+              )}
               <button
                 onClick={() => removeTeam(t.id)}
                 title="Déconnecter l'équipe"
@@ -398,13 +443,12 @@ export default function ConsolePage() {
 
         {gameStarted && gameId && (
           <div style={{ marginTop: 28 }}>
-            <GameArea gameId={gameId} />
+            <GameArea gameId={gameId} onRestart={resetSession} />
           </div>
         )}
       </section>
 
-      {/* Fenêtre d'invitation : se ferme seule dès qu'une équipe rejoint,
-          ou manuellement via la croix si personne n'a encore répondu */}
+      {/* Fenêtre d'invitation */}
       {showInvite && joinCode && (
         <div
           style={{
