@@ -84,7 +84,7 @@ export default function ConsolePage() {
         prevTeamsCount.current = data?.length ?? 0;
       });
 
-    const ch = supabase.channel(`game:${gameId}`);
+    const ch = supabase.channel(`game:${gameId}:console`);
     ch.on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },

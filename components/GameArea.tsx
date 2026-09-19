@@ -70,7 +70,7 @@ export default function GameArea({ gameId }: { gameId: string }) {
         }
       });
 
-    const ch = supabase.channel(`game:${gameId}`, {
+    const ch = supabase.channel(`game:${gameId}:play`, {
       config: { broadcast: { self: false } },
     });
 

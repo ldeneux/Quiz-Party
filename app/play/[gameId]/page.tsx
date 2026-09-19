@@ -117,7 +117,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   useEffect(() => {
     if (!team) return;
 
-    const channel = supabase.channel(`game:${gameId}`, {
+    const channel = supabase.channel(`game:${gameId}:play`, {
       config: { broadcast: { self: false } },
     });
 
@@ -145,7 +145,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
 
     setTeam({ id: newTeam.id, preset });
 
-    const channel = supabase.channel(`game:${gameId}`);
+    const channel = supabase.channel(`game:${gameId}:play`);
     await channel.subscribe();
     channel.send({
       type: 'broadcast',
@@ -177,7 +177,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
 
     setHasAnswered(true);
 
-    const channel = supabase.channel(`game:${gameId}`);
+    const channel = supabase.channel(`game:${gameId}:play`);
     await channel.subscribe();
     channel.send({
       type: 'broadcast',
