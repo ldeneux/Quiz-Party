@@ -210,26 +210,31 @@ export default function PlayScreen({ params }: { params: { gameId: string } }) {
       {hasAnswered ? (
         <p style={{ textAlign: 'center', fontWeight: 800, fontSize: 18 }}>Réponse envoyée ✓</p>
       ) : (
-        <div style={{ display: 'grid', gap: 12 }}>
-          {(['a', 'b', 'c', 'd'] as const).map((letter) => (
-            <button
-              key={letter}
-              onClick={() => submitAnswer(letter)}
-              style={{
-                padding: 20,
-                borderRadius: 16,
-                border: 'none',
-                fontWeight: 700,
-                fontSize: 16,
-                background: '#eef0f8',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <strong>{letter.toUpperCase()}.</strong> {question[`choice_${letter}` as const]}
-            </button>
-          ))}
-        </div>
+        <>
+          <p style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.4, marginBottom: 20, textAlign: 'center' }}>
+            {question.prompt}
+          </p>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {(['a', 'b', 'c', 'd'] as const).map((letter) => (
+              <button
+                key={letter}
+                onClick={() => submitAnswer(letter)}
+                style={{
+                  padding: 20,
+                  borderRadius: 16,
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: 16,
+                  background: '#eef0f8',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <strong>{letter.toUpperCase()}.</strong> {question[`choice_${letter}` as const]}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </main>
   );
