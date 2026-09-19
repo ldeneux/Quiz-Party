@@ -12,7 +12,7 @@ const MODES = [
 ];
 
 type Team = { id: string; name: string; avatar: string; color: string };
-type Profile = { id: string; name: string; is_favorite: boolean };
+type Profile = { id: string; name: string; is_favorite: boolean; is_default: boolean };
 
 export default function ConsolePage() {
   const router = useRouter();
@@ -32,13 +32,21 @@ export default function ConsolePage() {
     setOrigin(window.location.origin);
     supabase
       .from('quiz_profiles')
-      .select('id, name, is_favorite')
+      .select('id, name, is_favorite, is_default')
       .then(({ data }) => {
-        const sorted = ((data as Profile[]) ?? []).sort((a, b) => {
+        const list = (data as Profile[]) ?? [];
+        const sorted = list.sort((a, b) => {
+          if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
           if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
           return a.name.localeCompare(b.name);
         });
         setProfiles(sorted);
+
+        // Présélectionne le profil par défaut s'il en existe un ; sinon, rien n'est sélectionné
+        const defaultProfile = sorted.find((p) => p.is_default);
+        if (defaultProfile && !selectedProfileId) {
+          setSelectedProfileId(defaultProfile.id);
+        }
       });
   }, []);
 
@@ -107,6 +115,22 @@ export default function ConsolePage() {
     if (gameId) {
       await supabase.from('games').update({ mode }).eq('id', gameId);
     }
+  };
+
+  const selectProfile = async (profileId: string) => {
+    setSelectedProfileId(profileId);
+    if (gameId) {
+      await supabase.from('games').update({ profile_id: profileId || null }).eq('id', gameId);
+    }
+  };
+
+  const resetSession = () => {
+    localStorage.removeItem('quiz-party-game-id');
+    setGameId(null);
+    setJoinCode(null);
+    setTeams([]);
+    setShowInvite(false);
+    setError(null);
   };
 
   const inviteTeams = async () => {
@@ -269,8 +293,7 @@ export default function ConsolePage() {
 
           <select
             value={selectedProfileId}
-            onChange={(e) => setSelectedProfileId(e.target.value)}
-            disabled={!!gameId}
+            onChange={(e) => selectProfile(e.target.value)}
             style={{
               padding: '10px 14px',
               borderRadius: 999,
@@ -281,15 +304,34 @@ export default function ConsolePage() {
               background: '#fff',
             }}
           >
-            <option value="">Profil : par défaut (CM1)</option>
+            <option value="">— Choisir un profil —</option>
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.is_favorite ? '⭐ ' : ''}{p.name}
+                {p.is_default ? '🏠 ' : p.is_favorite ? '⭐ ' : ''}{p.name}
               </option>
             ))}
           </select>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {gameId && (
+              <button
+                onClick={resetSession}
+                title="Oublier cette partie et repartir de zéro"
+                style={{
+                  background: 'none',
+                  border: '1px solid #eaedf6',
+                  borderRadius: 999,
+                  padding: '8px 14px',
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  color: '#7a819c',
+                  cursor: 'pointer',
+                }}
+              >
+                Nouvelle partie
+              </button>
+            )}
+
             {teams.length > 0 && (
               <button
                 onClick={startGame}

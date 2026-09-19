@@ -15,7 +15,7 @@ const LEVELS = [
 
 type Category = { id: string; name: string; emoji: string };
 type Pack = { id: string; name: string; level_id: string; category_id: string; questionCount?: number };
-type Profile = { id: string; name: string; is_favorite: boolean; packIds?: string[] };
+type Profile = { id: string; name: string; is_favorite: boolean; is_default: boolean; packIds?: string[] };
 
 export default function ParametragePage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -72,6 +72,7 @@ export default function ParametragePage() {
     const sortedProfiles = ((profileRows as Profile[]) ?? [])
       .map((p) => ({ ...p, packIds: packsByProfile[p.id] ?? [] }))
       .sort((a, b) => {
+        if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
         if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
         return a.name.localeCompare(b.name);
       });
@@ -200,6 +201,18 @@ export default function ParametragePage() {
 
   const toggleFavorite = async (p: Profile) => {
     await supabase.from('quiz_profiles').update({ is_favorite: !p.is_favorite }).eq('id', p.id);
+    loadAll();
+  };
+
+  const setAsDefault = async (p: Profile) => {
+    if (p.is_default) {
+      // On peut retirer le défaut (revenir à "aucun profil par défaut")
+      await supabase.from('quiz_profiles').update({ is_default: false }).eq('id', p.id);
+    } else {
+      // Un seul profil par défaut à la fois : on retire l'ancien puis on pose le nouveau
+      await supabase.from('quiz_profiles').update({ is_default: false }).eq('is_default', true);
+      await supabase.from('quiz_profiles').update({ is_default: true }).eq('id', p.id);
+    }
     loadAll();
   };
 
@@ -359,6 +372,13 @@ export default function ParametragePage() {
             {profiles.map((p) => (
               <div key={p.id} style={listRow}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    onClick={() => setAsDefault(p)}
+                    title={p.is_default ? 'Retirer comme profil par défaut' : 'Définir comme profil par défaut'}
+                    style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 15, padding: 0 }}
+                  >
+                    {p.is_default ? '🏠' : '⬜'}
+                  </button>
                   <button
                     onClick={() => toggleFavorite(p)}
                     title="Favori"
