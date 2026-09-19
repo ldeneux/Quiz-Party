@@ -61,7 +61,12 @@ Contraintes :
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.9,
-          maxOutputTokens: 2048,
+          // Budget dynamique : ~350 tokens/question (prompt + 4 choix + explication)
+          // + marge, plafonné pour éviter un coût incontrôlé sur une erreur de saisie.
+          maxOutputTokens: Math.min(count * 350 + 500, 8192),
+          // Force une sortie JSON stricte : évite les balises markdown et
+          // réduit fortement le risque de troncature en plein milieu du JSON.
+          responseMimeType: 'application/json',
         },
       }),
     }
@@ -73,7 +78,14 @@ Contraintes :
   }
 
   const data = await response.json();
-  const rawText: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data?.candidates?.[0];
+  const rawText: string | undefined = candidate?.content?.parts?.[0]?.text;
+
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    throw new Error(
+      `Réponse Gemini tronquée (trop de questions demandées d'un coup pour le budget de tokens). Réduis le nombre de questions par pack et réessaie.`
+    );
+  }
 
   if (!rawText) {
     throw new Error('Réponse Gemini vide ou inattendue.');

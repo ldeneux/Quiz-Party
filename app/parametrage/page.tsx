@@ -52,7 +52,13 @@ export default function ParametragePage() {
     }
 
     const { data: packRows } = await supabase.from('question_packs').select('*').order('created_at', { ascending: false });
-    const { data: questionCounts } = await supabase.from('questions').select('pack_id');
+    const { data: questionCounts, error: qcError } = await supabase.from('questions').select('pack_id');
+
+    if (qcError) {
+      setLoadNotice((prev) =>
+        prev ? `${prev} | Erreur comptage questions : ${qcError.message}` : `Erreur comptage questions : ${qcError.message}`
+      );
+    }
 
     const countByPack: Record<string, number> = {};
     (questionCounts ?? []).forEach((q: any) => {
