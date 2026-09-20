@@ -63,6 +63,7 @@ export default function ConsolePage() {
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const [gameStarted, setGameStarted] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showNewGameChoice, setShowNewGameChoice] = useState(false);
   const [statsData, setStatsData] = useState<
     Record<string, { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }>
   >({});
@@ -169,13 +170,31 @@ export default function ConsolePage() {
     }
   };
 
-  const resetSession = () => {
+  const fullReset = () => {
     localStorage.removeItem('quiz-party-game-id');
     setGameId(null);
     setJoinCode(null);
     setTeams([]);
     setShowInvite(false);
     setError(null);
+    setGameStarted(false);
+    setShowNewGameChoice(false);
+  };
+
+  // Garde le même code et les mêmes équipes : remet juste les scores à zéro
+  // (et les vies, pour le mode Survie) et efface l'historique des
+  // questions posées pour repartir sur un pool de questions neuf.
+  const restartSameTeams = async () => {
+    setShowNewGameChoice(false);
+    if (!gameId) return;
+
+    await supabase.from('teams').update({ score: 0, lives: 3 }).eq('game_id', gameId);
+    await supabase.from('answers').delete().eq('game_id', gameId);
+    await supabase.from('games').update({ status: 'lobby', current_question_id: null }).eq('id', gameId);
+
+    const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
+    if (refreshedTeams) setTeams(refreshedTeams as Team[]);
+
     setGameStarted(false);
   };
 
@@ -218,7 +237,12 @@ export default function ConsolePage() {
     const { error } = await supabase.from('teams').delete().eq('id', teamId);
     if (error) {
       setError(`Impossible de déconnecter l'équipe (${error.message}).`);
+      return;
     }
+    // Retrait immédiat côté client : la tuile disparaît sans délai et les
+    // autres remontent (flexbox column), le nom redevient aussitôt
+    // disponible pour une nouvelle équipe sur l'écran de jointure.
+    setTeams((prev) => prev.filter((t) => t.id !== teamId));
   };
 
   const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null);
@@ -345,7 +369,7 @@ export default function ConsolePage() {
         <button
           onClick={inviteTeams}
           disabled={creating}
-          style={{ ...pillLabel, border: 'none', cursor: 'pointer', font: 'inherit' }}
+          style={{ ...pillLabel, border: 'none', cursor: 'pointer' }}
         >
           {creating ? 'Création…' : 'Rejoindre le jeu'}
         </button>
@@ -383,9 +407,7 @@ export default function ConsolePage() {
               >
                 {copiedTeamId === t.id ? 'Lien copié ✓' : t.name}
               </span>
-              {gameStarted && (
-                <span style={{ color: '#7a819c', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>{t.score} pts</span>
-              )}
+              <span style={{ color: '#7a819c', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>{t.score ?? 0} pts</span>
               <button
                 onClick={() => removeTeam(t.id)}
                 title="Déconnecter l'équipe"
@@ -442,7 +464,7 @@ export default function ConsolePage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
             {gameId && (
               <button
-                onClick={resetSession}
+                onClick={() => setShowNewGameChoice(true)}
                 title="Oublier cette partie et repartir de zéro"
                 style={{
                   background: 'none',
@@ -524,10 +546,81 @@ export default function ConsolePage() {
 
         {gameStarted && gameId && (
           <div style={{ marginTop: 28 }}>
-            <GameArea gameId={gameId} onRestart={resetSession} onClose={() => setGameStarted(false)} />
+            <GameArea gameId={gameId} onRestart={() => setShowNewGameChoice(true)} onClose={() => setGameStarted(false)} />
           </div>
         )}
       </section>
+
+      {/* Fenêtre de choix Nouvelle partie */}
+      {showNewGameChoice && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 32,
+              maxWidth: 420,
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 20 }}>Nouvelle partie</h2>
+            <button
+              onClick={restartSameTeams}
+              style={{
+                display: 'block',
+                width: '100%',
+                background: '#6c7bf7',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 999,
+                padding: '14px 20px',
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              Garder les mêmes équipes (même code, scores à zéro)
+            </button>
+            <button
+              onClick={fullReset}
+              style={{
+                display: 'block',
+                width: '100%',
+                background: '#eef0f8',
+                color: '#1f2440',
+                border: 'none',
+                borderRadius: 999,
+                padding: '14px 20px',
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              Changer d'équipes (nouveau code)
+            </button>
+            <button
+              onClick={() => setShowNewGameChoice(false)}
+              style={{ background: 'none', border: 'none', color: '#7a819c', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Fenêtre statistiques */}
       {showStats && (
