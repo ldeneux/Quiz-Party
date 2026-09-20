@@ -56,11 +56,17 @@ export default function GameArea({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [autoAttempted, setAutoAttempted] = useState(false);
   const [revealedInfo, setRevealedInfo] = useState<Record<string, RevealInfo>>({});
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const askedQuestionIdsRef = useRef<string[]>([]);
   const currentQuestionIdRef = useRef<string | null>(null);
   const [challengerTeamId, setChallengerTeamId] = useState<string | null>(null);
   const challengerCountsRef = useRef<Record<string, number>>({});
   const challengerIndexRef = useRef(0);
+  const [participatifTurnTeamId, setParticipatifTurnTeamId] = useState<string | null>(null);
+  const participatifTurnTeamIdRef = useRef<string | null>(null);
+  const participatifTurnsRef = useRef<Record<string, number>>({});
+  const participatifIndexRef = useRef(0);
+  const participatifPotRef = useRef(0);
 
   useEffect(() => {
     const loadGame = async () => {
@@ -146,7 +152,7 @@ export default function GameArea({
       channel?.send({
         type: 'broadcast',
         event: 'question:show',
-        payload: { question: q, startedAt: Date.now() },
+        payload: { question: q, startedAt: Date.now(), turnTeamId: participatifTurnTeamIdRef.current },
       });
     },
     [channel, gameId]
@@ -171,6 +177,41 @@ export default function GameArea({
     return false; // toutes les équipes ont défié 3 fois
   }, [teams]);
 
+  // Désigne l'équipe qui joue le tour suivant (round-robin, 3 tours max
+  // par équipe). Retourne false quand toutes les équipes ont joué 3 fois.
+  const pickNextParticipatifTurn = useCallback((): boolean => {
+    if (teams.length === 0) return false;
+    if (participatifPotRef.current === 0) participatifPotRef.current = teams.length;
+
+    for (let i = 0; i < teams.length; i++) {
+      const idx = (participatifIndexRef.current + i) % teams.length;
+      const candidate = teams[idx];
+      const count = participatifTurnsRef.current[candidate.id] ?? 0;
+      if (count < 3) {
+        participatifTurnsRef.current[candidate.id] = count + 1;
+        participatifIndexRef.current = (idx + 1) % teams.length;
+        participatifTurnTeamIdRef.current = candidate.id;
+        setParticipatifTurnTeamId(candidate.id);
+        return true;
+      }
+    }
+    return false;
+  }, [teams]);
+
+  // Distribue la cagnotte restante s'il y a une chaîne en cours au moment
+  // où tout le monde a joué ses 3 tours, puis termine la partie.
+  const finishParticipatif = useCallback(async () => {
+    if (participatifPotRef.current > teams.length && teams.length > 0) {
+      const share = participatifPotRef.current / teams.length;
+      for (const t of teams) {
+        await supabase.rpc('increment_team_score', { p_team_id: t.id, p_points: share });
+      }
+      const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
+      if (refreshedTeams) setTeams(refreshedTeams as Team[]);
+    }
+    setPhase('finished');
+  }, [teams, gameId]);
+
   const goToNextQuestion = useCallback(() => {
     if (mode === 'defi') {
       const hasNext = pickNextChallenger();
@@ -179,9 +220,16 @@ export default function GameArea({
         return;
       }
     }
+    if (mode === 'participatif') {
+      const hasNext = pickNextParticipatifTurn();
+      if (!hasNext) {
+        finishParticipatif();
+        return;
+      }
+    }
     setLoadError(null);
     loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
-  }, [mode, pickNextChallenger, gameId, startQuestion]);
+  }, [mode, pickNextChallenger, pickNextParticipatifTurn, finishParticipatif, gameId, startQuestion]);
 
   useEffect(() => {
     if (!autoAttempted && channel && phase === 'lobby' && teams.length > 0) {
@@ -192,14 +240,20 @@ export default function GameArea({
 
   useEffect(() => {
     if (phase !== 'question') return;
-    const activeTeamsCount = mode === 'survie' ? teams.filter((t) => (t.lives ?? 3) > 0).length : teams.length;
-    if (secondsLeft <= 0 || answeredTeamIds.size === activeTeamsCount) {
+
+    const shouldReveal =
+      mode === 'participatif'
+        ? secondsLeft <= 0 || answeredTeamIds.has(participatifTurnTeamId ?? '__none__')
+        : secondsLeft <= 0 ||
+          answeredTeamIds.size === (mode === 'survie' ? teams.filter((t) => (t.lives ?? 3) > 0).length : teams.length);
+
+    if (shouldReveal) {
       reveal();
       return;
     }
     const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
-  }, [phase, secondsLeft, answeredTeamIds, teams, mode]);
+  }, [phase, secondsLeft, answeredTeamIds, teams, mode, participatifTurnTeamId]);
 
   const reveal = useCallback(async () => {
     if (!question) return;
@@ -252,6 +306,27 @@ export default function GameArea({
       return;
     }
 
+    if (mode === 'participatif') {
+      const turnAnswer = submitted.find((s) => s.teamId === participatifTurnTeamId);
+      const isCorrect = turnAnswer?.choice === question.correct_choice;
+
+      if (isCorrect) {
+        participatifPotRef.current = participatifPotRef.current * 2;
+      } else {
+        const share = participatifPotRef.current / Math.max(teams.length, 1);
+        for (const t of teams) {
+          await supabase.rpc('increment_team_score', { p_team_id: t.id, p_points: share });
+        }
+        participatifPotRef.current = teams.length;
+      }
+
+      channel?.send({ type: 'broadcast', event: 'answers:revealed', payload: {} });
+
+      const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
+      if (refreshedTeams) setTeams(refreshedTeams as Team[]);
+      return;
+    }
+
     const results =
       mode === 'defi' && challengerTeamId
         ? scoreDefi(submitted as any, question.correct_choice, challengerTeamId)
@@ -265,7 +340,22 @@ export default function GameArea({
 
     const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
     if (refreshedTeams) setTeams(refreshedTeams as Team[]);
-  }, [question, channel, gameId, teams, mode, challengerTeamId]);
+  }, [question, channel, gameId, teams, mode, challengerTeamId, participatifTurnTeamId]);
+
+  const quitKeepingScores = () => {
+    setShowQuitConfirm(false);
+    setPhase('finished');
+  };
+
+  const quitResettingScores = async () => {
+    setShowQuitConfirm(false);
+    for (const t of teams) {
+      await supabase.from('teams').update({ score: 0 }).eq('id', t.id);
+    }
+    const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
+    if (refreshedTeams) setTeams(refreshedTeams as Team[]);
+    setPhase('finished');
+  };
 
   // --- Écran : partie terminée (plus de questions disponibles) ---
   if (phase === 'finished') {
@@ -273,9 +363,7 @@ export default function GameArea({
     return (
       <div style={styles.mainCard}>
         <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🏁 Partie terminée</h2>
-        <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 20 }}>
-          Toutes les questions disponibles ont été posées.
-        </p>
+        <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 20 }}>Voici le classement final.</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
           {ranked.map((t, i) => (
             <div key={t.id} style={{ ...styles.teamTile, borderColor: i === 0 ? '#ffb648' : '#eaedf6' }}>
@@ -328,6 +416,11 @@ export default function GameArea({
         <div style={styles.mainCard}>
           <div style={styles.qHead}>
             <span style={styles.qTag}>Question</span>
+            {mode === 'participatif' && (
+              <span style={{ ...styles.qTag, background: '#fff3e0', color: '#b5761f' }}>
+                🪙 Cagnotte : {participatifPotRef.current} pts
+              </span>
+            )}
             {phase === 'question' && <div style={styles.timer}>{secondsLeft}s</div>}
           </div>
           <div style={styles.questionText}>{question.prompt}</div>
@@ -366,6 +459,9 @@ export default function GameArea({
                     ...(mode === 'defi' && t.id === challengerTeamId && phase === 'question'
                       ? { borderColor: '#ffb648', background: '#fff3e0' }
                       : {}),
+                    ...(mode === 'participatif' && t.id === participatifTurnTeamId && phase === 'question'
+                      ? { borderColor: '#ffb648', background: '#fff3e0' }
+                      : {}),
                     ...(phase === 'question' && hasAnswered ? styles.teamAnswered : {}),
                     ...(phase === 'revealed' && choiceColor
                       ? { borderColor: choiceColor, background: choiceColor + '22' }
@@ -373,6 +469,7 @@ export default function GameArea({
                   }}
                 >
                   {mode === 'defi' && t.id === challengerTeamId && <span title="Challenger">👑 </span>}
+                  {mode === 'participatif' && t.id === participatifTurnTeamId && <span title="Son tour">🎙️ </span>}
                   <span>{t.avatar}</span> {t.name}
                   {mode === 'survie' && (
                     <span style={{ marginLeft: 6, fontSize: 12 }}>
@@ -401,6 +498,65 @@ export default function GameArea({
               <button style={styles.startBtn} onClick={goToNextQuestion}>
                 Question suivante
               </button>
+              <button
+                onClick={() => setShowQuitConfirm(true)}
+                style={{
+                  marginLeft: 10,
+                  background: 'none',
+                  border: '1px solid #eaedf6',
+                  borderRadius: 999,
+                  padding: '13px 20px',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: '#7a819c',
+                  cursor: 'pointer',
+                }}
+              >
+                Quitter la partie
+              </button>
+
+              {showQuitConfirm && (
+                <div style={{ marginTop: 14, background: '#f4f6fb', borderRadius: 14, padding: 16 }}>
+                  <p style={{ fontSize: 13.5, marginBottom: 10 }}>
+                    Terminer la partie maintenant — que faire des scores actuels ?
+                  </p>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={quitKeepingScores}
+                      style={{ ...styles.startBtn, marginTop: 0, fontSize: 13, padding: '10px 16px' }}
+                    >
+                      Garder les scores
+                    </button>
+                    <button
+                      onClick={quitResettingScores}
+                      style={{
+                        ...styles.startBtn,
+                        marginTop: 0,
+                        fontSize: 13,
+                        padding: '10px 16px',
+                        background: '#eef0f8',
+                        color: '#1f2440',
+                      }}
+                    >
+                      Remettre à zéro
+                    </button>
+                    <button
+                      onClick={() => setShowQuitConfirm(false)}
+                      style={{
+                        marginTop: 0,
+                        fontSize: 13,
+                        padding: '10px 16px',
+                        background: 'none',
+                        border: 'none',
+                        color: '#7a819c',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

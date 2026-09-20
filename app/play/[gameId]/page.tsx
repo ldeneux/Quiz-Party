@@ -33,6 +33,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [question, setQuestion] = useState<Question | null>(null);
   const [hasAnswered, setHasAnswered] = useState(false);
   const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
+  const [turnTeamId, setTurnTeamId] = useState<string | null>(null);
   const [kicked, setKicked] = useState(false);
 
   useEffect(() => {
@@ -125,6 +126,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       setQuestion(payload.question);
       setQuestionStartedAt(payload.startedAt);
       setHasAnswered(false);
+      setTurnTeamId(payload.turnTeamId ?? null);
     });
 
     channel.subscribe();
@@ -297,6 +299,11 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
 
       {hasAnswered ? (
         <p style={{ textAlign: 'center', fontWeight: 800, fontSize: 18 }}>Réponse envoyée ✓</p>
+      ) : turnTeamId && turnTeamId !== team.id ? (
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.4, marginBottom: 12 }}>{question.prompt}</p>
+          <p style={{ color: '#7a819c' }}>⏳ Ce n'est pas encore votre tour — regardez l'écran principal.</p>
+        </div>
       ) : (
         <>
           <p style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.4, marginBottom: 20, textAlign: 'center' }}>

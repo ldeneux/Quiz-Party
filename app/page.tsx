@@ -62,6 +62,10 @@ export default function ConsolePage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>('');
   const [gameStarted, setGameStarted] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [statsData, setStatsData] = useState<
+    Record<string, { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }>
+  >({});
   const prevTeamsCount = useRef(0);
 
   useEffect(() => {
@@ -234,6 +238,57 @@ export default function ConsolePage() {
     if (gameId) setGameStarted(true);
   };
 
+  const openStats = async () => {
+    if (!gameId) return;
+    setShowStats(true);
+
+    const { data: answersRows } = await supabase
+      .from('answers')
+      .select('team_id, choice, question_id')
+      .eq('game_id', gameId);
+
+    if (!answersRows || answersRows.length === 0) {
+      setStatsData({});
+      return;
+    }
+
+    const questionIds = Array.from(new Set(answersRows.map((a: any) => a.question_id)));
+    const { data: questionsRows } = await supabase
+      .from('questions')
+      .select('id, category_id, correct_choice')
+      .in('id', questionIds);
+
+    const { data: categoriesRows } = await supabase.from('categories').select('id, name');
+
+    const categoryNameById: Record<string, string> = {};
+    (categoriesRows ?? []).forEach((c: any) => (categoryNameById[c.id] = c.name));
+
+    const questionById: Record<string, any> = {};
+    (questionsRows ?? []).forEach((q: any) => (questionById[q.id] = q));
+
+    const result: typeof statsData = {};
+    teams.forEach((t) => {
+      result[t.id] = { teamName: t.name, teamAvatar: t.avatar, categories: {} };
+    });
+
+    answersRows.forEach((a: any) => {
+      const q = questionById[a.question_id];
+      if (!q) return;
+      const catName = categoryNameById[q.category_id] ?? 'Sans catégorie';
+      if (!result[a.team_id]) return; // équipe supprimée depuis
+      if (!result[a.team_id].categories[catName]) {
+        result[a.team_id].categories[catName] = { correct: 0, wrong: 0 };
+      }
+      if (a.choice === q.correct_choice) {
+        result[a.team_id].categories[catName].correct++;
+      } else {
+        result[a.team_id].categories[catName].wrong++;
+      }
+    });
+
+    setStatsData(result);
+  };
+
   return (
     <main style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif', background: '#f4f6fb' }}>
       {/* Colonne gauche : modes + invitation + équipes */}
@@ -355,8 +410,8 @@ export default function ConsolePage() {
 
       {/* Zone centrale */}
       <section style={{ flex: 1, padding: '28px 40px' }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <header style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <span style={{ fontSize: 22 }}>🎯</span> Quiz Party
           </div>
 
@@ -364,6 +419,9 @@ export default function ConsolePage() {
             value={selectedProfileId}
             onChange={(e) => selectProfile(e.target.value)}
             style={{
+              flex: 1,
+              minWidth: 0,
+              maxWidth: 520,
               padding: '10px 14px',
               borderRadius: 999,
               border: '1px solid #eaedf6',
@@ -381,7 +439,7 @@ export default function ConsolePage() {
             ))}
           </select>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
             {gameId && (
               <button
                 onClick={resetSession}
@@ -419,6 +477,29 @@ export default function ConsolePage() {
               </button>
             )}
 
+            {gameId && (
+              <button
+                onClick={openStats}
+                title="Statistiques par équipe et par catégorie"
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                  boxShadow: '0 4px 12px rgba(31,36,64,0.08)',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                📊
+              </button>
+            )}
+
             <a
               href="/parametrage"
               title="Paramétrage"
@@ -447,6 +528,96 @@ export default function ConsolePage() {
           </div>
         )}
       </section>
+
+      {/* Fenêtre statistiques */}
+      {showStats && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 32,
+              maxWidth: 640,
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <button
+              onClick={() => setShowStats(false)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                border: 'none',
+                background: '#f4f6fb',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                fontSize: 14,
+                cursor: 'pointer',
+                color: '#7a819c',
+              }}
+            >
+              ✕
+            </button>
+
+            <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 18 }}>📊 Réponses par équipe et par catégorie</h2>
+
+            {Object.keys(statsData).length === 0 ? (
+              <p style={{ color: '#7a819c', fontSize: 13.5 }}>Aucune réponse enregistrée pour l'instant.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {Object.entries(statsData).map(([teamId, data]) => (
+                  <div key={teamId}>
+                    <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
+                      {data.teamAvatar} {data.teamName}
+                    </div>
+                    {Object.keys(data.categories).length === 0 ? (
+                      <p style={{ color: '#7a819c', fontSize: 12.5, marginLeft: 8 }}>Pas encore de réponse.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {Object.entries(data.categories).map(([catName, counts]) => (
+                          <div
+                            key={catName}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: 13,
+                              background: '#f4f6fb',
+                              borderRadius: 10,
+                              padding: '6px 12px',
+                            }}
+                          >
+                            <span>{catName}</span>
+                            <span>
+                              <span style={{ color: '#35c2a3', fontWeight: 700 }}>{counts.correct} ✓</span>
+                              {'  '}
+                              <span style={{ color: '#ff7a68', fontWeight: 700 }}>{counts.wrong} ✕</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Fenêtre d'invitation */}
       {showInvite && joinCode && (
