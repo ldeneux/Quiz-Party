@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { scoreClassique, scoreSurvie } from '@/lib/scoring';
+import { scoreClassique, scoreSurvie, scoreDefi } from '@/lib/scoring';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type Team = {
@@ -36,7 +36,15 @@ const CHOICE_COLORS: Record<'a' | 'b' | 'c' | 'd', string> = {
   d: '#ff7a68',
 };
 
-export default function GameArea({ gameId, onRestart }: { gameId: string; onRestart?: () => void }) {
+export default function GameArea({
+  gameId,
+  onRestart,
+  onClose,
+}: {
+  gameId: string;
+  onRestart?: () => void;
+  onClose?: () => void;
+}) {
   const [joinCode, setJoinCode] = useState<string>('');
   const [mode, setMode] = useState<string>('classique');
   const [teams, setTeams] = useState<Team[]>([]);
@@ -50,6 +58,9 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
   const [revealedInfo, setRevealedInfo] = useState<Record<string, RevealInfo>>({});
   const askedQuestionIdsRef = useRef<string[]>([]);
   const currentQuestionIdRef = useRef<string | null>(null);
+  const [challengerTeamId, setChallengerTeamId] = useState<string | null>(null);
+  const challengerCountsRef = useRef<Record<string, number>>({});
+  const challengerIndexRef = useRef(0);
 
   useEffect(() => {
     const loadGame = async () => {
@@ -141,12 +152,43 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
     [channel, gameId]
   );
 
+  // Désigne le prochain challenger (round-robin, 3 tours max par équipe).
+  // Retourne false si toutes les équipes ont déjà défié 3 fois (fin du mode Défi).
+  const pickNextChallenger = useCallback((): boolean => {
+    if (teams.length === 0) return false;
+
+    for (let i = 0; i < teams.length; i++) {
+      const idx = (challengerIndexRef.current + i) % teams.length;
+      const candidate = teams[idx];
+      const count = challengerCountsRef.current[candidate.id] ?? 0;
+      if (count < 3) {
+        challengerCountsRef.current[candidate.id] = count + 1;
+        challengerIndexRef.current = (idx + 1) % teams.length;
+        setChallengerTeamId(candidate.id);
+        return true;
+      }
+    }
+    return false; // toutes les équipes ont défié 3 fois
+  }, [teams]);
+
+  const goToNextQuestion = useCallback(() => {
+    if (mode === 'defi') {
+      const hasNext = pickNextChallenger();
+      if (!hasNext) {
+        setPhase('finished');
+        return;
+      }
+    }
+    setLoadError(null);
+    loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
+  }, [mode, pickNextChallenger, gameId, startQuestion]);
+
   useEffect(() => {
     if (!autoAttempted && channel && phase === 'lobby' && teams.length > 0) {
       setAutoAttempted(true);
-      loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
+      goToNextQuestion();
     }
-  }, [autoAttempted, channel, phase, teams.length, gameId, startQuestion]);
+  }, [autoAttempted, channel, phase, teams.length, gameId, goToNextQuestion]);
 
   useEffect(() => {
     if (phase !== 'question') return;
@@ -210,7 +252,10 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
       return;
     }
 
-    const results = scoreClassique(submitted as any, question.correct_choice);
+    const results =
+      mode === 'defi' && challengerTeamId
+        ? scoreDefi(submitted as any, question.correct_choice, challengerTeamId)
+        : scoreClassique(submitted as any, question.correct_choice);
 
     for (const r of results) {
       await supabase.rpc('increment_team_score', { p_team_id: r.teamId, p_points: r.points });
@@ -220,7 +265,7 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
 
     const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
     if (refreshedTeams) setTeams(refreshedTeams as Team[]);
-  }, [question, channel, gameId, teams, mode]);
+  }, [question, channel, gameId, teams, mode, challengerTeamId]);
 
   // --- Écran : partie terminée (plus de questions disponibles) ---
   if (phase === 'finished') {
@@ -240,9 +285,19 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
           ))}
         </div>
         {onRestart && (
-          <button style={styles.startBtn} onClick={onRestart}>
-            Nouvelle partie
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button style={styles.startBtn} onClick={onRestart}>
+              Nouvelle partie
+            </button>
+            {onClose && (
+              <button
+                style={{ ...styles.startBtn, background: '#eef0f8', color: '#1f2440' }}
+                onClick={onClose}
+              >
+                Fermer
+              </button>
+            )}
+          </div>
         )}
       </div>
     );
@@ -262,13 +317,7 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
           )}
 
           {teams.length > 0 && (
-            <button
-              style={styles.startBtn}
-              onClick={() => {
-                setLoadError(null);
-                loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
-              }}
-            >
+            <button style={styles.startBtn} onClick={goToNextQuestion}>
               Démarrer la partie ({teams.length} équipes)
             </button>
           )}
@@ -314,12 +363,16 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
                   key={t.id}
                   style={{
                     ...styles.teamTile,
+                    ...(mode === 'defi' && t.id === challengerTeamId && phase === 'question'
+                      ? { borderColor: '#ffb648', background: '#fff3e0' }
+                      : {}),
                     ...(phase === 'question' && hasAnswered ? styles.teamAnswered : {}),
                     ...(phase === 'revealed' && choiceColor
                       ? { borderColor: choiceColor, background: choiceColor + '22' }
                       : {}),
                   }}
                 >
+                  {mode === 'defi' && t.id === challengerTeamId && <span title="Challenger">👑 </span>}
                   <span>{t.avatar}</span> {t.name}
                   {mode === 'survie' && (
                     <span style={{ marginLeft: 6, fontSize: 12 }}>
@@ -345,13 +398,7 @@ export default function GameArea({ gameId, onRestart }: { gameId: string; onRest
               {loadError && (
                 <p style={{ color: '#ff7a68', fontSize: 14, marginBottom: 12 }}>{loadError}</p>
               )}
-              <button
-                style={styles.startBtn}
-                onClick={() => {
-                  setLoadError(null);
-                  loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
-                }}
-              >
+              <button style={styles.startBtn} onClick={goToNextQuestion}>
                 Question suivante
               </button>
             </>

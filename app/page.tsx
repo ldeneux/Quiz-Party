@@ -443,7 +443,7 @@ export default function ConsolePage() {
 
         {gameStarted && gameId && (
           <div style={{ marginTop: 28 }}>
-            <GameArea gameId={gameId} onRestart={resetSession} />
+            <GameArea gameId={gameId} onRestart={resetSession} onClose={() => setGameStarted(false)} />
           </div>
         )}
       </section>
