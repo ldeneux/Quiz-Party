@@ -52,15 +52,17 @@ const CHOICE_COLORS: Record<'a' | 'b' | 'c' | 'd', string> = {
 
 export default function GameArea({
   gameId,
+  initialMode,
   onRestart,
   onClose,
 }: {
   gameId: string;
+  initialMode?: string;
   onRestart?: () => void;
   onClose?: () => void;
 }) {
   const [joinCode, setJoinCode] = useState<string>('');
-  const [mode, setMode] = useState<string>('classique');
+  const [mode, setMode] = useState<string>(initialMode ?? 'classique');
   const [teams, setTeams] = useState<Team[]>([]);
   const [answeredTeamIds, setAnsweredTeamIds] = useState<Set<string>>(new Set());
   const [question, setQuestion] = useState<Question | null>(null);
@@ -102,7 +104,13 @@ export default function GameArea({
       const { data: game } = await supabase.from('games').select('*').eq('id', gameId).single();
       if (game) {
         setJoinCode(game.join_code);
-        setMode(game.mode ?? 'classique');
+        // Si la console nous a passé le mode directement (source fiable,
+        // déjà à jour au moment du clic sur "Démarrer"), on ne l'écrase pas
+        // avec la valeur lue en base, qui peut être temporairement en retard
+        // juste après un changement de mode.
+        if (!initialMode) {
+          setMode(game.mode ?? 'classique');
+        }
       }
     };
     loadGame();

@@ -15,13 +15,24 @@ const LEVELS = [
 
 type Category = { id: string; name: string; emoji: string };
 type Pack = { id: string; name: string; level_id: string; category_id: string; questionCount?: number };
-type Profile = { id: string; name: string; is_favorite: boolean; is_default: boolean; packIds?: string[] };
+type Profile = {
+  id: string;
+  name: string;
+  is_favorite: boolean;
+  is_default: boolean;
+  packIds?: string[];
+  distinctCategoryCount?: number;
+  isTrivialEligible?: boolean;
+};
 
 export default function ParametragePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [packs, setPacks] = useState<Pack[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loadNotice, setLoadNotice] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null);
+
+  const askConfirm = (message: string, onConfirm: () => void) => setConfirmAction({ message, onConfirm });
 
   const [selectedLevels, setSelectedLevels] = useState<string[]>(['CM1']);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -75,8 +86,17 @@ export default function ParametragePage() {
       packsByProfile[pp.profile_id] = [...(packsByProfile[pp.profile_id] ?? []), pp.pack_id];
     });
 
+    const categoryByPackId: Record<string, string> = {};
+    ((packRows as Pack[]) ?? []).forEach((p) => {
+      if (p.category_id) categoryByPackId[p.id] = p.category_id;
+    });
+
     const sortedProfiles = ((profileRows as Profile[]) ?? [])
-      .map((p) => ({ ...p, packIds: packsByProfile[p.id] ?? [] }))
+      .map((p) => {
+        const packIds = packsByProfile[p.id] ?? [];
+        const distinctCategoryCount = new Set(packIds.map((id) => categoryByPackId[id]).filter(Boolean)).size;
+        return { ...p, packIds, distinctCategoryCount, isTrivialEligible: distinctCategoryCount === 10 };
+      })
       .sort((a, b) => {
         if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
         if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
@@ -120,14 +140,15 @@ export default function ParametragePage() {
     loadAll();
   };
 
-  const deleteCategory = async (id: string, name: string) => {
-    if (!window.confirm(`Supprimer la catégorie "${name}" ? Les packs qui l'utilisent perdront leur catégorie associée.`)) return;
-    const { error } = await supabase.from('categories').delete().eq('id', id);
-    if (error) {
-      setLoadNotice(`Erreur lors de la suppression de la catégorie : ${error.message}`);
-      return;
-    }
-    loadAll();
+  const deleteCategory = (id: string, name: string) => {
+    askConfirm(`Supprimer la catégorie "${name}" ? Les packs qui l'utilisent perdront leur catégorie associée.`, async () => {
+      const { error } = await supabase.from('categories').delete().eq('id', id);
+      if (error) {
+        setLoadNotice(`Erreur lors de la suppression de la catégorie : ${error.message}`);
+        return;
+      }
+      loadAll();
+    });
   };
 
   // --- Packs ---
@@ -167,13 +188,15 @@ export default function ParametragePage() {
     loadAll();
   };
 
-  const deletePack = async (id: string) => {
-    const { error } = await supabase.from('question_packs').delete().eq('id', id);
-    if (error) {
-      setLoadNotice(`Erreur lors de la suppression du pack : ${error.message}`);
-      return;
-    }
-    loadAll();
+  const deletePack = (id: string, name: string) => {
+    askConfirm(`Supprimer le pack "${name}" ? Toutes ses questions seront supprimées avec lui.`, async () => {
+      const { error } = await supabase.from('question_packs').delete().eq('id', id);
+      if (error) {
+        setLoadNotice(`Erreur lors de la suppression du pack : ${error.message}`);
+        return;
+      }
+      loadAll();
+    });
   };
 
   // --- Profils ---
@@ -231,15 +254,16 @@ export default function ParametragePage() {
     loadAll();
   };
 
-  const deleteProfile = async (id: string, name: string) => {
-    if (!window.confirm(`Supprimer le profil "${name}" ?`)) return;
-    const { error } = await supabase.from('quiz_profiles').delete().eq('id', id);
-    if (error) {
-      setLoadNotice(`Erreur lors de la suppression du profil : ${error.message}`);
-      return;
-    }
-    if (editingProfileId === id) cancelEditProfile();
-    loadAll();
+  const deleteProfile = (id: string, name: string) => {
+    askConfirm(`Supprimer le profil "${name}" ?`, async () => {
+      const { error } = await supabase.from('quiz_profiles').delete().eq('id', id);
+      if (error) {
+        setLoadNotice(`Erreur lors de la suppression du profil : ${error.message}`);
+        return;
+      }
+      if (editingProfileId === id) cancelEditProfile();
+      loadAll();
+    });
   };
 
   return (
@@ -348,7 +372,7 @@ export default function ParametragePage() {
                   <strong>{p.name}</strong>{' '}
                   <span style={{ color: '#7a819c', fontSize: 12.5 }}>({p.questionCount} question{p.questionCount !== 1 ? 's' : ''})</span>
                 </span>
-                <button onClick={() => deletePack(p.id)} style={deleteBtn}>✕</button>
+                <button onClick={() => deletePack(p.id, p.name)} style={deleteBtn}>✕</button>
               </div>
             ))}
           </div>
@@ -408,8 +432,24 @@ export default function ParametragePage() {
                   </button>
                   <strong>{p.name}</strong>
                   <span style={{ color: '#7a819c', fontSize: 12.5 }}>
-                    ({p.packIds?.length ?? 0} pack{(p.packIds?.length ?? 0) !== 1 ? 's' : ''})
+                    ({p.packIds?.length ?? 0} pack{(p.packIds?.length ?? 0) !== 1 ? 's' : ''} ·{' '}
+                    {p.distinctCategoryCount ?? 0} catégorie{(p.distinctCategoryCount ?? 0) !== 1 ? 's' : ''})
                   </span>
+                  {p.isTrivialEligible && (
+                    <span
+                      title="Éligible au mode Trivial Poursuit (10 catégories distinctes)"
+                      style={{
+                        background: '#fff3e0',
+                        color: '#b5761f',
+                        fontWeight: 800,
+                        fontSize: 11,
+                        padding: '3px 8px',
+                        borderRadius: 999,
+                      }}
+                    >
+                      🎡 Trivial Poursuit
+                    </span>
+                  )}
                 </span>
                 <span style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => startEditProfile(p)} title="Modifier" style={iconBtn}>✏️</button>
@@ -420,6 +460,63 @@ export default function ParametragePage() {
           </div>
         )}
       </section>
+
+      {confirmAction && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 32,
+              maxWidth: 420,
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 14 }}>Confirmer la suppression</h2>
+            <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 22 }}>{confirmAction.message}</p>
+            <button
+              onClick={() => {
+                const action = confirmAction.onConfirm;
+                setConfirmAction(null);
+                action();
+              }}
+              style={{
+                display: 'block',
+                width: '100%',
+                background: '#ff7a68',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 999,
+                padding: '14px 20px',
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              Supprimer
+            </button>
+            <button
+              onClick={() => setConfirmAction(null)}
+              style={{ background: 'none', border: 'none', color: '#7a819c', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

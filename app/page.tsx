@@ -35,10 +35,10 @@ const MODES = [
   },
   {
     id: 'camembert',
-    label: 'Camemberts',
+    label: 'Trivial Poursuit',
     emoji: '🥧',
     color: '#ffb648',
-    desc: "À tour de rôle, une équipe choisit une catégorie (sur son téléphone). 3 bonnes réponses d'affilée dans une catégorie = 1 part gagnée définitivement. Une erreur remet à zéro la progression en cours, sauf Joker (gagné à chaque part complétée, max 3). Première équipe avec toutes ses parts : +50 pts bonus.",
+    desc: "À tour de rôle, une équipe choisit une catégorie (sur son téléphone) parmi les 6 à 10 \"camemberts\" du profil. 3 bonnes réponses d'affilée dans une catégorie = 1 part gagnée définitivement. Une erreur remet à zéro la progression en cours, sauf Joker (gagné à chaque part complétée, max 3). Première équipe avec toutes ses parts : +50 pts bonus. Nécessite un profil marqué 🎡 Trivial Poursuit (10 catégories distinctes).",
   },
 ];
 
@@ -51,7 +51,14 @@ type Team = {
   camembert_won?: string[];
   camembert_jokers?: number;
 };
-type Profile = { id: string; name: string; is_favorite: boolean; is_default: boolean };
+type Profile = {
+  id: string;
+  name: string;
+  is_favorite: boolean;
+  is_default: boolean;
+  distinctCategoryCount?: number;
+  isTrivialEligible?: boolean;
+};
 
 const pillLabel: React.CSSProperties = {
   display: 'inline-block',
@@ -86,23 +93,41 @@ export default function ConsolePage() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    supabase
-      .from('quiz_profiles')
-      .select('id, name, is_favorite, is_default')
-      .then(({ data }) => {
-        const list = (data as Profile[]) ?? [];
-        const sorted = list.sort((a, b) => {
-          if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
-          if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
-          return a.name.localeCompare(b.name);
-        });
-        setProfiles(sorted);
 
-        const defaultProfile = sorted.find((p) => p.is_default);
-        if (defaultProfile && !selectedProfileId) {
-          setSelectedProfileId(defaultProfile.id);
-        }
+    (async () => {
+      const { data: profileRows } = await supabase.from('quiz_profiles').select('id, name, is_favorite, is_default');
+      const { data: profilePackRows } = await supabase.from('quiz_profile_packs').select('*');
+      const { data: packRows } = await supabase.from('question_packs').select('id, category_id');
+
+      const categoryByPackId: Record<string, string> = {};
+      (packRows ?? []).forEach((p: any) => {
+        if (p.category_id) categoryByPackId[p.id] = p.category_id;
       });
+
+      const packsByProfile: Record<string, string[]> = {};
+      (profilePackRows ?? []).forEach((pp: any) => {
+        packsByProfile[pp.profile_id] = [...(packsByProfile[pp.profile_id] ?? []), pp.pack_id];
+      });
+
+      const list = ((profileRows as Profile[]) ?? []).map((p) => {
+        const packIds = packsByProfile[p.id] ?? [];
+        const distinctCategoryCount = new Set(packIds.map((id) => categoryByPackId[id]).filter(Boolean)).size;
+        return { ...p, distinctCategoryCount, isTrivialEligible: distinctCategoryCount === 10 };
+      });
+
+      const sorted = list.sort((a, b) => {
+        if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
+        if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      setProfiles(sorted);
+
+      const defaultProfile = sorted.find((p) => p.is_default);
+      if (defaultProfile && !selectedProfileId) {
+        setSelectedProfileId(defaultProfile.id);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -173,6 +198,16 @@ export default function ConsolePage() {
 
   const selectMode = async (mode: string) => {
     setActiveMode(mode);
+
+    if (mode === 'camembert') {
+      const eligible = profiles.filter((p) => p.isTrivialEligible);
+      const currentIsEligible = eligible.some((p) => p.id === selectedProfileId);
+      if (!currentIsEligible && eligible.length > 0) {
+        setSelectedProfileId(eligible[0].id);
+        if (gameId) await supabase.from('games').update({ profile_id: eligible[0].id }).eq('id', gameId);
+      }
+    }
+
     if (gameId) {
       await supabase.from('games').update({ mode }).eq('id', gameId);
     }
@@ -476,12 +511,17 @@ export default function ConsolePage() {
             }}
           >
             <option value="">— Choisir un profil —</option>
-            {profiles.map((p) => (
+            {(activeMode === 'camembert' ? profiles.filter((p) => p.isTrivialEligible) : profiles).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.is_default ? '🏠 ' : p.is_favorite ? '⭐ ' : ''}{p.name}
               </option>
             ))}
           </select>
+          {activeMode === 'camembert' && profiles.filter((p) => p.isTrivialEligible).length === 0 && (
+            <span style={{ color: '#ff7a68', fontSize: 12, fontWeight: 700 }}>
+              Aucun profil éligible (10 catégories distinctes requises)
+            </span>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
             {gameId && (
@@ -568,7 +608,12 @@ export default function ConsolePage() {
 
         {gameStarted && gameId && (
           <div style={{ marginTop: 28 }}>
-            <GameArea gameId={gameId} onRestart={() => setShowNewGameChoice(true)} onClose={() => setGameStarted(false)} />
+            <GameArea
+              gameId={gameId}
+              initialMode={activeMode}
+              onRestart={() => setShowNewGameChoice(true)}
+              onClose={() => setGameStarted(false)}
+            />
           </div>
         )}
       </section>

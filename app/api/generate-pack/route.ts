@@ -15,15 +15,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'levelId et categoryId sont requis.' }, { status: 400 });
   }
 
-  // 1) Crée le pack
-  const { data: pack, error: packError } = await supabaseAdmin
+  // 1) Réutilise un pack existant pour ce couple niveau/catégorie s'il y en
+  //    a déjà un (les nouvelles questions viennent le compléter), sinon en crée un.
+  const { data: existingPack } = await supabaseAdmin
     .from('question_packs')
-    .insert({ name: `${levelLabel} · ${categoryName}`, level_id: levelId, category_id: categoryId })
-    .select()
-    .single();
+    .select('*')
+    .eq('level_id', levelId)
+    .eq('category_id', categoryId)
+    .limit(1)
+    .maybeSingle();
 
-  if (packError || !pack) {
-    return NextResponse.json({ error: packError?.message ?? 'Erreur création du pack' }, { status: 500 });
+  let pack = existingPack;
+  if (!pack) {
+    const { data: newPack, error: packError } = await supabaseAdmin
+      .from('question_packs')
+      .insert({ name: `${levelLabel} · ${categoryName}`, level_id: levelId, category_id: categoryId })
+      .select()
+      .single();
+
+    if (packError || !newPack) {
+      return NextResponse.json({ error: packError?.message ?? 'Erreur création du pack' }, { status: 500 });
+    }
+    pack = newPack;
   }
 
   // 2) Génère les questions via Gemini (un seul appel batch)
@@ -57,5 +70,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertError.message, pack }, { status: 500 });
   }
 
-  return NextResponse.json({ pack, questionCount: rows.length });
+  return NextResponse.json({ pack, questionCount: rows.length, merged: !!existingPack });
 }
