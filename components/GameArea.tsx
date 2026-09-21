@@ -354,7 +354,8 @@ export default function GameArea({
     proceedWithCategoryRef.current = proceedWithCategory;
   }, [proceedWithCategory]);
 
-
+useEffect(() => {
+  
     if (mode === 'defi') {
       const hasNext = pickNextChallenger();
       if (!hasNext) {
