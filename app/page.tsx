@@ -33,9 +33,24 @@ const MODES = [
     color: '#35c2a3',
     desc: 'Une cagnotte commune double à chaque bonne réponse en chaîne. Une erreur la redistribue à toutes les équipes.',
   },
+  {
+    id: 'camembert',
+    label: 'Camemberts',
+    emoji: '🥧',
+    color: '#ffb648',
+    desc: "À tour de rôle, une équipe choisit une catégorie (sur son téléphone). 3 bonnes réponses d'affilée dans une catégorie = 1 part gagnée définitivement. Une erreur remet à zéro la progression en cours, sauf Joker (gagné à chaque part complétée, max 3). Première équipe avec toutes ses parts : +50 pts bonus.",
+  },
 ];
 
-type Team = { id: string; name: string; avatar: string; color: string; score: number };
+type Team = {
+  id: string;
+  name: string;
+  avatar: string;
+  color: string;
+  score: number;
+  camembert_won?: string[];
+  camembert_jokers?: number;
+};
 type Profile = { id: string; name: string; is_favorite: boolean; is_default: boolean };
 
 const pillLabel: React.CSSProperties = {
@@ -324,7 +339,9 @@ export default function ConsolePage() {
             <div key={m.id}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <button
-                  onClick={() => selectMode(m.id)}
+                  onClick={() => !gameStarted && selectMode(m.id)}
+                  disabled={gameStarted}
+                  title={gameStarted ? 'Impossible de changer de mode en cours de partie' : ''}
                   style={{
                     flex: 1,
                     display: 'flex',
@@ -336,9 +353,10 @@ export default function ConsolePage() {
                     background: activeMode === m.id ? m.color + '18' : '#fff',
                     fontWeight: 700,
                     fontSize: 13.5,
-                    cursor: 'pointer',
+                    cursor: gameStarted ? 'not-allowed' : 'pointer',
                     textAlign: 'left',
                     color: activeMode === m.id ? '#1f2440' : '#7a819c',
+                    opacity: gameStarted && activeMode !== m.id ? 0.5 : 1,
                   }}
                 >
                   <span style={{ fontSize: 17 }}>{m.emoji}</span> {m.label}
@@ -407,7 +425,11 @@ export default function ConsolePage() {
               >
                 {copiedTeamId === t.id ? 'Lien copié ✓' : t.name}
               </span>
-              <span style={{ color: '#7a819c', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>{t.score ?? 0} pts</span>
+              <span style={{ color: '#7a819c', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
+                {t.score ?? 0} pts
+                {activeMode === 'camembert' &&
+                  ` · 🥧×${(t.camembert_won ?? []).length}${(t.camembert_jokers ?? 0) > 0 ? ` · 🃏×${t.camembert_jokers}` : ''}`}
+              </span>
               <button
                 onClick={() => removeTeam(t.id)}
                 title="Déconnecter l'équipe"

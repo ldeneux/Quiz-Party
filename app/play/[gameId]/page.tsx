@@ -14,6 +14,8 @@ type Question = {
   choice_d: string;
 };
 
+type CategoryChoice = { id: string; name: string; emoji: string };
+
 export default function PlayScreen(props: { params: { gameId: string } }) {
   return (
     <Suspense fallback={null}>
@@ -35,6 +37,20 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
   const [turnTeamId, setTurnTeamId] = useState<string | null>(null);
   const [kicked, setKicked] = useState(false);
+
+  // Mode Camemberts
+  const [categoryChoicePrompt, setCategoryChoicePrompt] = useState<{
+    chooserTeamId: string;
+    chooserTeamName: string;
+    categories: CategoryChoice[];
+  } | null>(null);
+  const [camembertCategory, setCamembertCategory] = useState<CategoryChoice | null>(null);
+  const [jokerOffer, setJokerOffer] = useState<{ categoryName: string; seconds: number } | null>(null);
+  const [jokerUsed, setJokerUsed] = useState(false);
+  const [myTeamData, setMyTeamData] = useState<{
+    camembert_won: string[];
+    camembert_jokers: number;
+  } | null>(null);
 
   useEffect(() => {
     setPresets(getRandomPresets('espace', 12));
@@ -93,9 +109,19 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     };
   }, [team, gameId]);
 
-  // Détecte si l'hôte supprime cette équipe pendant la partie
+  // Détecte si l'hôte supprime cette équipe pendant la partie, et suit sa
+  // propre progression Camemberts (parts gagnées, jokers) en direct.
   useEffect(() => {
     if (!team) return;
+
+    supabase
+      .from('teams')
+      .select('camembert_won, camembert_jokers')
+      .eq('id', team.id)
+      .single()
+      .then(({ data }) => {
+        if (data) setMyTeamData(data as any);
+      });
 
     const kickChannel = supabase.channel(`team-watch:${team.id}`);
     kickChannel.on(
@@ -105,6 +131,13 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
         setKicked(true);
         setTeam(null);
         setQuestion(null);
+      }
+    );
+    kickChannel.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'teams', filter: `id=eq.${team.id}` },
+      (payload) => {
+        setMyTeamData(payload.new as any);
       }
     );
     kickChannel.subscribe();
@@ -127,6 +160,22 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       setQuestionStartedAt(payload.startedAt);
       setHasAnswered(false);
       setTurnTeamId(payload.turnTeamId ?? null);
+      setCamembertCategory(payload.camembertCategory ?? null);
+      setCategoryChoicePrompt(null);
+      setJokerOffer(null);
+      setJokerUsed(false);
+    });
+
+    channel.on('broadcast', { event: 'choose-category:prompt' }, ({ payload }) => {
+      setCategoryChoicePrompt(payload);
+      setQuestion(null);
+    });
+
+    channel.on('broadcast', { event: 'joker:offer' }, ({ payload }) => {
+      if (team && payload.teamIds?.includes(team.id)) {
+        setJokerOffer({ categoryName: payload.categoryName, seconds: payload.seconds });
+        setJokerUsed(false);
+      }
     });
 
     channel.subscribe();
@@ -157,6 +206,24 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   };
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const pickCategory = (categoryId: string) => {
+    if (!team) return;
+    setCategoryChoicePrompt(null);
+    const channel = supabase.channel(`game:${gameId}:play`);
+    channel.subscribe(() => {
+      channel.send({ type: 'broadcast', event: 'choose-category:pick', payload: { teamId: team.id, categoryId } });
+    });
+  };
+
+  const useJoker = () => {
+    if (!team || jokerUsed) return;
+    setJokerUsed(true);
+    const channel = supabase.channel(`game:${gameId}:play`);
+    channel.subscribe(() => {
+      channel.send({ type: 'broadcast', event: 'joker:use', payload: { teamId: team.id } });
+    });
+  };
 
   const submitAnswer = async (choice: 'a' | 'b' | 'c' | 'd') => {
     if (!team || !question || hasAnswered) return;
@@ -260,6 +327,85 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     setQuestion(null);
   };
 
+  // --- Écran : choix de catégorie (mode Camemberts) ---
+  if (categoryChoicePrompt) {
+    const isChooser = categoryChoicePrompt.chooserTeamId === team.id;
+    return (
+      <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+        <p style={{ color: '#7a819c', marginBottom: 16 }}>
+          {team.preset.avatar} {team.preset.name}
+        </p>
+        {isChooser ? (
+          <>
+            <h2 style={{ fontWeight: 800, fontSize: 18, marginBottom: 16 }}>🥧 Choisis une catégorie</h2>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {categoryChoicePrompt.categories.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => pickCategory(c.id)}
+                  style={{
+                    padding: 18,
+                    borderRadius: 16,
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: 16,
+                    background: '#eef0f8',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {c.emoji} {c.name}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🥧</div>
+            <p style={{ color: '#7a819c' }}>{categoryChoicePrompt.chooserTeamName} choisit une catégorie…</p>
+          </>
+        )}
+      </main>
+    );
+  }
+
+  // --- Écran : offre de Joker (mode Camemberts) ---
+  if (jokerOffer) {
+    return (
+      <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+        <p style={{ color: '#7a819c', marginBottom: 16 }}>
+          {team.preset.avatar} {team.preset.name}
+        </p>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>🃏</div>
+        <h2 style={{ fontWeight: 800, fontSize: 17, marginBottom: 10 }}>
+          Votre progression sur "{jokerOffer.categoryName}" va être perdue
+        </h2>
+        {jokerUsed ? (
+          <p style={{ color: '#35c2a3', fontWeight: 700 }}>Joker utilisé — votre progression est protégée ✓</p>
+        ) : (
+          <>
+            <button
+              onClick={useJoker}
+              style={{
+                background: '#ffb648',
+                color: '#1f2440',
+                border: 'none',
+                borderRadius: 999,
+                padding: '14px 28px',
+                fontWeight: 800,
+                fontSize: 15,
+                cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              🃏 Utiliser un Joker
+            </button>
+            <p style={{ color: '#7a819c', fontSize: 13 }}>Sinon la progression sera remise à zéro.</p>
+          </>
+        )}
+      </main>
+    );
+  }
+
   // --- Écran 2 : en attente de question ---
   if (!question) {
     return (
@@ -267,6 +413,12 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
         <div style={{ fontSize: 36 }}>{team.preset.avatar}</div>
         <h2 style={{ fontWeight: 800 }}>{team.preset.name}</h2>
         <p style={{ color: '#7a819c' }}>En attente du démarrage…</p>
+        {myTeamData && (myTeamData.camembert_won?.length > 0 || myTeamData.camembert_jokers > 0) && (
+          <p style={{ color: '#7a819c', fontSize: 13, marginTop: 8 }}>
+            🥧×{myTeamData.camembert_won.length}
+            {myTeamData.camembert_jokers > 0 ? ` · 🃏×${myTeamData.camembert_jokers}` : ''}
+          </p>
+        )}
         <button
           onClick={leaveTeam}
           style={{
@@ -306,6 +458,11 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
         </div>
       ) : (
         <>
+          {camembertCategory && (
+            <p style={{ textAlign: 'center', color: '#6c7bf7', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
+              {camembertCategory.emoji} {camembertCategory.name}
+            </p>
+          )}
           <p style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.4, marginBottom: 20, textAlign: 'center' }}>
             {question.prompt}
           </p>

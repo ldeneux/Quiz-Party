@@ -150,7 +150,37 @@ export function scoreSurvie(
  *
  * NOTE : suppose un tour par tour. Nécessite un écran dédié.
  */
-export type ParticipatifState = {
+/**
+ * Mode CAMEMBERTS
+ * - 3 bonnes réponses d'affilée dans une catégorie = 1 part gagnée (définitive)
+ * - Une mauvaise réponse alors qu'il y a une progression en cours (1 ou 2/3)
+ *   remet à zéro CETTE catégorie — sauf protection par un Joker (géré côté appelant)
+ * - +10 pts par part gagnée, +50 pts bonus pour la première équipe qui a
+ *   toutes ses parts
+ * - Jokers : 1 gagné par part complétée, plafond 3, utilisables sur
+ *   n'importe quelle catégorie
+ */
+export function applyCamembertAnswer(
+  isCorrect: boolean,
+  currentStreak: number
+): { newStreak: number; justWon: boolean; wouldReset: boolean } {
+  if (isCorrect) {
+    const newStreak = currentStreak + 1;
+    if (newStreak >= 3) {
+      return { newStreak: 0, justWon: true, wouldReset: false };
+    }
+    return { newStreak, justWon: false, wouldReset: false };
+  }
+  if (currentStreak > 0) {
+    return { newStreak: currentStreak, justWon: false, wouldReset: true };
+  }
+  return { newStreak: 0, justWon: false, wouldReset: false };
+}
+
+export const CAMEMBERT_POINTS_PER_WEDGE = 10;
+export const CAMEMBERT_WIN_BONUS = 50;
+export const CAMEMBERT_MAX_JOKERS = 3;
+export const CAMEMBERT_JOKER_WINDOW_SECONDS = 10;
   pot: number;
   teamCount: number;
 };

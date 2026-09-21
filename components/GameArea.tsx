@@ -2,7 +2,16 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { scoreClassique, scoreSurvie, scoreDefi } from '@/lib/scoring';
+import {
+  scoreClassique,
+  scoreSurvie,
+  scoreDefi,
+  applyCamembertAnswer,
+  CAMEMBERT_POINTS_PER_WEDGE,
+  CAMEMBERT_WIN_BONUS,
+  CAMEMBERT_MAX_JOKERS,
+  CAMEMBERT_JOKER_WINDOW_SECONDS,
+} from '@/lib/scoring';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type Team = {
@@ -12,7 +21,12 @@ type Team = {
   color: string;
   score: number;
   lives: number;
+  camembert_progress: Record<string, number>;
+  camembert_won: string[];
+  camembert_jokers: number;
 };
+
+type Category = { id: string; name: string; emoji: string };
 
 type Question = {
   id: string;
@@ -50,7 +64,7 @@ export default function GameArea({
   const [teams, setTeams] = useState<Team[]>([]);
   const [answeredTeamIds, setAnsweredTeamIds] = useState<Set<string>>(new Set());
   const [question, setQuestion] = useState<Question | null>(null);
-  const [phase, setPhase] = useState<'lobby' | 'question' | 'revealed' | 'finished'>('lobby');
+  const [phase, setPhase] = useState<'lobby' | 'choosing-category' | 'question' | 'revealed' | 'finished'>('lobby');
   const [secondsLeft, setSecondsLeft] = useState(QUESTION_TIME_SECONDS);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -67,6 +81,21 @@ export default function GameArea({
   const participatifTurnsRef = useRef<Record<string, number>>({});
   const participatifIndexRef = useRef(0);
   const participatifPotRef = useRef(0);
+
+  // --- Mode Camemberts ---
+  const [wedgeCategories, setWedgeCategories] = useState<Category[]>([]);
+  const wedgeCategoriesRef = useRef<Category[]>([]);
+  const camembertChooserIndexRef = useRef(0);
+  const [camembertChooserTeamId, setCamembertChooserTeamId] = useState<string | null>(null);
+  const camembertChooserTeamIdRef = useRef<string | null>(null);
+  const [camembertCategory, setCamembertCategory] = useState<Category | null>(null);
+  const camembertCategoryRef = useRef<Category | null>(null);
+  const [awaitingCategoryPick, setAwaitingCategoryPick] = useState(false);
+  const [pendingJokerTeamIds, setPendingJokerTeamIds] = useState<string[]>([]);
+  const usedJokerTeamIdsRef = useRef<Set<string>>(new Set());
+  const [jokerSecondsLeft, setJokerSecondsLeft] = useState(0);
+  const [camembertWinnerId, setCamembertWinnerId] = useState<string | null>(null);
+  const proceedWithCategoryRef = useRef<((categoryId: string) => void) | null>(null);
 
   useEffect(() => {
     const loadGame = async () => {
@@ -126,6 +155,19 @@ export default function GameArea({
       }
     );
 
+    // Mode Camemberts : réception du choix de catégorie fait par l'équipe désignée
+    ch.on('broadcast', { event: 'choose-category:pick' }, ({ payload }) => {
+      if (payload.teamId === camembertChooserTeamIdRef.current) {
+        proceedWithCategoryRef.current?.(payload.categoryId);
+      }
+    });
+
+    // Mode Camemberts : une équipe décide d'utiliser un Joker pour se protéger
+    ch.on('broadcast', { event: 'joker:use' }, ({ payload }) => {
+      usedJokerTeamIdsRef.current.add(payload.teamId);
+      setPendingJokerTeamIds((prev) => prev.filter((id) => id !== payload.teamId));
+    });
+
     ch.subscribe();
     setChannel(ch);
 
@@ -152,7 +194,12 @@ export default function GameArea({
       channel?.send({
         type: 'broadcast',
         event: 'question:show',
-        payload: { question: q, startedAt: Date.now(), turnTeamId: participatifTurnTeamIdRef.current },
+        payload: {
+          question: q,
+          startedAt: Date.now(),
+          turnTeamId: participatifTurnTeamIdRef.current,
+          camembertCategory: camembertCategoryRef.current,
+        },
       });
     },
     [channel, gameId]
@@ -212,7 +259,102 @@ export default function GameArea({
     setPhase('finished');
   }, [teams, gameId]);
 
-  const goToNextQuestion = useCallback(() => {
+  // --- Mode Camemberts ---
+
+  const initWedgeCategoriesIfNeeded = useCallback(async () => {
+    if (wedgeCategoriesRef.current.length > 0) return;
+
+    const { data: game } = await supabase.from('games').select('profile_id, camembert_categories').eq('id', gameId).single();
+
+    if (game?.camembert_categories && Array.isArray(game.camembert_categories) && game.camembert_categories.length > 0) {
+      wedgeCategoriesRef.current = game.camembert_categories as Category[];
+      setWedgeCategories(game.camembert_categories as Category[]);
+      return;
+    }
+
+    let categoryIds: string[] = [];
+    if (game?.profile_id) {
+      const { data: profilePacks } = await supabase.from('quiz_profile_packs').select('pack_id').eq('profile_id', game.profile_id);
+      const packIds = (profilePacks ?? []).map((p) => p.pack_id);
+      const { data: packs } = await supabase.from('question_packs').select('category_id').in('id', packIds);
+      categoryIds = Array.from(new Set((packs ?? []).map((p: any) => p.category_id).filter(Boolean)));
+    }
+
+    const n = Math.min(Math.max(teams.length, 6), 10);
+    const chosenIds = categoryIds.slice(0, n);
+
+    const { data: categoriesData } = await supabase.from('categories').select('id, name, emoji').in('id', chosenIds);
+    const chosen = (categoriesData as Category[]) ?? [];
+
+    wedgeCategoriesRef.current = chosen;
+    setWedgeCategories(chosen);
+    await supabase.from('games').update({ camembert_categories: chosen }).eq('id', gameId);
+  }, [gameId, teams.length]);
+
+  const pickCamembertChooser = useCallback((): Team | null => {
+    if (teams.length === 0) return null;
+    const idx = camembertChooserIndexRef.current % teams.length;
+    camembertChooserIndexRef.current = (idx + 1) % teams.length;
+    const chooser = teams[idx];
+    camembertChooserTeamIdRef.current = chooser.id;
+    setCamembertChooserTeamId(chooser.id);
+    return chooser;
+  }, [teams]);
+
+  const categoryChoiceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startCategoryChoice = useCallback(async () => {
+    await initWedgeCategoriesIfNeeded();
+    const chooser = pickCamembertChooser();
+    if (!chooser) return;
+
+    const won = chooser.camembert_won ?? [];
+    let available = wedgeCategoriesRef.current.filter((c) => !won.includes(c.id));
+    if (available.length === 0) available = wedgeCategoriesRef.current; // sécurité, ne devrait pas arriver
+
+    setPhase('choosing-category');
+    setAwaitingCategoryPick(true);
+
+    channel?.send({
+      type: 'broadcast',
+      event: 'choose-category:prompt',
+      payload: { chooserTeamId: chooser.id, chooserTeamName: chooser.name, categories: available },
+    });
+
+    if (categoryChoiceTimeoutRef.current) clearTimeout(categoryChoiceTimeoutRef.current);
+    categoryChoiceTimeoutRef.current = setTimeout(() => {
+      proceedWithCategoryRef.current?.(available[0].id);
+    }, 20000);
+  }, [initWedgeCategoriesIfNeeded, pickCamembertChooser, channel]);
+
+  const proceedWithCategory = useCallback(
+    (categoryId: string) => {
+      if (categoryChoiceTimeoutRef.current) {
+        clearTimeout(categoryChoiceTimeoutRef.current);
+        categoryChoiceTimeoutRef.current = null;
+      }
+      setAwaitingCategoryPick(false);
+      const cat = wedgeCategoriesRef.current.find((c) => c.id === categoryId) ?? null;
+      setCamembertCategory(cat);
+      camembertCategoryRef.current = cat;
+      setLoadError(null);
+      loadNextQuestion(
+        gameId,
+        startQuestion,
+        setLoadError,
+        () => setPhase('finished'),
+        askedQuestionIdsRef.current,
+        categoryId
+      );
+    },
+    [gameId, startQuestion]
+  );
+
+  useEffect(() => {
+    proceedWithCategoryRef.current = proceedWithCategory;
+  }, [proceedWithCategory]);
+
+
     if (mode === 'defi') {
       const hasNext = pickNextChallenger();
       if (!hasNext) {
@@ -227,9 +369,13 @@ export default function GameArea({
         return;
       }
     }
+    if (mode === 'camembert') {
+      startCategoryChoice();
+      return;
+    }
     setLoadError(null);
     loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
-  }, [mode, pickNextChallenger, pickNextParticipatifTurn, finishParticipatif, gameId, startQuestion]);
+  }, [mode, pickNextChallenger, pickNextParticipatifTurn, finishParticipatif, startCategoryChoice, gameId, startQuestion]);
 
   useEffect(() => {
     if (!autoAttempted && channel && phase === 'lobby' && teams.length > 0) {
@@ -327,6 +473,83 @@ export default function GameArea({
       return;
     }
 
+    if (mode === 'camembert') {
+      const categoryId = camembertCategoryRef.current?.id;
+      const immediateUpdates: { teamId: string; progress: Record<string, number>; won: string[]; jokers: number; pointsDelta: number }[] = [];
+      const jokerCandidates: string[] = [];
+      let winnerTeam: Team | null = null;
+
+      for (const t of teams) {
+        const answer = submitted.find((s) => s.teamId === t.id);
+        const isCorrect = answer?.choice === question.correct_choice;
+        const currentStreak = categoryId ? (t.camembert_progress?.[categoryId] ?? 0) : 0;
+        const { newStreak, justWon, wouldReset } = applyCamembertAnswer(isCorrect, currentStreak);
+
+        const newProgress = { ...(t.camembert_progress ?? {}) };
+        const newWon = [...(t.camembert_won ?? [])];
+        let newJokers = t.camembert_jokers ?? 0;
+        let pointsDelta = 0;
+
+        if (justWon && categoryId) {
+          delete newProgress[categoryId];
+          newWon.push(categoryId);
+          pointsDelta += CAMEMBERT_POINTS_PER_WEDGE;
+          newJokers = Math.min(newJokers + 1, CAMEMBERT_MAX_JOKERS);
+          if (newWon.length === wedgeCategoriesRef.current.length) {
+            winnerTeam = t;
+            pointsDelta += CAMEMBERT_WIN_BONUS;
+          }
+        } else if (wouldReset && categoryId) {
+          if ((t.camembert_jokers ?? 0) > 0) {
+            jokerCandidates.push(t.id);
+            continue; // décision différée : ne pas toucher à la progression tout de suite
+          }
+          newProgress[categoryId] = 0;
+        } else if (categoryId) {
+          newProgress[categoryId] = newStreak;
+        }
+
+        immediateUpdates.push({ teamId: t.id, progress: newProgress, won: newWon, jokers: newJokers, pointsDelta });
+      }
+
+      for (const u of immediateUpdates) {
+        await supabase
+          .from('teams')
+          .update({ camembert_progress: u.progress, camembert_won: u.won, camembert_jokers: u.jokers })
+          .eq('id', u.teamId);
+        if (u.pointsDelta !== 0) {
+          await supabase.rpc('increment_team_score', { p_team_id: u.teamId, p_points: u.pointsDelta });
+        }
+      }
+
+      if (winnerTeam) {
+        setCamembertWinnerId(winnerTeam.id);
+        const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
+        if (refreshedTeams) setTeams(refreshedTeams as Team[]);
+        setTimeout(() => setPhase('finished'), 50);
+        return;
+      }
+
+      if (jokerCandidates.length > 0 && categoryId) {
+        usedJokerTeamIdsRef.current = new Set();
+        setPendingJokerTeamIds(jokerCandidates);
+        channel?.send({
+          type: 'broadcast',
+          event: 'joker:offer',
+          payload: {
+            teamIds: jokerCandidates,
+            categoryName: camembertCategoryRef.current?.name,
+            seconds: CAMEMBERT_JOKER_WINDOW_SECONDS,
+          },
+        });
+        setJokerSecondsLeft(CAMEMBERT_JOKER_WINDOW_SECONDS);
+      } else {
+        const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
+        if (refreshedTeams) setTeams(refreshedTeams as Team[]);
+      }
+      return;
+    }
+
     const results =
       mode === 'defi' && challengerTeamId
         ? scoreDefi(submitted as any, question.correct_choice, challengerTeamId)
@@ -341,6 +564,47 @@ export default function GameArea({
     const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
     if (refreshedTeams) setTeams(refreshedTeams as Team[]);
   }, [question, channel, gameId, teams, mode, challengerTeamId, participatifTurnTeamId]);
+
+  // Finalise la fenêtre Joker : applique la protection pour les équipes
+  // qui ont répondu à temps, remet à zéro la progression des autres.
+  const finalizeJokerWindow = useCallback(async () => {
+    const categoryId = camembertCategoryRef.current?.id;
+    if (!categoryId) {
+      setPendingJokerTeamIds([]);
+      return;
+    }
+
+    for (const teamId of pendingJokerTeamIds) {
+      const t = teams.find((tt) => tt.id === teamId);
+      if (!t) continue;
+
+      if (usedJokerTeamIdsRef.current.has(teamId)) {
+        await supabase
+          .from('teams')
+          .update({ camembert_jokers: Math.max((t.camembert_jokers ?? 0) - 1, 0) })
+          .eq('id', teamId);
+      } else {
+        const newProgress = { ...(t.camembert_progress ?? {}), [categoryId]: 0 };
+        await supabase.from('teams').update({ camembert_progress: newProgress }).eq('id', teamId);
+      }
+    }
+
+    setPendingJokerTeamIds([]);
+    usedJokerTeamIdsRef.current = new Set();
+
+    const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
+    if (refreshedTeams) setTeams(refreshedTeams as Team[]);
+  }, [pendingJokerTeamIds, teams, gameId]);
+
+  useEffect(() => {
+    if (pendingJokerTeamIds.length === 0) return;
+    if (jokerSecondsLeft <= 0) {
+      finalizeJokerWindow();
+      return;
+    }
+    const t = setTimeout(() => setJokerSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [pendingJokerTeamIds, jokerSecondsLeft, finalizeJokerWindow]);
 
   const quitKeepingScores = () => {
     setShowQuitConfirm(false);
@@ -360,15 +624,27 @@ export default function GameArea({
   // --- Écran : partie terminée (plus de questions disponibles) ---
   if (phase === 'finished') {
     const ranked = [...teams].sort((a, b) => b.score - a.score);
+    const winner = camembertWinnerId ? teams.find((t) => t.id === camembertWinnerId) : null;
     return (
       <div style={styles.mainCard}>
         <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🏁 Partie terminée</h2>
-        <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 20 }}>Voici le classement final.</p>
+        {winner ? (
+          <p style={{ color: '#35c2a3', fontSize: 14, fontWeight: 700, marginBottom: 20 }}>
+            🥧 {winner.avatar} {winner.name} a complété tous ses camemberts !
+          </p>
+        ) : (
+          <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 20 }}>Voici le classement final.</p>
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
           {ranked.map((t, i) => (
             <div key={t.id} style={{ ...styles.teamTile, borderColor: i === 0 ? '#ffb648' : '#eaedf6' }}>
               {i === 0 ? '🏆 ' : `${i + 1}. `}
               <span>{t.avatar}</span> {t.name} — <strong>{t.score} pts</strong>
+              {mode === 'camembert' && (
+                <span style={{ marginLeft: 8, color: '#7a819c', fontSize: 12 }}>
+                  ({(t.camembert_won ?? []).length}/{wedgeCategories.length} parts)
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -412,6 +688,16 @@ export default function GameArea({
         </div>
       )}
 
+      {phase === 'choosing-category' && (
+        <div style={styles.lobbyCard}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🥧</div>
+          <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>
+            {teams.find((t) => t.id === camembertChooserTeamId)?.name ?? 'Une équipe'} choisit une catégorie…
+          </h1>
+          <p style={{ color: '#7a819c', fontSize: 13.5 }}>La sélection se fait sur son téléphone.</p>
+        </div>
+      )}
+
       {(phase === 'question' || phase === 'revealed') && question && (
         <div style={styles.mainCard}>
           <div style={styles.qHead}>
@@ -419,6 +705,11 @@ export default function GameArea({
             {mode === 'participatif' && (
               <span style={{ ...styles.qTag, background: '#fff3e0', color: '#b5761f' }}>
                 🪙 Cagnotte : {participatifPotRef.current} pts
+              </span>
+            )}
+            {mode === 'camembert' && camembertCategory && (
+              <span style={{ ...styles.qTag, background: '#eef0f8', color: '#6c7bf7' }}>
+                {camembertCategory.emoji} {camembertCategory.name}
               </span>
             )}
             {phase === 'question' && <div style={styles.timer}>{secondsLeft}s</div>}
@@ -470,10 +761,18 @@ export default function GameArea({
                 >
                   {mode === 'defi' && t.id === challengerTeamId && <span title="Challenger">👑 </span>}
                   {mode === 'participatif' && t.id === participatifTurnTeamId && <span title="Son tour">🎙️ </span>}
+                  {mode === 'camembert' && t.id === camembertChooserTeamId && <span title="Choisit la catégorie">🥧 </span>}
                   <span>{t.avatar}</span> {t.name}
                   {mode === 'survie' && (
                     <span style={{ marginLeft: 6, fontSize: 12 }}>
                       {(t.lives ?? 3) > 0 ? '❤️'.repeat(t.lives ?? 3) : '💀'}
+                    </span>
+                  )}
+                  {mode === 'camembert' && (
+                    <span style={{ marginLeft: 6, fontSize: 12, color: '#7a819c' }}>
+                      {(t.camembert_won ?? []).length}/{wedgeCategories.length} parts
+                      {(t.camembert_jokers ?? 0) > 0 ? ` · 🃏×${t.camembert_jokers}` : ''}
+                      {pendingJokerTeamIds.includes(t.id) ? ` · ⏳ décision Joker (${jokerSecondsLeft}s)` : ''}
                     </span>
                   )}
                   {phase === 'revealed' && (
@@ -495,7 +794,7 @@ export default function GameArea({
               {loadError && (
                 <p style={{ color: '#ff7a68', fontSize: 14, marginBottom: 12 }}>{loadError}</p>
               )}
-              <button style={styles.startBtn} onClick={goToNextQuestion}>
+              <button style={styles.startBtn} onClick={goToNextQuestion} disabled={pendingJokerTeamIds.length > 0}>
                 Question suivante
               </button>
               <button
@@ -570,7 +869,8 @@ async function loadNextQuestion(
   startQuestion: (q: Question) => void,
   onError: (msg: string) => void,
   onExhausted: () => void,
-  askedQuestionIds: string[] = []
+  askedQuestionIds: string[] = [],
+  forceCategoryId?: string
 ) {
   const { data: game } = await supabase
     .from('games')
@@ -615,6 +915,14 @@ async function loadNextQuestion(
       "Aucune question disponible. Va dans Paramétrage pour créer des packs (Gemini) et un profil, ou vérifie que la table `questions` contient des lignes validées."
     );
     return;
+  }
+
+  if (forceCategoryId) {
+    pool = pool.filter((q) => q.category_id === forceCategoryId);
+    if (pool.length === 0) {
+      onError("Aucune question disponible pour cette catégorie précise. Ajoute des questions à ce pack dans Paramétrage.");
+      return;
+    }
   }
 
   const freshPool = pool.filter((q) => !askedQuestionIds.includes(q.id));

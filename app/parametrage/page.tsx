@@ -121,7 +121,11 @@ export default function ParametragePage() {
   };
 
   const deleteCategory = async (id: string) => {
-    await supabase.from('categories').delete().eq('id', id);
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+    if (error) {
+      setLoadNotice(`Erreur lors de la suppression de la catégorie : ${error.message}`);
+      return;
+    }
     loadAll();
   };
 
@@ -163,7 +167,11 @@ export default function ParametragePage() {
   };
 
   const deletePack = async (id: string) => {
-    await supabase.from('question_packs').delete().eq('id', id);
+    const { error } = await supabase.from('question_packs').delete().eq('id', id);
+    if (error) {
+      setLoadNotice(`Erreur lors de la suppression du pack : ${error.message}`);
+      return;
+    }
     loadAll();
   };
 
@@ -223,7 +231,11 @@ export default function ParametragePage() {
   };
 
   const deleteProfile = async (id: string) => {
-    await supabase.from('quiz_profiles').delete().eq('id', id);
+    const { error } = await supabase.from('quiz_profiles').delete().eq('id', id);
+    if (error) {
+      setLoadNotice(`Erreur lors de la suppression du profil : ${error.message}`);
+      return;
+    }
     if (editingProfileId === id) cancelEditProfile();
     loadAll();
   };
