@@ -354,8 +354,7 @@ export default function GameArea({
     proceedWithCategoryRef.current = proceedWithCategory;
   }, [proceedWithCategory]);
 
-useEffect(() => {
-  
+  const goToNextQuestion = useCallback(() => {
     if (mode === 'defi') {
       const hasNext = pickNextChallenger();
       if (!hasNext) {
@@ -381,9 +380,9 @@ useEffect(() => {
   useEffect(() => {
     if (!autoAttempted && channel && phase === 'lobby' && teams.length > 0) {
       setAutoAttempted(true);
-      loadNextQuestion();
+      goToNextQuestion();
     }
-  }, [autoAttempted, channel, phase, teams.length, gameId, loadNextQuestion]);
+  }, [autoAttempted, channel, phase, teams.length, gameId, goToNextQuestion]);
 
   useEffect(() => {
     if (phase !== 'question') return;
@@ -682,7 +681,7 @@ useEffect(() => {
           )}
 
           {teams.length > 0 && (
-            <button style={styles.startBtn} onClick={loadNextQuestion}>
+            <button style={styles.startBtn} onClick={goToNextQuestion}>
               Démarrer la partie ({teams.length} équipes)
             </button>
           )}
@@ -795,7 +794,7 @@ useEffect(() => {
               {loadError && (
                 <p style={{ color: '#ff7a68', fontSize: 14, marginBottom: 12 }}>{loadError}</p>
               )}
-              <button style={styles.startBtn} onClick={loadNextQuestion} disabled={pendingJokerTeamIds.length > 0}>
+              <button style={styles.startBtn} onClick={goToNextQuestion} disabled={pendingJokerTeamIds.length > 0}>
                 Question suivante
               </button>
               <button

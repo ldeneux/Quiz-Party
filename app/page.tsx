@@ -695,37 +695,44 @@ export default function ConsolePage() {
               <p style={{ color: '#7a819c', fontSize: 13.5 }}>Aucune réponse enregistrée pour l'instant.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                {Object.entries(statsData).map(([teamId, data]) => (
-                  <div key={teamId}>
-                    <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
-                      {data.teamAvatar} {data.teamName}
-                    </div>
-                    {Object.keys(data.categories).length === 0 ? (
-                      <p style={{ color: '#7a819c', fontSize: 12.5, marginLeft: 8 }}>Pas encore de réponse.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {Object.entries(data.categories).map(([catName, counts]) => (
-                          <div
-                            key={catName}
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              fontSize: 13,
-                              background: '#f4f6fb',
-                              borderRadius: 10,
-                              padding: '6px 12px',
-                            }}
-                          >
-                            <span>{catName}</span>
-                            <span>
-                              <span style={{ color: '#35c2a3', fontWeight: 700 }}>{counts.correct} ✓</span>
-                              {'  '}
-                              <span style={{ color: '#ff7a68', fontWeight: 700 }}>{counts.wrong} ✕</span>
-                            </span>
-                          </div>
-                        ))}
+                {Object.entries(statsData).map(
+                  ([
+                    teamId,
+                    data,
+                  ]: [
+                    string,
+                    { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }
+                  ]) => (
+                    <div key={teamId}>
+                      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
+                        {data.teamAvatar} {data.teamName}
                       </div>
-                    )}
+                      {Object.keys(data.categories).length === 0 ? (
+                        <p style={{ color: '#7a819c', fontSize: 12.5, marginLeft: 8 }}>Pas encore de réponse.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {Object.entries(data.categories).map(([catName, counts]: [string, { correct: number; wrong: number }]) => (
+                            <div
+                              key={catName}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: 13,
+                                background: '#f4f6fb',
+                                borderRadius: 10,
+                                padding: '6px 12px',
+                              }}
+                            >
+                              <span>{catName}</span>
+                              <span>
+                                <span style={{ color: '#35c2a3', fontWeight: 700 }}>{counts.correct} ✓</span>
+                                {'  '}
+                                <span style={{ color: '#ff7a68', fontWeight: 700 }}>{counts.wrong} ✕</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                   </div>
                 ))}
               </div>

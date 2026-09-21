@@ -120,7 +120,8 @@ export default function ParametragePage() {
     loadAll();
   };
 
-  const deleteCategory = async (id: string) => {
+  const deleteCategory = async (id: string, name: string) => {
+    if (!window.confirm(`Supprimer la catégorie "${name}" ? Les packs qui l'utilisent perdront leur catégorie associée.`)) return;
     const { error } = await supabase.from('categories').delete().eq('id', id);
     if (error) {
       setLoadNotice(`Erreur lors de la suppression de la catégorie : ${error.message}`);
@@ -230,7 +231,8 @@ export default function ParametragePage() {
     loadAll();
   };
 
-  const deleteProfile = async (id: string) => {
+  const deleteProfile = async (id: string, name: string) => {
+    if (!window.confirm(`Supprimer le profil "${name}" ?`)) return;
     const { error } = await supabase.from('quiz_profiles').delete().eq('id', id);
     if (error) {
       setLoadNotice(`Erreur lors de la suppression du profil : ${error.message}`);
@@ -301,7 +303,7 @@ export default function ParametragePage() {
                   {c.emoji} {c.name}
                 </button>
                 <button onClick={() => editCategory(c)} title="Modifier" style={iconBtn}>✏️</button>
-                <button onClick={() => deleteCategory(c.id)} title="Supprimer" style={iconBtn}>✕</button>
+                <button onClick={() => deleteCategory(c.id, c.name)} title="Supprimer" style={iconBtn}>✕</button>
               </div>
             ))}
           </div>
@@ -411,7 +413,7 @@ export default function ParametragePage() {
                 </span>
                 <span style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => startEditProfile(p)} title="Modifier" style={iconBtn}>✏️</button>
-                  <button onClick={() => deleteProfile(p.id)} style={deleteBtn}>✕</button>
+                  <button onClick={() => deleteProfile(p.id, p.name)} style={deleteBtn}>✕</button>
                 </span>
               </div>
             ))}

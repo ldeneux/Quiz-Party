@@ -182,11 +182,10 @@ export const CAMEMBERT_WIN_BONUS = 50;
 export const CAMEMBERT_MAX_JOKERS = 3;
 export const CAMEMBERT_JOKER_WINDOW_SECONDS = 10;
 
-// ✅ Correction : interface manquante
-export interface ParticipatifState {
+export type ParticipatifState = {
   pot: number;
   teamCount: number;
-}
+};
 
 export function scoreParticipatifTurn(
   isCorrect: boolean,
