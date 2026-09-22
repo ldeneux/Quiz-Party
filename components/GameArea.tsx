@@ -37,6 +37,9 @@ type Question = {
   choice_d: string;
   correct_choice: 'a' | 'b' | 'c' | 'd';
   explanation: string | null;
+  category_id?: string;
+  category_name?: string;
+  category_emoji?: string;
 };
 
 type RevealInfo = { choice: string | null; timeMs: number | null };
@@ -66,7 +69,9 @@ export default function GameArea({
   const [teams, setTeams] = useState<Team[]>([]);
   const [answeredTeamIds, setAnsweredTeamIds] = useState<Set<string>>(new Set());
   const [question, setQuestion] = useState<Question | null>(null);
-  const [phase, setPhase] = useState<'lobby' | 'choosing-category' | 'question' | 'revealed' | 'finished'>('lobby');
+  const [phase, setPhase] = useState<
+    'lobby' | 'camembert-setup' | 'choosing-category' | 'question' | 'revealed' | 'finished'
+  >('lobby');
   const [secondsLeft, setSecondsLeft] = useState(QUESTION_TIME_SECONDS);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -269,35 +274,9 @@ export default function GameArea({
 
   // --- Mode Camemberts ---
 
-  const initWedgeCategoriesIfNeeded = useCallback(async () => {
-    if (wedgeCategoriesRef.current.length > 0) return;
-
-    const { data: game } = await supabase.from('games').select('profile_id, camembert_categories').eq('id', gameId).single();
-
-    if (game?.camembert_categories && Array.isArray(game.camembert_categories) && game.camembert_categories.length > 0) {
-      wedgeCategoriesRef.current = game.camembert_categories as Category[];
-      setWedgeCategories(game.camembert_categories as Category[]);
-      return;
-    }
-
-    let categoryIds: string[] = [];
-    if (game?.profile_id) {
-      const { data: profilePacks } = await supabase.from('quiz_profile_packs').select('pack_id').eq('profile_id', game.profile_id);
-      const packIds = (profilePacks ?? []).map((p) => p.pack_id);
-      const { data: packs } = await supabase.from('question_packs').select('category_id').in('id', packIds);
-      categoryIds = Array.from(new Set((packs ?? []).map((p: any) => p.category_id).filter(Boolean)));
-    }
-
-    const n = Math.min(Math.max(teams.length, 6), 10);
-    const chosenIds = categoryIds.slice(0, n);
-
-    const { data: categoriesData } = await supabase.from('categories').select('id, name, emoji').in('id', chosenIds);
-    const chosen = (categoriesData as Category[]) ?? [];
-
-    wedgeCategoriesRef.current = chosen;
-    setWedgeCategories(chosen);
-    await supabase.from('games').update({ camembert_categories: chosen }).eq('id', gameId);
-  }, [gameId, teams.length]);
+  const [camembertSetupPool, setCamembertSetupPool] = useState<Category[]>([]);
+  const [camembertSetupNeeded, setCamembertSetupNeeded] = useState(6);
+  const [camembertSetupSelected, setCamembertSetupSelected] = useState<string[]>([]);
 
   const pickCamembertChooser = useCallback((): Team | null => {
     if (teams.length === 0) return null;
@@ -312,7 +291,6 @@ export default function GameArea({
   const categoryChoiceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startCategoryChoice = useCallback(async () => {
-    await initWedgeCategoriesIfNeeded();
     const chooser = pickCamembertChooser();
     if (!chooser) return;
 
@@ -333,7 +311,60 @@ export default function GameArea({
     categoryChoiceTimeoutRef.current = setTimeout(() => {
       proceedWithCategoryRef.current?.(available[0].id);
     }, 20000);
-  }, [initWedgeCategoriesIfNeeded, pickCamembertChooser, channel]);
+  }, [pickCamembertChooser, channel]);
+
+  const beginCamembertSetup = useCallback(async () => {
+    const { data: game } = await supabase.from('games').select('profile_id, camembert_categories').eq('id', gameId).single();
+
+    if (game?.camembert_categories && Array.isArray(game.camembert_categories) && game.camembert_categories.length > 0) {
+      wedgeCategoriesRef.current = game.camembert_categories as Category[];
+      setWedgeCategories(game.camembert_categories as Category[]);
+      startCategoryChoice();
+      return;
+    }
+
+    let categoryIds: string[] = [];
+    if (game?.profile_id) {
+      const { data: profilePacks } = await supabase.from('quiz_profile_packs').select('pack_id').eq('profile_id', game.profile_id);
+      const packIds = (profilePacks ?? []).map((p) => p.pack_id);
+      const { data: packs } = await supabase.from('question_packs').select('category_id').in('id', packIds);
+      categoryIds = Array.from(new Set((packs ?? []).map((p: any) => p.category_id).filter(Boolean)));
+    }
+
+    const { data: categoriesData } = await supabase.from('categories').select('id, name, emoji').in('id', categoryIds);
+    const pool = (categoriesData as Category[]) ?? [];
+    const n = Math.min(Math.max(teams.length, 6), 10);
+
+    if (pool.length <= n) {
+      // Le profil n'a pas plus de thèmes que nécessaire : pas de vrai choix possible, on prend tout.
+      wedgeCategoriesRef.current = pool;
+      setWedgeCategories(pool);
+      await supabase.from('games').update({ camembert_categories: pool }).eq('id', gameId);
+      startCategoryChoice();
+      return;
+    }
+
+    setCamembertSetupPool(pool);
+    setCamembertSetupNeeded(n);
+    setCamembertSetupSelected(pool.slice(0, n).map((c) => c.id));
+    setPhase('camembert-setup');
+  }, [gameId, teams.length, startCategoryChoice]);
+
+  const toggleCamembertSetupCategory = (id: string) => {
+    setCamembertSetupSelected((prev) => {
+      if (prev.includes(id)) return prev.filter((c) => c !== id);
+      if (prev.length >= camembertSetupNeeded) return prev; // déjà au max
+      return [...prev, id];
+    });
+  };
+
+  const confirmCamembertSetup = useCallback(async () => {
+    const chosen = camembertSetupPool.filter((c) => camembertSetupSelected.includes(c.id));
+    wedgeCategoriesRef.current = chosen;
+    setWedgeCategories(chosen);
+    await supabase.from('games').update({ camembert_categories: chosen }).eq('id', gameId);
+    startCategoryChoice();
+  }, [camembertSetupPool, camembertSetupSelected, gameId, startCategoryChoice]);
 
   const proceedWithCategory = useCallback(
     (categoryId: string) => {
@@ -378,12 +409,16 @@ export default function GameArea({
       }
     }
     if (mode === 'camembert') {
-      startCategoryChoice();
+      if (wedgeCategoriesRef.current.length === 0) {
+        beginCamembertSetup();
+      } else {
+        startCategoryChoice();
+      }
       return;
     }
     setLoadError(null);
     loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
-  }, [mode, pickNextChallenger, pickNextParticipatifTurn, finishParticipatif, startCategoryChoice, gameId, startQuestion]);
+  }, [mode, pickNextChallenger, pickNextParticipatifTurn, finishParticipatif, startCategoryChoice, beginCamembertSetup, gameId, startQuestion]);
 
   useEffect(() => {
     if (!autoAttempted && channel && phase === 'lobby' && teams.length > 0) {
@@ -696,6 +731,45 @@ export default function GameArea({
         </div>
       )}
 
+      {phase === 'camembert-setup' && (
+        <div style={styles.mainCard}>
+          <h1 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🥧 Choix des thèmes de la partie</h1>
+          <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 16 }}>
+            Sélectionne {camembertSetupNeeded} thème{camembertSetupNeeded > 1 ? 's' : ''} parmi les {camembertSetupPool.length}{' '}
+            disponibles ({teams.length} équipe{teams.length > 1 ? 's' : ''} en jeu).
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            {camembertSetupPool.map((c) => {
+              const selected = camembertSetupSelected.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => toggleCamembertSetupCategory(c.id)}
+                  style={{
+                    padding: '9px 16px',
+                    borderRadius: 999,
+                    border: selected ? '2px solid #ffb648' : '2px solid #eaedf6',
+                    background: selected ? '#fff3e0' : '#fff',
+                    fontWeight: 700,
+                    fontSize: 13.5,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {c.emoji} {c.name}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            style={{ ...styles.startBtn, opacity: camembertSetupSelected.length === camembertSetupNeeded ? 1 : 0.5 }}
+            onClick={confirmCamembertSetup}
+            disabled={camembertSetupSelected.length !== camembertSetupNeeded}
+          >
+            Valider ({camembertSetupSelected.length}/{camembertSetupNeeded})
+          </button>
+        </div>
+      )}
+
       {phase === 'choosing-category' && (
         <div style={styles.lobbyCard}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🥧</div>
@@ -710,14 +784,14 @@ export default function GameArea({
         <div style={styles.mainCard}>
           <div style={styles.qHead}>
             <span style={styles.qTag}>Question</span>
+            {(question.category_name || camembertCategory) && (
+              <span style={{ ...styles.qTag, background: '#eef0f8', color: '#6c7bf7' }}>
+                {question.category_emoji ?? camembertCategory?.emoji} {question.category_name ?? camembertCategory?.name}
+              </span>
+            )}
             {mode === 'participatif' && (
               <span style={{ ...styles.qTag, background: '#fff3e0', color: '#b5761f' }}>
                 🪙 Cagnotte : {participatifPotRef.current} pts
-              </span>
-            )}
-            {mode === 'camembert' && camembertCategory && (
-              <span style={{ ...styles.qTag, background: '#eef0f8', color: '#6c7bf7' }}>
-                {camembertCategory.emoji} {camembertCategory.name}
               </span>
             )}
             {phase === 'question' && <div style={styles.timer}>{secondsLeft}s</div>}
@@ -942,6 +1016,17 @@ async function loadNextQuestion(
   }
 
   const randomQuestion = freshPool[Math.floor(Math.random() * freshPool.length)];
+
+  // Attache le nom/emoji de la catégorie à la question, pour l'afficher
+  // quel que soit le mode de jeu (les packs mélangent plusieurs thèmes).
+  if (randomQuestion.category_id) {
+    const { data: cat } = await supabase.from('categories').select('name, emoji').eq('id', randomQuestion.category_id).single();
+    if (cat) {
+      randomQuestion.category_name = cat.name;
+      randomQuestion.category_emoji = cat.emoji;
+    }
+  }
+
   startQuestion(randomQuestion as Question);
 }
 

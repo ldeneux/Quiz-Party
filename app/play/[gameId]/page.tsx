@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { getRandomPresets, TeamPreset } from '@/lib/teamPresets';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type Question = {
   id: string;
@@ -12,6 +13,8 @@ type Question = {
   choice_b: string;
   choice_c: string;
   choice_d: string;
+  category_name?: string;
+  category_emoji?: string;
 };
 
 type CategoryChoice = { id: string; name: string; emoji: string };
@@ -37,6 +40,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
   const [turnTeamId, setTurnTeamId] = useState<string | null>(null);
   const [kicked, setKicked] = useState(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   // Mode Camemberts
   const [categoryChoicePrompt, setCategoryChoicePrompt] = useState<{
@@ -179,9 +183,11 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     });
 
     channel.subscribe();
+    channelRef.current = channel;
 
     return () => {
       supabase.removeChannel(channel);
+      channelRef.current = null;
     };
   }, [team, gameId]);
 
@@ -195,14 +201,6 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     if (error || !newTeam) return;
 
     setTeam({ id: newTeam.id, preset });
-
-    const channel = supabase.channel(`game:${gameId}:play`);
-    await channel.subscribe();
-    channel.send({
-      type: 'broadcast',
-      event: 'team:joined',
-      payload: { team: { id: newTeam.id, name: preset.name, avatar: preset.avatar, color: preset.color, score: 0 } },
-    });
   };
 
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -210,19 +208,17 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const pickCategory = (categoryId: string) => {
     if (!team) return;
     setCategoryChoicePrompt(null);
-    const channel = supabase.channel(`game:${gameId}:play`);
-    channel.subscribe(() => {
-      channel.send({ type: 'broadcast', event: 'choose-category:pick', payload: { teamId: team.id, categoryId } });
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'choose-category:pick',
+      payload: { teamId: team.id, categoryId },
     });
   };
 
   const useJoker = () => {
     if (!team || jokerUsed) return;
     setJokerUsed(true);
-    const channel = supabase.channel(`game:${gameId}:play`);
-    channel.subscribe(() => {
-      channel.send({ type: 'broadcast', event: 'joker:use', payload: { teamId: team.id } });
-    });
+    channelRef.current?.send({ type: 'broadcast', event: 'joker:use', payload: { teamId: team.id } });
   };
 
   const submitAnswer = async (choice: 'a' | 'b' | 'c' | 'd') => {
@@ -246,9 +242,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
 
     setHasAnswered(true);
 
-    const channel = supabase.channel(`game:${gameId}:play`);
-    await channel.subscribe();
-    channel.send({
+    channelRef.current?.send({
       type: 'broadcast',
       event: 'answer:submitted',
       payload: { teamId: team.id }, // jamais le choix : pas de fuite avant révélation
@@ -458,9 +452,9 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
         </div>
       ) : (
         <>
-          {camembertCategory && (
+          {(question.category_name || camembertCategory) && (
             <p style={{ textAlign: 'center', color: '#6c7bf7', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
-              {camembertCategory.emoji} {camembertCategory.name}
+              {question.category_emoji ?? camembertCategory?.emoji} {question.category_name ?? camembertCategory?.name}
             </p>
           )}
           <p style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.4, marginBottom: 20, textAlign: 'center' }}>
