@@ -238,9 +238,15 @@ export default function ConsolePage() {
     setShowNewGameChoice(false);
     if (!gameId) return;
 
-    await supabase.from('teams').update({ score: 0, lives: 3 }).eq('game_id', gameId);
+    await supabase
+      .from('teams')
+      .update({ score: 0, lives: 3, camembert_progress: {}, camembert_won: [], camembert_jokers: 0 })
+      .eq('game_id', gameId);
     await supabase.from('answers').delete().eq('game_id', gameId);
-    await supabase.from('games').update({ status: 'lobby', current_question_id: null }).eq('id', gameId);
+    await supabase
+      .from('games')
+      .update({ status: 'lobby', current_question_id: null, camembert_categories: [] })
+      .eq('id', gameId);
 
     const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
     if (refreshedTeams) setTeams(refreshedTeams as Team[]);
@@ -463,7 +469,7 @@ export default function ConsolePage() {
               <span style={{ color: '#7a819c', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
                 {t.score ?? 0} pts
                 {activeMode === 'camembert' &&
-                  ` · 🥧×${(t.camembert_won ?? []).length}${(t.camembert_jokers ?? 0) > 0 ? ` · 🃏×${t.camembert_jokers}` : ''}`}
+                  ` · 🥧×${(t.camembert_won ?? []).length}${(t.camembert_jokers ?? 0) > 0 ? ` · 🤡×${t.camembert_jokers}` : ''}`}
               </span>
               <button
                 onClick={() => removeTeam(t.id)}

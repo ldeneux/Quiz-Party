@@ -202,3 +202,32 @@ export function scoreParticipatifTurn(
     payout: { share } as any, // le caller distribue `share` à chaque équipe
   };
 }
+
+/**
+ * Mode PARTICIPATIF (v2) — toutes les équipes répondent, mais seule la
+ * réponse de l'équipe désignée fait avancer la cagnotte :
+ * - Bonne réponse de l'équipe désignée : la cagnotte double, on continue.
+ * - Mauvaise réponse : l'équipe est "sauvée" (pas de distribution, la
+ *   cagnotte reste identique) si le taux de bonnes réponses des AUTRES
+ *   équipes (rapporté au nombre total d'équipes) dépasse 60 %. Sinon, la
+ *   cagnotte est distribuée à parts égales à toutes les équipes puis
+ *   revient à 0 (elle repart à `teamCount` au tour suivant).
+ */
+export function scoreParticipatifTurnV2(
+  turnCorrect: boolean,
+  otherTeamsCorrectCount: number,
+  totalTeams: number,
+  state: ParticipatifState
+): { newState: ParticipatifState; payout: number | null; outcome: 'correct' | 'rescued' | 'distributed' } {
+  if (turnCorrect) {
+    return { newState: { ...state, pot: state.pot * 2 }, payout: null, outcome: 'correct' };
+  }
+
+  const rescueRate = totalTeams > 0 ? otherTeamsCorrectCount / totalTeams : 0;
+  if (rescueRate > 0.6) {
+    return { newState: state, payout: null, outcome: 'rescued' };
+  }
+
+  const share = state.pot / Math.max(totalTeams, 1);
+  return { newState: { pot: 0, teamCount: totalTeams }, payout: share, outcome: 'distributed' };
+}

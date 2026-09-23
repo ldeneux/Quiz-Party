@@ -369,7 +369,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
         <p style={{ color: '#7a819c', marginBottom: 16 }}>
           {team.preset.avatar} {team.preset.name}
         </p>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>🃏</div>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>🤡</div>
         <h2 style={{ fontWeight: 800, fontSize: 17, marginBottom: 10 }}>
           Votre progression sur "{jokerOffer.categoryName}" va être perdue
         </h2>
@@ -391,7 +391,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
                 marginBottom: 10,
               }}
             >
-              🃏 Utiliser un Joker
+              🤡 Utiliser un Joker
             </button>
             <p style={{ color: '#7a819c', fontSize: 13 }}>Sinon la progression sera remise à zéro.</p>
           </>
@@ -410,7 +410,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
         {myTeamData && (myTeamData.camembert_won?.length > 0 || myTeamData.camembert_jokers > 0) && (
           <p style={{ color: '#7a819c', fontSize: 13, marginTop: 8 }}>
             🥧×{myTeamData.camembert_won.length}
-            {myTeamData.camembert_jokers > 0 ? ` · 🃏×${myTeamData.camembert_jokers}` : ''}
+            {myTeamData.camembert_jokers > 0 ? ` · 🤡×${myTeamData.camembert_jokers}` : ''}
           </p>
         )}
         <button
@@ -445,11 +445,6 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
 
       {hasAnswered ? (
         <p style={{ textAlign: 'center', fontWeight: 800, fontSize: 18 }}>Réponse envoyée ✓</p>
-      ) : turnTeamId && turnTeamId !== team.id ? (
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.4, marginBottom: 12 }}>{question.prompt}</p>
-          <p style={{ color: '#7a819c' }}>⏳ Ce n'est pas encore votre tour — regardez l'écran principal.</p>
-        </div>
       ) : (
         <>
           {(question.category_name || camembertCategory) && (

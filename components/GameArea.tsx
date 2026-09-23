@@ -6,6 +6,7 @@ import {
   scoreClassique,
   scoreSurvie,
   scoreDefi,
+  scoreParticipatifTurnV2,
   applyCamembertAnswer,
   CAMEMBERT_POINTS_PER_WEDGE,
   CAMEMBERT_WIN_BONUS,
@@ -88,6 +89,7 @@ export default function GameArea({
   const participatifTurnsRef = useRef<Record<string, number>>({});
   const participatifIndexRef = useRef(0);
   const participatifPotRef = useRef(0);
+  const [participatifOutcome, setParticipatifOutcome] = useState<'correct' | 'rescued' | 'distributed' | null>(null);
 
   // --- Mode Camemberts ---
   const [wedgeCategories, setWedgeCategories] = useState<Category[]>([]);
@@ -175,9 +177,21 @@ export default function GameArea({
       }
     });
 
-    // Mode Camemberts : une équipe décide d'utiliser un Joker pour se protéger
+    // Mode Camemberts : une équipe décide d'utiliser un Joker pour se protéger.
+    // Le décompte du joker se fait immédiatement (RPC atomique), sans attendre
+    // la fin du compte à rebours : sinon, si toutes les équipes concernées
+    // répondent avant les 10s, le joker n'était jamais réellement débité.
     ch.on('broadcast', { event: 'joker:use' }, ({ payload }) => {
       usedJokerTeamIdsRef.current.add(payload.teamId);
+      supabase.rpc('decrement_team_joker', { p_team_id: payload.teamId }).then(() => {
+        supabase
+          .from('teams')
+          .select('*')
+          .eq('game_id', gameId)
+          .then(({ data }) => {
+            if (data) setTeams(data as Team[]);
+          });
+      });
       setPendingJokerTeamIds((prev) => prev.filter((id) => id !== payload.teamId));
     });
 
@@ -197,6 +211,7 @@ export default function GameArea({
       setPhase('question');
       setAnsweredTeamIds(new Set());
       setRevealedInfo({});
+      setParticipatifOutcome(null);
       setSecondsLeft(QUESTION_TIME_SECONDS);
 
       await supabase
@@ -431,10 +446,8 @@ export default function GameArea({
     if (phase !== 'question') return;
 
     const shouldReveal =
-      mode === 'participatif'
-        ? secondsLeft <= 0 || answeredTeamIds.has(participatifTurnTeamId ?? '__none__')
-        : secondsLeft <= 0 ||
-          answeredTeamIds.size === (mode === 'survie' ? teams.filter((t) => (t.lives ?? 3) > 0).length : teams.length);
+      secondsLeft <= 0 ||
+      answeredTeamIds.size === (mode === 'survie' ? teams.filter((t) => (t.lives ?? 3) > 0).length : teams.length);
 
     if (shouldReveal) {
       reveal();
@@ -498,18 +511,29 @@ export default function GameArea({
     if (mode === 'participatif') {
       const turnAnswer = submitted.find((s) => s.teamId === participatifTurnTeamId);
       const isCorrect = turnAnswer?.choice === question.correct_choice;
+      const othersCorrectCount = submitted.filter(
+        (s) => s.teamId !== participatifTurnTeamId && s.choice === question.correct_choice
+      ).length;
 
-      if (isCorrect) {
-        participatifPotRef.current = participatifPotRef.current * 2;
-      } else {
-        const share = participatifPotRef.current / Math.max(teams.length, 1);
+      const { newState, payout, outcome } = scoreParticipatifTurnV2(isCorrect, othersCorrectCount, teams.length, {
+        pot: participatifPotRef.current,
+        teamCount: teams.length,
+      });
+
+      participatifPotRef.current = newState.pot;
+      setParticipatifOutcome(outcome);
+
+      if (payout !== null) {
         for (const t of teams) {
-          await supabase.rpc('increment_team_score', { p_team_id: t.id, p_points: share });
+          await supabase.rpc('increment_team_score', { p_team_id: t.id, p_points: payout });
         }
-        participatifPotRef.current = teams.length;
       }
 
-      channel?.send({ type: 'broadcast', event: 'answers:revealed', payload: {} });
+      channel?.send({
+        type: 'broadcast',
+        event: 'answers:revealed',
+        payload: { results: teams.map((t) => ({ teamId: t.id, points: payout ?? 0 })) },
+      });
 
       const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
       if (refreshedTeams) setTeams(refreshedTeams as Team[]);
@@ -565,6 +589,12 @@ export default function GameArea({
         }
       }
 
+      channel?.send({
+        type: 'broadcast',
+        event: 'answers:revealed',
+        payload: { results: immediateUpdates.map((u) => ({ teamId: u.teamId, points: u.pointsDelta })) },
+      });
+
       if (winnerTeam) {
         setCamembertWinnerId(winnerTeam.id);
         const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
@@ -608,8 +638,9 @@ export default function GameArea({
     if (refreshedTeams) setTeams(refreshedTeams as Team[]);
   }, [question, channel, gameId, teams, mode, challengerTeamId, participatifTurnTeamId]);
 
-  // Finalise la fenêtre Joker : applique la protection pour les équipes
-  // qui ont répondu à temps, remet à zéro la progression des autres.
+  // Finalise la fenêtre Joker à l'expiration du temps : remet à zéro la
+  // progression des équipes qui n'ont PAS utilisé de joker à temps.
+  // (Celles qui l'utilisent sont déjà traitées immédiatement à la réception.)
   const finalizeJokerWindow = useCallback(async () => {
     const categoryId = camembertCategoryRef.current?.id;
     if (!categoryId) {
@@ -620,16 +651,8 @@ export default function GameArea({
     for (const teamId of pendingJokerTeamIds) {
       const t = teams.find((tt) => tt.id === teamId);
       if (!t) continue;
-
-      if (usedJokerTeamIdsRef.current.has(teamId)) {
-        await supabase
-          .from('teams')
-          .update({ camembert_jokers: Math.max((t.camembert_jokers ?? 0) - 1, 0) })
-          .eq('id', teamId);
-      } else {
-        const newProgress = { ...(t.camembert_progress ?? {}), [categoryId]: 0 };
-        await supabase.from('teams').update({ camembert_progress: newProgress }).eq('id', teamId);
-      }
+      const newProgress = { ...(t.camembert_progress ?? {}), [categoryId]: 0 };
+      await supabase.from('teams').update({ camembert_progress: newProgress }).eq('id', teamId);
     }
 
     setPendingJokerTeamIds([]);
@@ -792,6 +815,8 @@ export default function GameArea({
             {mode === 'participatif' && (
               <span style={{ ...styles.qTag, background: '#fff3e0', color: '#b5761f' }}>
                 🪙 Cagnotte : {participatifPotRef.current} pts
+                {phase === 'revealed' && participatifOutcome === 'correct' && ' 👌'}
+                {phase === 'revealed' && participatifOutcome === 'rescued' && ' 💓'}
               </span>
             )}
             {phase === 'question' && <div style={styles.timer}>{secondsLeft}s</div>}
@@ -853,7 +878,7 @@ export default function GameArea({
                   {mode === 'camembert' && (
                     <span style={{ marginLeft: 6, fontSize: 12, color: '#7a819c' }}>
                       {(t.camembert_won ?? []).length}/{wedgeCategories.length} parts
-                      {(t.camembert_jokers ?? 0) > 0 ? ` · 🃏×${t.camembert_jokers}` : ''}
+                      {(t.camembert_jokers ?? 0) > 0 ? ` · 🤡×${t.camembert_jokers}` : ''}
                       {pendingJokerTeamIds.includes(t.id) ? ` · ⏳ décision Joker (${jokerSecondsLeft}s)` : ''}
                     </span>
                   )}
