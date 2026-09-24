@@ -104,6 +104,7 @@ export default function GameArea({
   const usedJokerTeamIdsRef = useRef<Set<string>>(new Set());
   const [jokerSecondsLeft, setJokerSecondsLeft] = useState(0);
   const [camembertWinnerId, setCamembertWinnerId] = useState<string | null>(null);
+  const [showProgressTable, setShowProgressTable] = useState(false);
   const proceedWithCategoryRef = useRef<((categoryId: string) => void) | null>(null);
 
   useEffect(() => {
@@ -334,6 +335,7 @@ export default function GameArea({
     if (game?.camembert_categories && Array.isArray(game.camembert_categories) && game.camembert_categories.length > 0) {
       wedgeCategoriesRef.current = game.camembert_categories as Category[];
       setWedgeCategories(game.camembert_categories as Category[]);
+      channel?.send({ type: 'broadcast', event: 'wedge-categories:set', payload: { categories: game.camembert_categories } });
       startCategoryChoice();
       return;
     }
@@ -355,6 +357,7 @@ export default function GameArea({
       wedgeCategoriesRef.current = pool;
       setWedgeCategories(pool);
       await supabase.from('games').update({ camembert_categories: pool }).eq('id', gameId);
+      channel?.send({ type: 'broadcast', event: 'wedge-categories:set', payload: { categories: pool } });
       startCategoryChoice();
       return;
     }
@@ -363,7 +366,7 @@ export default function GameArea({
     setCamembertSetupNeeded(n);
     setCamembertSetupSelected(pool.slice(0, n).map((c) => c.id));
     setPhase('camembert-setup');
-  }, [gameId, teams.length, startCategoryChoice]);
+  }, [gameId, teams.length, startCategoryChoice, channel]);
 
   const toggleCamembertSetupCategory = (id: string) => {
     setCamembertSetupSelected((prev) => {
@@ -378,8 +381,9 @@ export default function GameArea({
     wedgeCategoriesRef.current = chosen;
     setWedgeCategories(chosen);
     await supabase.from('games').update({ camembert_categories: chosen }).eq('id', gameId);
+    channel?.send({ type: 'broadcast', event: 'wedge-categories:set', payload: { categories: chosen } });
     startCategoryChoice();
-  }, [camembertSetupPool, camembertSetupSelected, gameId, startCategoryChoice]);
+  }, [camembertSetupPool, camembertSetupSelected, gameId, startCategoryChoice, channel]);
 
   const proceedWithCategory = useCallback(
     (categoryId: string) => {
