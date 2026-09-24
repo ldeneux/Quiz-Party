@@ -54,6 +54,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [myTeamData, setMyTeamData] = useState<{
     camembert_won: string[];
     camembert_jokers: number;
+    camembert_progress: Record<string, number>;
   } | null>(null);
 
   useEffect(() => {
@@ -120,7 +121,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
 
     supabase
       .from('teams')
-      .select('camembert_won, camembert_jokers')
+      .select('camembert_won, camembert_jokers, camembert_progress')
       .eq('id', team.id)
       .single()
       .then(({ data }) => {
@@ -333,23 +334,33 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
           <>
             <h2 style={{ fontWeight: 800, fontSize: 18, marginBottom: 16 }}>🥧 Choisis une catégorie</h2>
             <div style={{ display: 'grid', gap: 10 }}>
-              {categoryChoicePrompt.categories.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => pickCategory(c.id)}
-                  style={{
-                    padding: 18,
-                    borderRadius: 16,
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: 16,
-                    background: '#eef0f8',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {c.emoji} {c.name}
-                </button>
-              ))}
+              {categoryChoicePrompt.categories.map((c) => {
+                const progress = myTeamData?.camembert_progress?.[c.id] ?? 0;
+                const bg =
+                  progress === 2 ? '#7fe0b8' : progress === 1 ? '#c8f0df' : '#eef0f8';
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => pickCategory(c.id)}
+                    style={{
+                      padding: 18,
+                      borderRadius: 16,
+                      border: 'none',
+                      fontWeight: 700,
+                      fontSize: 16,
+                      background: bg,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>{c.emoji} {c.name}</span>
+                    {progress > 0 && <span style={{ fontSize: 13, fontWeight: 800 }}>{progress}/3</span>}
+                  </button>
+                );
+              })}
             </div>
           </>
         ) : (
