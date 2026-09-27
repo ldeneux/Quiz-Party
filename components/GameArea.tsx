@@ -228,6 +228,7 @@ export default function GameArea({
           startedAt: Date.now(),
           turnTeamId: participatifTurnTeamIdRef.current,
           camembertCategory: camembertCategoryRef.current,
+          mode,
         },
       });
     },
