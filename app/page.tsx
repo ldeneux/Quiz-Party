@@ -216,7 +216,14 @@ export default function ConsolePage() {
   const selectProfile = async (profileId: string) => {
     setSelectedProfileId(profileId);
     if (gameId) {
-      await supabase.from('games').update({ profile_id: profileId || null }).eq('id', gameId);
+      // On efface aussi les thèmes Trivial Poursuit déjà mémorisés pour
+      // cette partie : ils appartenaient à l'ancien profil, sinon le
+      // nouveau profil serait ignoré (le tirage réutiliserait les
+      // anciennes catégories déjà figées).
+      await supabase
+        .from('games')
+        .update({ profile_id: profileId || null, camembert_categories: [] })
+        .eq('id', gameId);
     }
   };
 
@@ -314,8 +321,13 @@ export default function ConsolePage() {
     }
   };
 
-  const startGame = () => {
-    if (gameId) setGameStarted(true);
+  const startGame = async () => {
+    if (!gameId) return;
+    // Filet de sécurité final : garantit qu'au moment précis où l'écran de
+    // jeu se lance, la base reflète bien le mode et le profil actuellement
+    // affichés dans la console, quoi qu'il ait pu se passer avant.
+    await supabase.from('games').update({ mode: activeMode, profile_id: selectedProfileId || null }).eq('id', gameId);
+    setGameStarted(true);
   };
 
   const openStats = async () => {
@@ -503,6 +515,8 @@ export default function ConsolePage() {
           <select
             value={selectedProfileId}
             onChange={(e) => selectProfile(e.target.value)}
+            disabled={gameStarted}
+            title={gameStarted ? 'Impossible de changer de profil en cours de partie' : ''}
             style={{
               flex: 1,
               minWidth: 0,
@@ -512,8 +526,9 @@ export default function ConsolePage() {
               border: '1px solid #eaedf6',
               fontSize: 13,
               fontWeight: 700,
-              color: '#1f2440',
-              background: '#fff',
+              color: gameStarted ? '#9aa1c2' : '#1f2440',
+              background: gameStarted ? '#f4f6fb' : '#fff',
+              cursor: gameStarted ? 'not-allowed' : 'pointer',
             }}
           >
             <option value="">— Choisir un profil —</option>

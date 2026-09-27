@@ -6,6 +6,33 @@ import { supabase } from '@/lib/supabaseClient';
 import { getRandomPresets, TeamPreset } from '@/lib/teamPresets';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
+const MODE_META: Record<string, { label: string; emoji: string }> = {
+  classique: { label: 'Classique', emoji: '🎯' },
+  defi: { label: 'Défi', emoji: '⚔️' },
+  survie: { label: 'Survie', emoji: '❤️' },
+  participatif: { label: 'Participatif', emoji: '🤝' },
+  camembert: { label: 'Trivial Poursuit', emoji: '🥧' },
+};
+
+function ModeLabel({ mode }: { mode: string | null }) {
+  if (!mode || !MODE_META[mode]) return null;
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 10,
+        left: 12,
+        fontSize: 12,
+        fontWeight: 800,
+        color: '#7a819c',
+        zIndex: 10,
+      }}
+    >
+      {MODE_META[mode].emoji} {MODE_META[mode].label}
+    </div>
+  );
+}
+
 type Question = {
   id: string;
   prompt: string;
@@ -18,6 +45,13 @@ type Question = {
 };
 
 type CategoryChoice = { id: string; name: string; emoji: string };
+type AllTeamProgress = {
+  id: string;
+  name: string;
+  avatar: string;
+  camembert_won: string[];
+  camembert_progress: Record<string, number>;
+};
 
 export default function PlayScreen(props: { params: { gameId: string } }) {
   return (
@@ -54,7 +88,12 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [myTeamData, setMyTeamData] = useState<{
     camembert_won: string[];
     camembert_jokers: number;
+    camembert_progress: Record<string, number>;
   } | null>(null);
+  const [allWedgeCategories, setAllWedgeCategories] = useState<CategoryChoice[]>([]);
+  const [allTeamsProgress, setAllTeamsProgress] = useState<AllTeamProgress[]>([]);
+  const [showProgressTable, setShowProgressTable] = useState(false);
+  const [gameMode, setGameMode] = useState<string | null>(null);
 
   useEffect(() => {
     setPresets(getRandomPresets('espace', 12));
@@ -120,7 +159,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
 
     supabase
       .from('teams')
-      .select('camembert_won, camembert_jokers')
+      .select('camembert_won, camembert_jokers, camembert_progress')
       .eq('id', team.id)
       .single()
       .then(({ data }) => {
@@ -181,6 +220,39 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
         setJokerUsed(false);
       }
     });
+
+    channel.on('broadcast', { event: 'wedge-categories:set' }, ({ payload }) => {
+      setAllWedgeCategories(payload.categories ?? []);
+    });
+
+    channel.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
+      (payload) => {
+        const updated = payload.new as AllTeamProgress;
+        setAllTeamsProgress((prev) => {
+          const exists = prev.some((t) => t.id === updated.id);
+          return exists ? prev.map((t) => (t.id === updated.id ? updated : t)) : [...prev, updated];
+        });
+      }
+    );
+
+    supabase
+      .from('teams')
+      .select('id, name, avatar, camembert_won, camembert_progress')
+      .eq('game_id', gameId)
+      .then(({ data }) => {
+        if (data) setAllTeamsProgress(data as AllTeamProgress[]);
+      });
+
+    supabase
+      .from('games')
+      .select('mode')
+      .eq('id', gameId)
+      .single()
+      .then(({ data }) => {
+        if (data) setGameMode(data.mode);
+      });
 
     channel.subscribe();
     channelRef.current = channel;
@@ -253,6 +325,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   if (kicked) {
     return (
       <main style={{ textAlign: 'center', marginTop: 100, fontFamily: 'Inter, sans-serif', padding: 24 }}>
+        <ModeLabel mode={gameMode} />
         <div style={{ fontSize: 36 }}>👋</div>
         <h2 style={{ fontWeight: 800 }}>Votre équipe a été retirée du jeu</h2>
         <p style={{ color: '#7a819c', marginBottom: 20 }}>L'hôte vous a déconnecté. Vous pouvez rejoindre à nouveau si besoin.</p>
@@ -278,6 +351,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   if (!team) {
     return (
       <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto' }}>
+        <ModeLabel mode={gameMode} />
         <h1 style={{ fontSize: 20, fontWeight: 800, textAlign: 'center', marginBottom: 16 }}>
           Choisissez votre équipe
         </h1>
@@ -326,6 +400,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     const isChooser = categoryChoicePrompt.chooserTeamId === team.id;
     return (
       <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+        <ModeLabel mode={gameMode} />
         <p style={{ color: '#7a819c', marginBottom: 16 }}>
           {team.preset.avatar} {team.preset.name}
         </p>
@@ -333,23 +408,33 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
           <>
             <h2 style={{ fontWeight: 800, fontSize: 18, marginBottom: 16 }}>🥧 Choisis une catégorie</h2>
             <div style={{ display: 'grid', gap: 10 }}>
-              {categoryChoicePrompt.categories.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => pickCategory(c.id)}
-                  style={{
-                    padding: 18,
-                    borderRadius: 16,
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: 16,
-                    background: '#eef0f8',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {c.emoji} {c.name}
-                </button>
-              ))}
+              {categoryChoicePrompt.categories.map((c) => {
+                const progress = myTeamData?.camembert_progress?.[c.id] ?? 0;
+                const bg =
+                  progress === 2 ? '#7fe0b8' : progress === 1 ? '#c8f0df' : '#eef0f8';
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => pickCategory(c.id)}
+                    style={{
+                      padding: 18,
+                      borderRadius: 16,
+                      border: 'none',
+                      fontWeight: 700,
+                      fontSize: 16,
+                      background: bg,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>{c.emoji} {c.name}</span>
+                    {progress > 0 && <span style={{ fontSize: 13, fontWeight: 800 }}>{progress}/3</span>}
+                  </button>
+                );
+              })}
             </div>
           </>
         ) : (
@@ -366,6 +451,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   if (jokerOffer) {
     return (
       <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+        <ModeLabel mode={gameMode} />
         <p style={{ color: '#7a819c', marginBottom: 16 }}>
           {team.preset.avatar} {team.preset.name}
         </p>
@@ -404,6 +490,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   if (!question) {
     return (
       <main style={{ textAlign: 'center', marginTop: 100, fontFamily: 'Inter, sans-serif' }}>
+        <ModeLabel mode={gameMode} />
         <div style={{ fontSize: 36 }}>{team.preset.avatar}</div>
         <h2 style={{ fontWeight: 800 }}>{team.preset.name}</h2>
         <p style={{ color: '#7a819c' }}>En attente du démarrage…</p>
@@ -435,6 +522,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   // --- Écran 3 : réponse ---
   return (
     <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto' }}>
+      <ModeLabel mode={gameMode} />
       <p style={{ textAlign: 'center', color: '#7a819c', marginBottom: 20 }}>
         {team.preset.avatar} {team.preset.name}
       </p>

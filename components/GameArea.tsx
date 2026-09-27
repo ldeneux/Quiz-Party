@@ -104,6 +104,7 @@ export default function GameArea({
   const usedJokerTeamIdsRef = useRef<Set<string>>(new Set());
   const [jokerSecondsLeft, setJokerSecondsLeft] = useState(0);
   const [camembertWinnerId, setCamembertWinnerId] = useState<string | null>(null);
+  const [showProgressTable, setShowProgressTable] = useState(false);
   const proceedWithCategoryRef = useRef<((categoryId: string) => void) | null>(null);
 
   useEffect(() => {
@@ -334,6 +335,7 @@ export default function GameArea({
     if (game?.camembert_categories && Array.isArray(game.camembert_categories) && game.camembert_categories.length > 0) {
       wedgeCategoriesRef.current = game.camembert_categories as Category[];
       setWedgeCategories(game.camembert_categories as Category[]);
+      channel?.send({ type: 'broadcast', event: 'wedge-categories:set', payload: { categories: game.camembert_categories } });
       startCategoryChoice();
       return;
     }
@@ -355,6 +357,7 @@ export default function GameArea({
       wedgeCategoriesRef.current = pool;
       setWedgeCategories(pool);
       await supabase.from('games').update({ camembert_categories: pool }).eq('id', gameId);
+      channel?.send({ type: 'broadcast', event: 'wedge-categories:set', payload: { categories: pool } });
       startCategoryChoice();
       return;
     }
@@ -363,7 +366,7 @@ export default function GameArea({
     setCamembertSetupNeeded(n);
     setCamembertSetupSelected(pool.slice(0, n).map((c) => c.id));
     setPhase('camembert-setup');
-  }, [gameId, teams.length, startCategoryChoice]);
+  }, [gameId, teams.length, startCategoryChoice, channel]);
 
   const toggleCamembertSetupCategory = (id: string) => {
     setCamembertSetupSelected((prev) => {
@@ -378,8 +381,9 @@ export default function GameArea({
     wedgeCategoriesRef.current = chosen;
     setWedgeCategories(chosen);
     await supabase.from('games').update({ camembert_categories: chosen }).eq('id', gameId);
+    channel?.send({ type: 'broadcast', event: 'wedge-categories:set', payload: { categories: chosen } });
     startCategoryChoice();
-  }, [camembertSetupPool, camembertSetupSelected, gameId, startCategoryChoice]);
+  }, [camembertSetupPool, camembertSetupSelected, gameId, startCategoryChoice, channel]);
 
   const proceedWithCategory = useCallback(
     (categoryId: string) => {
@@ -734,7 +738,29 @@ export default function GameArea({
   }
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
+      {mode === 'camembert' && wedgeCategories.length > 0 && (
+        <button
+          onClick={() => setShowProgressTable(true)}
+          title="Voir la progression de toutes les équipes"
+          style={{
+            position: 'absolute',
+            top: -44,
+            right: 0,
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            background: '#fff',
+            border: 'none',
+            boxShadow: '0 4px 12px rgba(31,36,64,0.08)',
+            fontSize: 16,
+            cursor: 'pointer',
+          }}
+        >
+          📈
+        </button>
+      )}
+
       {phase === 'lobby' && (
         <div style={styles.lobbyCard}>
           <h1 style={{ fontSize: 22, fontWeight: 800 }}>En attente de démarrage…</h1>
@@ -965,6 +991,87 @@ export default function GameArea({
               )}
             </>
           )}
+        </div>
+      )}
+
+      {showProgressTable && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 28,
+              maxWidth: 720,
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              position: 'relative',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <button
+              onClick={() => setShowProgressTable(false)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                border: 'none',
+                background: '#f4f6fb',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                fontSize: 14,
+                cursor: 'pointer',
+                color: '#7a819c',
+              }}
+            >
+              ✕
+            </button>
+            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 16 }}>📈 Progression des camemberts</h2>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: 8 }}></th>
+                    {teams.map((t) => (
+                      <th key={t.id} style={{ padding: 8, fontWeight: 800, whiteSpace: 'nowrap' }}>
+                        {t.avatar} {t.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {wedgeCategories.map((c) => (
+                    <tr key={c.id}>
+                      <td style={{ padding: 8, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {c.emoji} {c.name}
+                      </td>
+                      {teams.map((t) => {
+                        const won = (t.camembert_won ?? []).includes(c.id);
+                        const progress = t.camembert_progress?.[c.id] ?? 0;
+                        const icon = won ? '💚' : progress === 2 ? '🩵' : progress === 1 ? '🩶' : '';
+                        return (
+                          <td key={t.id} style={{ padding: 8, textAlign: 'center', fontSize: 18 }}>
+                            {icon}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>
