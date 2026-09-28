@@ -232,7 +232,7 @@ export default function GameArea({
         },
       });
     },
-    [channel, gameId]
+    [channel, gameId, mode]
   );
 
   // Désigne le prochain challenger (round-robin, 3 tours max par équipe).
