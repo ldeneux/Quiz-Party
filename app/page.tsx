@@ -1,148 +1,185 @@
 'use client';
 
-import { useEffect, useState, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { getRandomPresets, TeamPreset } from '@/lib/teamPresets';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import GameArea from '@/components/GameArea';
 
-const MODE_META: Record<string, { label: string; emoji: string }> = {
-  classique: { label: 'Classique', emoji: '🎯' },
-  defi: { label: 'Défi', emoji: '⚔️' },
-  survie: { label: 'Survie', emoji: '❤️' },
-  participatif: { label: 'Participatif', emoji: '🤝' },
-  camembert: { label: 'Trivial Poursuit', emoji: '🥧' },
-};
+const MODES = [
+  {
+    id: 'classique',
+    label: 'Classique',
+    emoji: '🎯',
+    color: '#6c7bf7',
+    desc: '1 point par bonne réponse, avec un bonus de rapidité pour les 3 premières équipes correctes (+3/+2/+1). Objectif : 150 points.',
+  },
+  {
+    id: 'defi',
+    label: 'Défi',
+    emoji: '⚔️',
+    color: '#a26ce0',
+    desc: "Une équipe choisit le thème et joue : elle gagne 3 pts par bonne réponse sans jamais en perdre. Les adversaires qui se trompent perdent 2 pts, reversés à l'équipe qui a lancé le défi.",
+  },
+  {
+    id: 'survie',
+    label: 'Survie',
+    emoji: '❤️',
+    color: '#ff7a68',
+    desc: '3 vies par équipe. Une mauvaise réponse (ou pas de réponse) coûte une vie. Les points aux équipes éliminées augmentent à chaque manche.',
+  },
+  {
+    id: 'participatif',
+    label: 'Participatif',
+    emoji: '🤝',
+    color: '#35c2a3',
+    desc: 'Une cagnotte commune double à chaque bonne réponse en chaîne. Une erreur la redistribue à toutes les équipes.',
+  },
+  {
+    id: 'camembert',
+    label: 'Trivial Poursuit',
+    emoji: '🥧',
+    color: '#ffb648',
+    desc: "À tour de rôle, une équipe choisit une catégorie (sur son téléphone) parmi les 6 à 10 \"camemberts\" du profil. 3 bonnes réponses d'affilée dans une catégorie = 1 part gagnée définitivement. Une erreur remet à zéro la progression en cours, sauf Joker (gagné à chaque part complétée, max 3). Première équipe avec toutes ses parts : +50 pts bonus. Nécessite un profil marqué 🎡 Trivial Poursuit (10 catégories distinctes).",
+  },
+];
 
-function ModeLabel({ mode }: { mode: string | null }) {
-  if (!mode || !MODE_META[mode]) return null;
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 10,
-        left: 12,
-        fontSize: 12,
-        fontWeight: 800,
-        color: '#7a819c',
-        zIndex: 10,
-      }}
-    >
-      {MODE_META[mode].emoji} {MODE_META[mode].label}
-    </div>
-  );
-}
-
-type Question = {
-  id: string;
-  prompt: string;
-  choice_a: string;
-  choice_b: string;
-  choice_c: string;
-  choice_d: string;
-  category_name?: string;
-  category_emoji?: string;
-};
-
-type CategoryChoice = { id: string; name: string; emoji: string };
-type AllTeamProgress = {
+type Team = {
   id: string;
   name: string;
   avatar: string;
-  camembert_won: string[];
-  camembert_progress: Record<string, number>;
+  color: string;
+  score: number;
+  camembert_won?: string[];
+  camembert_jokers?: number;
+};
+type Profile = {
+  id: string;
+  name: string;
+  is_favorite: boolean;
+  is_default: boolean;
+  distinctCategoryCount?: number;
+  isTrivialEligible?: boolean;
 };
 
-export default function PlayScreen(props: { params: { gameId: string } }) {
-  return (
-    <Suspense fallback={null}>
-      <PlayScreenInner {...props} />
-    </Suspense>
-  );
-}
+const pillLabel: React.CSSProperties = {
+  display: 'inline-block',
+  background: '#e6f5fd',
+  color: '#4fb0e8',
+  fontWeight: 800,
+  fontSize: 12.5,
+  padding: '6px 14px',
+  borderRadius: 999,
+  marginBottom: 18,
+};
 
-function PlayScreenInner({ params }: { params: { gameId: string } }) {
-  const { gameId } = params;
-  const searchParams = useSearchParams();
-  const resumeTeamId = searchParams.get('team');
-
-  const [team, setTeam] = useState<{ id: string; preset: TeamPreset } | null>(null);
-  const [presets, setPresets] = useState<TeamPreset[]>([]);
-  const [takenNames, setTakenNames] = useState<Set<string>>(new Set());
-  const [question, setQuestion] = useState<Question | null>(null);
-  const [hasAnswered, setHasAnswered] = useState(false);
-  const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
-  const [turnTeamId, setTurnTeamId] = useState<string | null>(null);
-  const [kicked, setKicked] = useState(false);
-  const channelRef = useRef<RealtimeChannel | null>(null);
-
-  // Mode Camemberts
-  const [categoryChoicePrompt, setCategoryChoicePrompt] = useState<{
-    chooserTeamId: string;
-    chooserTeamName: string;
-    categories: CategoryChoice[];
-  } | null>(null);
-  const [camembertCategory, setCamembertCategory] = useState<CategoryChoice | null>(null);
-  const [jokerOffer, setJokerOffer] = useState<{ categoryName: string; seconds: number } | null>(null);
-  const [jokerUsed, setJokerUsed] = useState(false);
-  const [myTeamData, setMyTeamData] = useState<{
-    camembert_won: string[];
-    camembert_jokers: number;
-    camembert_progress: Record<string, number>;
-  } | null>(null);
-  const [allWedgeCategories, setAllWedgeCategories] = useState<CategoryChoice[]>([]);
-  const [allTeamsProgress, setAllTeamsProgress] = useState<AllTeamProgress[]>([]);
-  const [showProgressTable, setShowProgressTable] = useState(false);
-  const [gameMode, setGameMode] = useState<string | null>(null);
+export default function ConsolePage() {
+  const [activeMode, setActiveMode] = useState('classique');
+  const [infoMode, setInfoMode] = useState<string | null>(null);
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [origin, setOrigin] = useState('');
+  const [showInvite, setShowInvite] = useState(false);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
+  const [gameStarted, setGameStarted] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showNewGameChoice, setShowNewGameChoice] = useState(false);
+  const [statsData, setStatsData] = useState<
+    Record<string, { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }>
+  >({});
+  const prevTeamsCount = useRef(0);
 
   useEffect(() => {
-    setPresets(getRandomPresets('espace', 12));
+    setOrigin(window.location.origin);
+
+    (async () => {
+      const { data: profileRows } = await supabase.from('quiz_profiles').select('id, name, is_favorite, is_default');
+      const { data: profilePackRows } = await supabase.from('quiz_profile_packs').select('*');
+      const { data: packRows } = await supabase.from('question_packs').select('id, category_id');
+
+      const categoryByPackId: Record<string, string> = {};
+      (packRows ?? []).forEach((p: any) => {
+        if (p.category_id) categoryByPackId[p.id] = p.category_id;
+      });
+
+      const packsByProfile: Record<string, string[]> = {};
+      (profilePackRows ?? []).forEach((pp: any) => {
+        packsByProfile[pp.profile_id] = [...(packsByProfile[pp.profile_id] ?? []), pp.pack_id];
+      });
+
+      const list = ((profileRows as Profile[]) ?? []).map((p) => {
+        const packIds = packsByProfile[p.id] ?? [];
+        const distinctCategoryCount = new Set(packIds.map((id) => categoryByPackId[id]).filter(Boolean)).size;
+        return { ...p, distinctCategoryCount, isTrivialEligible: distinctCategoryCount === 10 };
+      });
+
+      const sorted = list.sort((a, b) => {
+        if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
+        if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      setProfiles(sorted);
+
+      const defaultProfile = sorted.find((p) => p.is_default);
+      if (defaultProfile && !selectedProfileId) {
+        setSelectedProfileId(defaultProfile.id);
+      }
+    })();
   }, []);
 
-  // Reprise directe via un lien de récupération (?team=<id>) — utile si
-  // la page d'une équipe s'est fermée par erreur : cliquer sur sa tuile
-  // dans la console donne un lien qui la reconnecte directement.
   useEffect(() => {
-    if (!resumeTeamId) return;
+    const saved = localStorage.getItem('quiz-party-game-id');
+    if (saved) {
+      supabase
+        .from('games')
+        .select('*')
+        .eq('id', saved)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setGameId(data.id);
+            setJoinCode(data.join_code);
+            setActiveMode(data.mode ?? 'classique');
+          } else {
+            localStorage.removeItem('quiz-party-game-id');
+          }
+        });
+    }
+  }, []);
+
+  // Charge + écoute les équipes (jointure, départ, ET score en direct)
+  useEffect(() => {
+    if (!gameId) return;
+
     supabase
       .from('teams')
       .select('*')
-      .eq('id', resumeTeamId)
       .eq('game_id', gameId)
-      .single()
       .then(({ data }) => {
-        if (data) {
-          setTeam({ id: data.id, preset: { name: data.name, avatar: data.avatar, color: data.color } });
-        }
+        setTeams((data as Team[]) ?? []);
+        prevTeamsCount.current = data?.length ?? 0;
       });
-  }, [resumeTeamId, gameId]);
 
-  // Liste des noms déjà pris, pour griser les tuiles correspondantes
-  // sur l'écran de choix — et les tenir à jour en direct.
-  useEffect(() => {
-    if (team) return; // pas besoin une fois l'équipe choisie
-
-    supabase
-      .from('teams')
-      .select('name')
-      .eq('game_id', gameId)
-      .then(({ data }) => setTakenNames(new Set((data ?? []).map((t: any) => t.name))));
-
-    const ch = supabase.channel(`taken-names:${gameId}`);
+    const ch = supabase.channel(`game:${gameId}:console`);
     ch.on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
-      (payload) => setTakenNames((prev) => new Set(prev).add((payload.new as any).name))
+      (payload) => setTeams((prev) => [...prev, payload.new as Team])
     );
     ch.on(
       'postgres_changes',
       { event: 'DELETE', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
+      (payload) => setTeams((prev) => prev.filter((t) => t.id !== (payload.old as { id: string }).id))
+    );
+    ch.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
       (payload) => {
-        setTakenNames((prev) => {
-          const next = new Set(prev);
-          next.delete((payload.old as any).name);
-          return next;
-        });
+        const updated = payload.new as Team;
+        setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       }
     );
     ch.subscribe();
@@ -150,421 +187,678 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [team, gameId]);
-
-  // Détecte si l'hôte supprime cette équipe pendant la partie, et suit sa
-  // propre progression Camemberts (parts gagnées, jokers) en direct.
-  useEffect(() => {
-    if (!team) return;
-
-    supabase
-      .from('teams')
-      .select('camembert_won, camembert_jokers, camembert_progress')
-      .eq('id', team.id)
-      .single()
-      .then(({ data }) => {
-        if (data) setMyTeamData(data as any);
-      });
-
-    const kickChannel = supabase.channel(`team-watch:${team.id}`);
-    kickChannel.on(
-      'postgres_changes',
-      { event: 'DELETE', schema: 'public', table: 'teams', filter: `id=eq.${team.id}` },
-      () => {
-        setKicked(true);
-        setTeam(null);
-        setQuestion(null);
-      }
-    );
-    kickChannel.on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'teams', filter: `id=eq.${team.id}` },
-      (payload) => {
-        setMyTeamData(payload.new as any);
-      }
-    );
-    kickChannel.subscribe();
-
-    return () => {
-      supabase.removeChannel(kickChannel);
-    };
-  }, [team]);
-
+  }, [gameId]);
 
   useEffect(() => {
-    if (!team) return;
+    if (showInvite && teams.length > prevTeamsCount.current) {
+      setShowInvite(false);
+    }
+    prevTeamsCount.current = teams.length;
+  }, [teams, showInvite]);
 
-    const channel = supabase.channel(`game:${gameId}:play`, {
-      config: { broadcast: { self: false } },
-    });
+  const selectMode = async (mode: string) => {
+    setActiveMode(mode);
 
-    channel.on('broadcast', { event: 'question:show' }, ({ payload }) => {
-      setQuestion(payload.question);
-      setQuestionStartedAt(payload.startedAt);
-      setHasAnswered(false);
-      setTurnTeamId(payload.turnTeamId ?? null);
-      setCamembertCategory(payload.camembertCategory ?? null);
-      if (payload.mode) setGameMode(payload.mode);
-      setCategoryChoicePrompt(null);
-      setJokerOffer(null);
-      setJokerUsed(false);
-    });
-
-    channel.on('broadcast', { event: 'choose-category:prompt' }, ({ payload }) => {
-      setCategoryChoicePrompt(payload);
-      setQuestion(null);
-    });
-
-    channel.on('broadcast', { event: 'joker:offer' }, ({ payload }) => {
-      if (team && payload.teamIds?.includes(team.id)) {
-        setJokerOffer({ categoryName: payload.categoryName, seconds: payload.seconds });
-        setJokerUsed(false);
+    if (mode === 'camembert') {
+      const eligible = profiles.filter((p) => p.isTrivialEligible);
+      const currentIsEligible = eligible.some((p) => p.id === selectedProfileId);
+      if (!currentIsEligible && eligible.length > 0) {
+        setSelectedProfileId(eligible[0].id);
+        if (gameId) await supabase.from('games').update({ profile_id: eligible[0].id }).eq('id', gameId);
       }
-    });
-
-    channel.on('broadcast', { event: 'wedge-categories:set' }, ({ payload }) => {
-      setAllWedgeCategories(payload.categories ?? []);
-    });
-
-    channel.on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'teams', filter: `game_id=eq.${gameId}` },
-      (payload) => {
-        const updated = payload.new as AllTeamProgress;
-        setAllTeamsProgress((prev) => {
-          const exists = prev.some((t) => t.id === updated.id);
-          return exists ? prev.map((t) => (t.id === updated.id ? updated : t)) : [...prev, updated];
-        });
-      }
-    );
-
-    supabase
-      .from('teams')
-      .select('id, name, avatar, camembert_won, camembert_progress')
-      .eq('game_id', gameId)
-      .then(({ data }) => {
-        if (data) setAllTeamsProgress(data as AllTeamProgress[]);
-      });
-
-    supabase
-      .from('games')
-      .select('mode')
-      .eq('id', gameId)
-      .single()
-      .then(({ data }) => {
-        if (data) setGameMode(data.mode);
-      });
-
-    channel.subscribe();
-    channelRef.current = channel;
-
-    return () => {
-      supabase.removeChannel(channel);
-      channelRef.current = null;
-    };
-  }, [team, gameId]);
-
-  const joinAsTeam = async (preset: TeamPreset) => {
-    const { data: newTeam, error } = await supabase
-      .from('teams')
-      .insert({ game_id: gameId, name: preset.name, avatar: preset.avatar, color: preset.color })
-      .select()
-      .single();
-
-    if (error || !newTeam) return;
-
-    setTeam({ id: newTeam.id, preset });
-  };
-
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const pickCategory = (categoryId: string) => {
-    if (!team) return;
-    setCategoryChoicePrompt(null);
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'choose-category:pick',
-      payload: { teamId: team.id, categoryId },
-    });
-  };
-
-  const useJoker = () => {
-    if (!team || jokerUsed) return;
-    setJokerUsed(true);
-    channelRef.current?.send({ type: 'broadcast', event: 'joker:use', payload: { teamId: team.id } });
-  };
-
-  const submitAnswer = async (choice: 'a' | 'b' | 'c' | 'd') => {
-    if (!team || !question || hasAnswered) return;
-    setSubmitError(null);
-
-    const responseTimeMs = questionStartedAt ? Date.now() - questionStartedAt : null;
-
-    const { error } = await supabase.from('answers').insert({
-      game_id: gameId,
-      question_id: question.id,
-      team_id: team.id,
-      choice,
-      response_time_ms: responseTimeMs,
-    });
-
-    if (error) {
-      setSubmitError(`Échec de l'envoi (${error.message}). Réessaie.`);
-      return; // hasAnswered reste false : le bouton reste cliquable
     }
 
-    setHasAnswered(true);
-
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'answer:submitted',
-      payload: { teamId: team.id }, // jamais le choix : pas de fuite avant révélation
-    });
+    if (gameId) {
+      await supabase.from('games').update({ mode }).eq('id', gameId);
+    }
   };
 
-  // --- Écran : équipe expulsée par l'hôte ---
-  if (kicked) {
-    return (
-      <main style={{ textAlign: 'center', marginTop: 100, fontFamily: 'Inter, sans-serif', padding: 24 }}>
-        <ModeLabel mode={gameMode} />
-        <div style={{ fontSize: 36 }}>👋</div>
-        <h2 style={{ fontWeight: 800 }}>Votre équipe a été retirée du jeu</h2>
-        <p style={{ color: '#7a819c', marginBottom: 20 }}>L'hôte vous a déconnecté. Vous pouvez rejoindre à nouveau si besoin.</p>
-        <button
-          onClick={() => setKicked(false)}
-          style={{
-            background: '#6c7bf7',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 999,
-            padding: '10px 24px',
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          Choisir une nouvelle équipe
-        </button>
-      </main>
-    );
-  }
+  const selectProfile = async (profileId: string) => {
+    setSelectedProfileId(profileId);
+    if (gameId) {
+      // On efface aussi les thèmes Trivial Poursuit déjà mémorisés pour
+      // cette partie : ils appartenaient à l'ancien profil, sinon le
+      // nouveau profil serait ignoré (le tirage réutiliserait les
+      // anciennes catégories déjà figées).
+      await supabase
+        .from('games')
+        .update({ profile_id: profileId || null, camembert_categories: [] })
+        .eq('id', gameId);
+    }
+  };
 
-  // --- Écran 1 : choix du nom d'équipe ---
-  if (!team) {
-    return (
-      <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto' }}>
-        <ModeLabel mode={gameMode} />
-        <h1 style={{ fontSize: 20, fontWeight: 800, textAlign: 'center', marginBottom: 16 }}>
-          Choisissez votre équipe
-        </h1>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {presets.map((p) => {
-            const taken = takenNames.has(p.name);
-            return (
-              <button
-                key={p.name}
-                onClick={() => !taken && joinAsTeam(p)}
-                disabled={taken}
+  const fullReset = () => {
+    localStorage.removeItem('quiz-party-game-id');
+    setGameId(null);
+    setJoinCode(null);
+    setTeams([]);
+    setShowInvite(false);
+    setError(null);
+    setGameStarted(false);
+    setShowNewGameChoice(false);
+  };
+
+  // Garde le même code et les mêmes équipes : remet juste les scores à zéro
+  // (et les vies, pour le mode Survie) et efface l'historique des
+  // questions posées pour repartir sur un pool de questions neuf.
+  const restartSameTeams = async () => {
+    setShowNewGameChoice(false);
+    if (!gameId) return;
+
+    await supabase
+      .from('teams')
+      .update({ score: 0, lives: 3, camembert_progress: {}, camembert_won: [], camembert_jokers: 0 })
+      .eq('game_id', gameId);
+    await supabase.from('answers').delete().eq('game_id', gameId);
+    await supabase
+      .from('games')
+      .update({ status: 'lobby', current_question_id: null, camembert_categories: [] })
+      .eq('id', gameId);
+
+    const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
+    if (refreshedTeams) setTeams(refreshedTeams as Team[]);
+
+    setGameStarted(false);
+  };
+
+  const inviteTeams = async () => {
+    setError(null);
+
+    if (gameId) {
+      setShowInvite(true);
+      return;
+    }
+
+    setCreating(true);
+    const res = await fetch('/api/create-game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: activeMode,
+        visualTheme: 'espace',
+        levelIds: ['CM1'],
+        categoryIds: [],
+        profileId: selectedProfileId || null,
+      }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      setError(data.error);
+      setCreating(false);
+      return;
+    }
+
+    setGameId(data.game.id);
+    setJoinCode(data.game.join_code);
+    localStorage.setItem('quiz-party-game-id', data.game.id);
+    setCreating(false);
+    setShowInvite(true);
+  };
+
+  const removeTeam = async (teamId: string) => {
+    const { error } = await supabase.from('teams').delete().eq('id', teamId);
+    if (error) {
+      setError(`Impossible de déconnecter l'équipe (${error.message}).`);
+      return;
+    }
+    // Retrait immédiat côté client : la tuile disparaît sans délai et les
+    // autres remontent (flexbox column), le nom redevient aussitôt
+    // disponible pour une nouvelle équipe sur l'écran de jointure.
+    setTeams((prev) => prev.filter((t) => t.id !== teamId));
+  };
+
+  const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null);
+
+  const copyTeamLink = async (teamId: string) => {
+    const link = `${origin}/play/${gameId}?team=${teamId}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedTeamId(teamId);
+      setTimeout(() => setCopiedTeamId(null), 2000);
+    } catch {
+      window.prompt('Lien de récupération (copie-le manuellement) :', link);
+    }
+  };
+
+  const startGame = async () => {
+    if (!gameId) return;
+    // Filet de sécurité final : garantit qu'au moment précis où l'écran de
+    // jeu se lance, la base reflète bien le mode et le profil actuellement
+    // affichés dans la console, quoi qu'il ait pu se passer avant.
+    await supabase.from('games').update({ mode: activeMode, profile_id: selectedProfileId || null }).eq('id', gameId);
+    setGameStarted(true);
+  };
+
+  const openStats = async () => {
+    if (!gameId) return;
+    setShowStats(true);
+
+    const { data: answersRows } = await supabase
+      .from('answers')
+      .select('team_id, choice, question_id')
+      .eq('game_id', gameId);
+
+    if (!answersRows || answersRows.length === 0) {
+      setStatsData({});
+      return;
+    }
+
+    const questionIds = Array.from(new Set(answersRows.map((a: any) => a.question_id)));
+    const { data: questionsRows } = await supabase
+      .from('questions')
+      .select('id, category_id, correct_choice')
+      .in('id', questionIds);
+
+    const { data: categoriesRows } = await supabase.from('categories').select('id, name');
+
+    const categoryNameById: Record<string, string> = {};
+    (categoriesRows ?? []).forEach((c: any) => (categoryNameById[c.id] = c.name));
+
+    const questionById: Record<string, any> = {};
+    (questionsRows ?? []).forEach((q: any) => (questionById[q.id] = q));
+
+    const result: typeof statsData = {};
+    teams.forEach((t) => {
+      result[t.id] = { teamName: t.name, teamAvatar: t.avatar, categories: {} };
+    });
+
+    answersRows.forEach((a: any) => {
+      const q = questionById[a.question_id];
+      if (!q) return;
+      const catName = categoryNameById[q.category_id] ?? 'Sans catégorie';
+      if (!result[a.team_id]) return; // équipe supprimée depuis
+      if (!result[a.team_id].categories[catName]) {
+        result[a.team_id].categories[catName] = { correct: 0, wrong: 0 };
+      }
+      if (a.choice === q.correct_choice) {
+        result[a.team_id].categories[catName].correct++;
+      } else {
+        result[a.team_id].categories[catName].wrong++;
+      }
+    });
+
+    setStatsData(result);
+  };
+
+  return (
+    <main style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif', background: '#f4f6fb' }}>
+      {/* Colonne gauche : modes + invitation + équipes */}
+      <aside style={{ width: 270, background: '#eef0f8', padding: '28px 22px' }}>
+        <div style={pillLabel}>Mode de jeu</div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
+          {MODES.map((m) => (
+            <div key={m.id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  onClick={() => !gameStarted && selectMode(m.id)}
+                  disabled={gameStarted}
+                  title={gameStarted ? 'Impossible de changer de mode en cours de partie' : ''}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 14px',
+                    borderRadius: 999,
+                    border: activeMode === m.id ? `2px solid ${m.color}` : '2px solid transparent',
+                    background: activeMode === m.id ? m.color + '18' : '#fff',
+                    fontWeight: 700,
+                    fontSize: 13.5,
+                    cursor: gameStarted ? 'not-allowed' : 'pointer',
+                    textAlign: 'left',
+                    color: activeMode === m.id ? '#1f2440' : '#7a819c',
+                    opacity: gameStarted && activeMode !== m.id ? 0.5 : 1,
+                  }}
+                >
+                  <span style={{ fontSize: 17 }}>{m.emoji}</span> {m.label}
+                </button>
+                <button
+                  onClick={() => setInfoMode(infoMode === m.id ? null : m.id)}
+                  title="Règles du mode"
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    color: '#9aa1c2',
+                    cursor: 'pointer',
+                    fontSize: 15,
+                    width: 22,
+                    flexShrink: 0,
+                  }}
+                >
+                  ⓘ
+                </button>
+              </div>
+              {infoMode === m.id && (
+                <p style={{ fontSize: 12, color: '#7a819c', lineHeight: 1.5, margin: '6px 4px 0' }}>{m.desc}</p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={inviteTeams}
+          disabled={creating}
+          style={{ ...pillLabel, border: 'none', cursor: 'pointer' }}
+        >
+          {creating ? 'Création…' : 'Rejoindre le jeu'}
+        </button>
+
+        {error && <p style={{ color: '#ff7a68', fontSize: 12.5, marginBottom: 12 }}>{error}</p>}
+
+        {/* Équipes déjà enrôlées, avec leur score */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {teams.map((t) => (
+            <div
+              key={t.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: '#fff',
+                border: `2px solid ${t.color}`,
+                borderRadius: 999,
+                padding: '6px 6px 6px 12px',
+                fontWeight: 700,
+                fontSize: 13,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{t.avatar}</span>
+              <span
+                onClick={() => copyTeamLink(t.id)}
+                title="Copier le lien de récupération de cette équipe"
                 style={{
-                  background: taken ? '#f0f1f5' : p.color + '22',
-                  border: `2px solid ${taken ? '#dcdfe8' : p.color}`,
-                  borderRadius: 16,
-                  padding: 16,
-                  fontWeight: 700,
-                  cursor: taken ? 'not-allowed' : 'pointer',
-                  textAlign: 'left',
-                  opacity: taken ? 0.5 : 1,
-                  position: 'relative',
+                  flex: 1,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  cursor: 'pointer',
                 }}
               >
-                <div style={{ fontSize: 24 }}>{p.avatar}</div>
-                {p.name}
-                {taken && (
-                  <div style={{ fontSize: 11, color: '#7a819c', marginTop: 2 }}>Déjà prise</div>
-                )}
+                {copiedTeamId === t.id ? 'Lien copié ✓' : t.name}
+              </span>
+              <span style={{ color: '#7a819c', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
+                {t.score ?? 0} pts
+                {activeMode === 'camembert' &&
+                  ` · 🥧×${(t.camembert_won ?? []).length}${(t.camembert_jokers ?? 0) > 0 ? ` · 🤡×${t.camembert_jokers}` : ''}`}
+              </span>
+              <button
+                onClick={() => removeTeam(t.id)}
+                title="Déconnecter l'équipe"
+                style={{
+                  border: 'none',
+                  background: 'rgba(0,0,0,0.06)',
+                  borderRadius: '50%',
+                  width: 18,
+                  height: 18,
+                  fontSize: 10,
+                  cursor: 'pointer',
+                  color: '#7a819c',
+                  flexShrink: 0,
+                }}
+              >
+                ✕
               </button>
-            );
-          })}
-        </div>
-      </main>
-    );
-  }
-
-  const leaveTeam = async () => {
-    if (!team) return;
-    await supabase.from('teams').delete().eq('id', team.id);
-    setTeam(null);
-    setQuestion(null);
-  };
-
-  // --- Écran : choix de catégorie (mode Camemberts) ---
-  if (categoryChoicePrompt) {
-    const isChooser = categoryChoicePrompt.chooserTeamId === team.id;
-    return (
-      <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
-        <ModeLabel mode={gameMode} />
-        <p style={{ color: '#7a819c', marginBottom: 16 }}>
-          {team.preset.avatar} {team.preset.name}
-        </p>
-        {isChooser ? (
-          <>
-            <h2 style={{ fontWeight: 800, fontSize: 18, marginBottom: 16 }}>🥧 Choisis une catégorie</h2>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {categoryChoicePrompt.categories.map((c) => {
-                const progress = myTeamData?.camembert_progress?.[c.id] ?? 0;
-                const bg =
-                  progress === 2 ? '#7fe0b8' : progress === 1 ? '#c8f0df' : '#eef0f8';
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => pickCategory(c.id)}
-                    style={{
-                      padding: 18,
-                      borderRadius: 16,
-                      border: 'none',
-                      fontWeight: 700,
-                      fontSize: 16,
-                      background: bg,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span>{c.emoji} {c.name}</span>
-                    {progress > 0 && <span style={{ fontSize: 13, fontWeight: 800 }}>{progress}/3</span>}
-                  </button>
-                );
-              })}
             </div>
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🥧</div>
-            <p style={{ color: '#7a819c' }}>{categoryChoicePrompt.chooserTeamName} choisit une catégorie…</p>
-          </>
-        )}
-      </main>
-    );
-  }
+          ))}
+        </div>
+      </aside>
 
-  // --- Écran : offre de Joker (mode Camemberts) ---
-  if (jokerOffer) {
-    return (
-      <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
-        <ModeLabel mode={gameMode} />
-        <p style={{ color: '#7a819c', marginBottom: 16 }}>
-          {team.preset.avatar} {team.preset.name}
-        </p>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>🤡</div>
-        <h2 style={{ fontWeight: 800, fontSize: 17, marginBottom: 10 }}>
-          Votre progression sur "{jokerOffer.categoryName}" va être perdue
-        </h2>
-        {jokerUsed ? (
-          <p style={{ color: '#35c2a3', fontWeight: 700 }}>Joker utilisé — votre progression est protégée ✓</p>
-        ) : (
-          <>
-            <button
-              onClick={useJoker}
+      {/* Zone centrale */}
+      <section style={{ flex: 1, padding: '28px 40px' }}>
+        <header style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <span style={{ fontSize: 22 }}>🎯</span> Quiz Party
+          </div>
+
+          <select
+            value={selectedProfileId}
+            onChange={(e) => selectProfile(e.target.value)}
+            disabled={gameStarted}
+            title={gameStarted ? 'Impossible de changer de profil en cours de partie' : ''}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              maxWidth: 520,
+              padding: '10px 14px',
+              borderRadius: 999,
+              border: '1px solid #eaedf6',
+              fontSize: 13,
+              fontWeight: 700,
+              color: gameStarted ? '#9aa1c2' : '#1f2440',
+              background: gameStarted ? '#f4f6fb' : '#fff',
+              cursor: gameStarted ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <option value="">— Choisir un profil —</option>
+            {(activeMode === 'camembert' ? profiles.filter((p) => p.isTrivialEligible) : profiles).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.is_default ? '🏠 ' : p.is_favorite ? '⭐ ' : ''}{p.name}
+              </option>
+            ))}
+          </select>
+          {activeMode === 'camembert' && profiles.filter((p) => p.isTrivialEligible).length === 0 && (
+            <span style={{ color: '#ff7a68', fontSize: 12, fontWeight: 700 }}>
+              Aucun profil éligible (10 catégories distinctes requises)
+            </span>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+            {gameId && (
+              <button
+                onClick={() => setShowNewGameChoice(true)}
+                title="Oublier cette partie et repartir de zéro"
+                style={{
+                  background: 'none',
+                  border: '1px solid #eaedf6',
+                  borderRadius: 999,
+                  padding: '8px 14px',
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  color: '#7a819c',
+                  cursor: 'pointer',
+                }}
+              >
+                Nouvelle partie
+              </button>
+            )}
+
+            {teams.length > 0 && !gameStarted && (
+              <button
+                onClick={startGame}
+                style={{
+                  background: '#6c7bf7',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '12px 22px',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Démarrer la partie ({teams.length} équipe{teams.length > 1 ? 's' : ''})
+              </button>
+            )}
+
+            {gameId && (
+              <button
+                onClick={openStats}
+                title="Statistiques par équipe et par catégorie"
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                  boxShadow: '0 4px 12px rgba(31,36,64,0.08)',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                📊
+              </button>
+            )}
+
+            <a
+              href="/parametrage"
+              title="Paramétrage"
               style={{
-                background: '#ffb648',
-                color: '#1f2440',
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                background: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+                boxShadow: '0 4px 12px rgba(31,36,64,0.08)',
+                textDecoration: 'none',
+                flexShrink: 0,
+              }}
+            >
+              ⚙️
+            </a>
+          </div>
+        </header>
+
+        {gameStarted && gameId && (
+          <div style={{ marginTop: 28 }}>
+            <GameArea
+              gameId={gameId}
+              initialMode={activeMode}
+              onRestart={() => setShowNewGameChoice(true)}
+              onClose={() => setGameStarted(false)}
+            />
+          </div>
+        )}
+      </section>
+
+      {/* Fenêtre de choix Nouvelle partie */}
+      {showNewGameChoice && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 32,
+              maxWidth: 420,
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 20 }}>Nouvelle partie</h2>
+            <button
+              onClick={restartSameTeams}
+              style={{
+                display: 'block',
+                width: '100%',
+                background: '#6c7bf7',
+                color: '#fff',
                 border: 'none',
                 borderRadius: 999,
-                padding: '14px 28px',
-                fontWeight: 800,
-                fontSize: 15,
+                padding: '14px 20px',
+                fontWeight: 700,
+                fontSize: 14,
                 cursor: 'pointer',
                 marginBottom: 10,
               }}
             >
-              🤡 Utiliser un Joker
+              Garder les mêmes équipes (même code, scores à zéro)
             </button>
-            <p style={{ color: '#7a819c', fontSize: 13 }}>Sinon la progression sera remise à zéro.</p>
-          </>
-        )}
-      </main>
-    );
-  }
-
-  // --- Écran 2 : en attente de question ---
-  if (!question) {
-    return (
-      <main style={{ textAlign: 'center', marginTop: 100, fontFamily: 'Inter, sans-serif' }}>
-        <ModeLabel mode={gameMode} />
-        <div style={{ fontSize: 36 }}>{team.preset.avatar}</div>
-        <h2 style={{ fontWeight: 800 }}>{team.preset.name}</h2>
-        <p style={{ color: '#7a819c' }}>En attente du démarrage…</p>
-        {myTeamData && (myTeamData.camembert_won?.length > 0 || myTeamData.camembert_jokers > 0) && (
-          <p style={{ color: '#7a819c', fontSize: 13, marginTop: 8 }}>
-            🥧×{myTeamData.camembert_won.length}
-            {myTeamData.camembert_jokers > 0 ? ` · 🤡×${myTeamData.camembert_jokers}` : ''}
-          </p>
-        )}
-        <button
-          onClick={leaveTeam}
-          style={{
-            marginTop: 20,
-            background: 'none',
-            border: '1px solid #eaedf6',
-            borderRadius: 999,
-            padding: '8px 18px',
-            color: '#ff7a68',
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          Quitter la partie
-        </button>
-      </main>
-    );
-  }
-
-  // --- Écran 3 : réponse ---
-  return (
-    <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto' }}>
-      <ModeLabel mode={gameMode} />
-      <p style={{ textAlign: 'center', color: '#7a819c', marginBottom: 20 }}>
-        {team.preset.avatar} {team.preset.name}
-      </p>
-
-      {submitError && (
-        <p style={{ textAlign: 'center', color: '#ff7a68', fontSize: 13, marginBottom: 12 }}>{submitError}</p>
+            <button
+              onClick={fullReset}
+              style={{
+                display: 'block',
+                width: '100%',
+                background: '#eef0f8',
+                color: '#1f2440',
+                border: 'none',
+                borderRadius: 999,
+                padding: '14px 20px',
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              Changer d'équipes (nouveau code)
+            </button>
+            <button
+              onClick={() => setShowNewGameChoice(false)}
+              style={{ background: 'none', border: 'none', color: '#7a819c', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
       )}
 
-      {hasAnswered ? (
-        <p style={{ textAlign: 'center', fontWeight: 800, fontSize: 18 }}>Réponse envoyée ✓</p>
-      ) : (
-        <>
-          {(question.category_name || camembertCategory) && (
-            <p style={{ textAlign: 'center', color: '#6c7bf7', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
-              {question.category_emoji ?? camembertCategory?.emoji} {question.category_name ?? camembertCategory?.name}
-            </p>
-          )}
-          <p style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.4, marginBottom: 20, textAlign: 'center' }}>
-            {question.prompt}
-          </p>
-          <div style={{ display: 'grid', gap: 12 }} key={question.id}>
-            {(['a', 'b', 'c', 'd'] as const).map((letter) => (
-              <button
-                key={`${question.id}-${letter}`}
-                onClick={() => submitAnswer(letter)}
-                style={{
-                  padding: 20,
-                  borderRadius: 16,
-                  border: 'none',
-                  fontWeight: 700,
-                  fontSize: 16,
-                  background: '#eef0f8',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <strong>{letter.toUpperCase()}.</strong> {question[`choice_${letter}` as const]}
-              </button>
-            ))}
+      {/* Fenêtre statistiques */}
+      {showStats && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 32,
+              maxWidth: 640,
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <button
+              onClick={() => setShowStats(false)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                border: 'none',
+                background: '#f4f6fb',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                fontSize: 14,
+                cursor: 'pointer',
+                color: '#7a819c',
+              }}
+            >
+              ✕
+            </button>
+
+            <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 18 }}>📊 Réponses par équipe et par catégorie</h2>
+
+            {Object.keys(statsData).length === 0 ? (
+              <p style={{ color: '#7a819c', fontSize: 13.5 }}>Aucune réponse enregistrée pour l'instant.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {Object.entries(statsData).map(
+                  ([
+                    teamId,
+                    data,
+                  ]: [
+                    string,
+                    { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }
+                  ]) => (
+                    <div key={teamId}>
+                      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
+                        {data.teamAvatar} {data.teamName}
+                      </div>
+                      {Object.keys(data.categories).length === 0 ? (
+                        <p style={{ color: '#7a819c', fontSize: 12.5, marginLeft: 8 }}>Pas encore de réponse.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {Object.entries(data.categories).map(([catName, counts]: [string, { correct: number; wrong: number }]) => (
+                            <div
+                              key={catName}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: 13,
+                                background: '#f4f6fb',
+                                borderRadius: 10,
+                                padding: '6px 12px',
+                              }}
+                            >
+                              <span>{catName}</span>
+                              <span>
+                                <span style={{ color: '#35c2a3', fontWeight: 700 }}>{counts.correct} ✓</span>
+                                {'  '}
+                                <span style={{ color: '#ff7a68', fontWeight: 700 }}>{counts.wrong} ✕</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </>
+        </div>
+      )}
+
+      {/* Fenêtre d'invitation */}
+      {showInvite && joinCode && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 36,
+              maxWidth: 420,
+              width: '90%',
+              textAlign: 'center',
+              position: 'relative',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <button
+              onClick={() => setShowInvite(false)}
+              title="Fermer"
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                border: 'none',
+                background: '#f4f6fb',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                fontSize: 14,
+                cursor: 'pointer',
+                color: '#7a819c',
+              }}
+            >
+              ✕
+            </button>
+
+            <p style={{ color: '#7a819c', marginBottom: 8 }}>En attente de l'équipe…</p>
+            <div style={{ color: '#7a819c', fontSize: 13, marginBottom: 16 }}>
+              Rejoindre sur : <strong>{origin}/join</strong>
+            </div>
+            <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: 8, color: '#6c7bf7' }}>{joinCode}</div>
+          </div>
+        </div>
       )}
     </main>
   );

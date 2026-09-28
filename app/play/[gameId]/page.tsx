@@ -204,6 +204,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       setHasAnswered(false);
       setTurnTeamId(payload.turnTeamId ?? null);
       setCamembertCategory(payload.camembertCategory ?? null);
+      if (payload.mode) setGameMode(payload.mode);
       setCategoryChoicePrompt(null);
       setJokerOffer(null);
       setJokerUsed(false);
