@@ -123,10 +123,12 @@ export default function ConsolePage() {
 
       setProfiles(sorted);
 
-      const defaultProfile = sorted.find((p) => p.is_default);
-      if (defaultProfile && !selectedProfileId) {
-        setSelectedProfileId(defaultProfile.id);
-      }
+      // Pré-sélectionne le profil par défaut s'il n'y a pas encore de profil choisi
+      setSelectedProfileId((prev) => {
+        if (prev) return prev;
+        const defaultProf = sorted.find((p) => p.is_default);
+        return defaultProf ? defaultProf.id : sorted[0]?.id ?? '';
+      });
     })();
   }, []);
 
@@ -143,6 +145,9 @@ export default function ConsolePage() {
             setGameId(data.id);
             setJoinCode(data.join_code);
             setActiveMode(data.mode ?? 'classique');
+            if (data.profile_id) {
+              setSelectedProfileId(data.profile_id);
+            }
           } else {
             localStorage.removeItem('quiz-party-game-id');
           }
@@ -216,10 +221,6 @@ export default function ConsolePage() {
   const selectProfile = async (profileId: string) => {
     setSelectedProfileId(profileId);
     if (gameId) {
-      // On efface aussi les thèmes Trivial Poursuit déjà mémorisés pour
-      // cette partie : ils appartenaient à l'ancien profil, sinon le
-      // nouveau profil serait ignoré (le tirage réutiliserait les
-      // anciennes catégories déjà figées).
       await supabase
         .from('games')
         .update({ profile_id: profileId || null, camembert_categories: [] })
@@ -238,9 +239,6 @@ export default function ConsolePage() {
     setShowNewGameChoice(false);
   };
 
-  // Garde le même code et les mêmes équipes : remet juste les scores à zéro
-  // (et les vies, pour le mode Survie) et efface l'historique des
-  // questions posées pour repartir sur un pool de questions neuf.
   const restartSameTeams = async () => {
     setShowNewGameChoice(false);
     if (!gameId) return;
@@ -252,7 +250,7 @@ export default function ConsolePage() {
     await supabase.from('answers').delete().eq('game_id', gameId);
     await supabase
       .from('games')
-      .update({ status: 'lobby', current_question_id: null, camembert_categories: [] })
+      .update({ status: 'lobby', current_question_id: null, camembert_categories: [], profile_id: selectedProfileId || null })
       .eq('id', gameId);
 
     const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
@@ -270,6 +268,10 @@ export default function ConsolePage() {
     }
 
     setCreating(true);
+
+    // Détermine le profil exact à envoyer : la sélection active ou le premier profil disponible
+    const profileToUse = selectedProfileId || profiles.find((p) => p.is_default)?.id || profiles[0]?.id || null;
+
     const res = await fetch('/api/create-game', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -278,7 +280,7 @@ export default function ConsolePage() {
         visualTheme: 'espace',
         levelIds: ['CM1'],
         categoryIds: [],
-        profileId: selectedProfileId || null,
+        profileId: profileToUse,
       }),
     });
     const data = await res.json();
@@ -302,9 +304,6 @@ export default function ConsolePage() {
       setError(`Impossible de déconnecter l'équipe (${error.message}).`);
       return;
     }
-    // Retrait immédiat côté client : la tuile disparaît sans délai et les
-    // autres remontent (flexbox column), le nom redevient aussitôt
-    // disponible pour une nouvelle équipe sur l'écran de jointure.
     setTeams((prev) => prev.filter((t) => t.id !== teamId));
   };
 
@@ -323,9 +322,6 @@ export default function ConsolePage() {
 
   const startGame = async () => {
     if (!gameId) return;
-    // Filet de sécurité final : garantit qu'au moment précis où l'écran de
-    // jeu se lance, la base reflète bien le mode et le profil actuellement
-    // affichés dans la console, quoi qu'il ait pu se passer avant.
     await supabase.from('games').update({ mode: activeMode, profile_id: selectedProfileId || null }).eq('id', gameId);
     setGameStarted(true);
   };
@@ -367,7 +363,7 @@ export default function ConsolePage() {
       const q = questionById[a.question_id];
       if (!q) return;
       const catName = categoryNameById[q.category_id] ?? 'Sans catégorie';
-      if (!result[a.team_id]) return; // équipe supprimée depuis
+      if (!result[a.team_id]) return;
       if (!result[a.team_id].categories[catName]) {
         result[a.team_id].categories[catName] = { correct: 0, wrong: 0 };
       }
@@ -639,7 +635,7 @@ export default function ConsolePage() {
         )}
       </section>
 
-      {/* Fenêtre de choix Nouvelle partie */}
+      {/* Fenêtres de dialogue (Modales) */}
       {showNewGameChoice && (
         <div
           style={{
@@ -710,7 +706,6 @@ export default function ConsolePage() {
         </div>
       )}
 
-      {/* Fenêtre statistiques */}
       {showStats && (
         <div
           style={{
@@ -799,15 +794,15 @@ export default function ConsolePage() {
                           ))}
                         </div>
                       )}
-                  </div>
-                ))}
+                    </div>
+                  )
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Fenêtre d'invitation */}
       {showInvite && joinCode && (
         <div
           style={{
