@@ -33,6 +33,42 @@ function ModeLabel({ mode }: { mode: string | null }) {
   );
 }
 
+function TeamHeader({
+  mode,
+  avatar,
+  name,
+  lives,
+}: {
+  mode: string | null;
+  avatar: string;
+  name: string;
+  lives?: number | null;
+}) {
+  const meta = mode ? MODE_META[mode] : null;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 14,
+        fontSize: 12.5,
+        fontWeight: 800,
+        color: '#7a819c',
+      }}
+    >
+      <span>{meta ? `${meta.emoji} ${meta.label}` : ''}</span>
+      <span>
+        {avatar} {name}
+        {mode === 'survie' && lives !== null && lives !== undefined && (
+          <span style={{ marginLeft: 6 }}>{lives > 0 ? '❤️'.repeat(lives) : '💀'}</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 type Question = {
   id: string;
   prompt: string;
@@ -89,6 +125,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     camembert_won: string[];
     camembert_jokers: number;
     camembert_progress: Record<string, number>;
+    lives?: number;
   } | null>(null);
   const [allWedgeCategories, setAllWedgeCategories] = useState<CategoryChoice[]>([]);
   const [allTeamsProgress, setAllTeamsProgress] = useState<AllTeamProgress[]>([]);
@@ -159,7 +196,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
 
     supabase
       .from('teams')
-      .select('camembert_won, camembert_jokers, camembert_progress')
+      .select('camembert_won, camembert_jokers, camembert_progress, lives')
       .eq('id', team.id)
       .single()
       .then(({ data }) => {
@@ -401,10 +438,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     const isChooser = categoryChoicePrompt.chooserTeamId === team.id;
     return (
       <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
-        <ModeLabel mode={gameMode} />
-        <p style={{ color: '#7a819c', marginBottom: 16 }}>
-          {team.preset.avatar} {team.preset.name}
-        </p>
+        <TeamHeader mode={gameMode} avatar={team.preset.avatar} name={team.preset.name} lives={myTeamData?.lives} />
         {isChooser ? (
           <>
             <h2 style={{ fontWeight: 800, fontSize: 18, marginBottom: 16 }}>🥧 Choisis une catégorie</h2>
@@ -452,10 +486,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   if (jokerOffer) {
     return (
       <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
-        <ModeLabel mode={gameMode} />
-        <p style={{ color: '#7a819c', marginBottom: 16 }}>
-          {team.preset.avatar} {team.preset.name}
-        </p>
+        <TeamHeader mode={gameMode} avatar={team.preset.avatar} name={team.preset.name} lives={myTeamData?.lives} />
         <div style={{ fontSize: 32, marginBottom: 8 }}>🤡</div>
         <h2 style={{ fontWeight: 800, fontSize: 17, marginBottom: 10 }}>
           Votre progression sur "{jokerOffer.categoryName}" va être perdue
@@ -490,7 +521,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   // --- Écran 2 : en attente de question ---
   if (!question) {
     return (
-      <main style={{ textAlign: 'center', marginTop: 100, fontFamily: 'Inter, sans-serif' }}>
+      <main style={{ textAlign: 'center', marginTop: 40, fontFamily: 'Inter, sans-serif' }}>
         <ModeLabel mode={gameMode} />
         <div style={{ fontSize: 36 }}>{team.preset.avatar}</div>
         <h2 style={{ fontWeight: 800 }}>{team.preset.name}</h2>
@@ -523,10 +554,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   // --- Écran 3 : réponse ---
   return (
     <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto' }}>
-      <ModeLabel mode={gameMode} />
-      <p style={{ textAlign: 'center', color: '#7a819c', marginBottom: 20 }}>
-        {team.preset.avatar} {team.preset.name}
-      </p>
+      <TeamHeader mode={gameMode} avatar={team.preset.avatar} name={team.preset.name} lives={myTeamData?.lives} />
 
       {submitError && (
         <p style={{ textAlign: 'center', color: '#ff7a68', fontSize: 13, marginBottom: 12 }}>{submitError}</p>
