@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -9,12 +9,12 @@ export default function JoinPage() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (value: string = code) => {
     setError(null);
     const { data: game, error: fetchError } = await supabase
       .from('games')
       .select('id')
-      .eq('join_code', code.toUpperCase())
+      .eq('join_code', value.toUpperCase())
       .single();
 
     if (fetchError || !game) {
@@ -24,6 +24,16 @@ export default function JoinPage() {
 
     router.push(`/play/${game.id}`);
   };
+
+  // Arrivée par QR code (/join?code=XXXX) : on pré-remplit et on valide tout de suite
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get('code');
+    if (c && /^[A-Za-z0-9]{4}$/.test(c)) {
+      setCode(c.toUpperCase());
+      handleSubmit(c);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <main style={{ maxWidth: 400, margin: '80px auto', textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>
@@ -47,7 +57,7 @@ export default function JoinPage() {
       />
       {error && <p style={{ color: '#ff7a68', fontSize: 14 }}>{error}</p>}
       <button
-        onClick={handleSubmit}
+        onClick={() => handleSubmit()}
         style={{
           background: '#6c7bf7',
           color: '#fff',

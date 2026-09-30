@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import GameArea from '@/components/GameArea';
 import { ckKey, ckLed } from '@/lib/cockpitUi';
 import CockpitPlate from '@/components/CockpitPlate';
+import CockpitQR from '@/components/CockpitQR';
 
 const MODES = [
   {
@@ -510,10 +511,14 @@ export default function ConsolePage() {
         <div style={{ position: 'absolute', left: '84.6%', top: '14.3%', width: '14%', height: '26.5%', overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw' }}>
           {!gameStarted &&
             (joinCode ? (
-              <div style={{ textAlign: 'center', fontSize: '1cqw', color: '#9fb2e8', lineHeight: 1.4, marginTop: '1.5cqw' }}>
-                Rejoindre sur
-                <div style={{ fontWeight: 800, color: '#dfe9ff', wordBreak: 'break-all' }}>{origin.replace(/^https?:\/\//, '')}/join</div>
-                <div style={{ marginTop: '0.6cqw', fontSize: '0.85cqw', color: '#8a97c4' }}>Code de la partie affiché juste en dessous</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.45cqw', paddingTop: '0.5cqw' }}>
+                <div style={{ width: '9cqw' }}>
+                  <CockpitQR url={`${origin}/join?code=${joinCode}`} />
+                </div>
+                <div style={{ fontSize: '0.85cqw', fontWeight: 800, letterSpacing: '0.08cqw', color: '#9fc4ff' }}>SCANNE POUR REJOINDRE</div>
+                <div style={{ fontSize: '0.7cqw', color: '#8a97c4', wordBreak: 'break-all', textAlign: 'center' }}>
+                  ou saisis le code sur {origin.replace(/^https?:\/\//, '')}/join
+                </div>
               </div>
             ) : (
               <div style={{ fontSize: '1cqw', color: '#8a97c4', marginTop: '2cqw', textAlign: 'center' }}>Clique sur « Rejoindre le jeu » pour créer un code</div>

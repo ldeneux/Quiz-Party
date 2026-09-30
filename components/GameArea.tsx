@@ -481,12 +481,35 @@ export default function GameArea({
     loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
   }, [mode, pickNextChallenger, pickNextParticipatifTurn, finishParticipatif, startCategoryChoice, beginCamembertSetup, gameId, startQuestion]);
 
+  // Décompte 3-2-1-décollage avant la toute première question (mode cockpit uniquement)
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const goNextRef = useRef(goToNextQuestion);
+  useEffect(() => {
+    goNextRef.current = goToNextQuestion;
+  }, [goToNextQuestion]);
+
   useEffect(() => {
     if (!autoAttempted && channel && phase === 'lobby' && teams.length > 0) {
       setAutoAttempted(true);
-      goToNextQuestion();
+      if (cockpit) setCountdown(3);
+      else goToNextQuestion();
     }
-  }, [autoAttempted, channel, phase, teams.length, gameId, goToNextQuestion]);
+  }, [autoAttempted, channel, phase, teams.length, gameId, goToNextQuestion, cockpit]);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    const timer = setTimeout(
+      () => {
+        if (countdown > 0) setCountdown(countdown - 1);
+        else {
+          setCountdown(null);
+          goNextRef.current();
+        }
+      },
+      countdown === 0 ? 1100 : 1000
+    );
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   useEffect(() => {
     if (phase !== 'question') return;
@@ -786,7 +809,7 @@ export default function GameArea({
           (() => {
             const a =
               phase === 'lobby'
-                ? { label: 'Démarrer la partie', ok: teams.length > 0, hint: teams.length > 0 ? 'Espace' : 'Aucune équipe connectée' }
+                ? { label: 'Démarrer la partie', ok: teams.length > 0 && countdown === null, hint: countdown !== null ? 'Décollage en cours…' : teams.length > 0 ? 'Espace' : 'Aucune équipe connectée' }
                 : phase === 'revealed'
                   ? { label: 'Question suivante', ok: pendingJokerTeamIds.length === 0, hint: pendingJokerTeamIds.length === 0 ? 'Espace' : 'Des jokers sont à régler' }
                   : { label: 'Question suivante', ok: false, hint: 'Disponible après la réponse' };
@@ -822,7 +845,34 @@ export default function GameArea({
         </button>
       )}
 
-      {phase === 'lobby' && (
+      {phase === 'lobby' && cockpit && countdown !== null && (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+          <style>{`
+            @keyframes ck-pop{0%{transform:scale(1.9);opacity:0}30%{opacity:1}100%{transform:scale(0.92);opacity:.9}}
+            @keyframes ck-launch{0%{transform:translateY(3cqw) scale(1);opacity:0}15%{opacity:1}100%{transform:translateY(-22cqw) scale(1.5);opacity:0}}
+            @media (prefers-reduced-motion: reduce){.ck-cd-num,.ck-cd-rocket{animation:none !important}}
+          `}</style>
+          <div style={{ fontSize: '1.3cqw', fontWeight: 800, letterSpacing: '0.3cqw', color: '#9fc4ff' }}>
+            {countdown > 0 ? 'PRÉPAREZ-VOUS' : 'C’EST PARTI !'}
+          </div>
+          {countdown > 0 ? (
+            <div key={countdown} className="ck-cd-num" style={{ fontSize: '12cqw', lineHeight: 1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9), 0 0 6cqw rgba(255,120,40,0.5)', animation: 'ck-pop 1s ease-out' }}>
+              {countdown}
+            </div>
+          ) : (
+            <>
+              <div className="ck-cd-num" style={{ fontSize: '6cqw', lineHeight: 1.1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9)', animation: 'ck-pop 0.6s ease-out' }}>
+                DÉCOLLAGE
+              </div>
+              <div className="ck-cd-rocket" style={{ position: 'absolute', bottom: '0.5cqw', fontSize: '5cqw', animation: 'ck-launch 1.1s ease-in forwards' }}>
+                🚀
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {phase === 'lobby' && countdown === null && (
         <div style={styles.lobbyCard}>
           <h1 style={{ fontSize: 22, fontWeight: 800 }}>En attente de démarrage…</h1>
           <div style={styles.joinCode}>{joinCode}</div>
