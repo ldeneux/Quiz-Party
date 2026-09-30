@@ -123,12 +123,10 @@ export default function ConsolePage() {
 
       setProfiles(sorted);
 
-      // Pré-sélectionne le profil par défaut s'il n'y a pas encore de profil choisi
-      setSelectedProfileId((prev) => {
-        if (prev) return prev;
-        const defaultProf = sorted.find((p) => p.is_default);
-        return defaultProf ? defaultProf.id : sorted[0]?.id ?? '';
-      });
+      const defaultProfile = sorted.find((p) => p.is_default);
+      if (defaultProfile && !selectedProfileId) {
+        setSelectedProfileId(defaultProfile.id);
+      }
     })();
   }, []);
 
@@ -145,9 +143,6 @@ export default function ConsolePage() {
             setGameId(data.id);
             setJoinCode(data.join_code);
             setActiveMode(data.mode ?? 'classique');
-            if (data.profile_id) {
-              setSelectedProfileId(data.profile_id);
-            }
           } else {
             localStorage.removeItem('quiz-party-game-id');
           }
@@ -201,6 +196,28 @@ export default function ConsolePage() {
     prevTeamsCount.current = teams.length;
   }, [teams, showInvite]);
 
+  // Toutes les mises à jour de la partie passent par le serveur (service role) :
+  // les update directs depuis le navigateur étaient bloqués silencieusement par RLS.
+  const updateGame = async (fields: { mode?: string; profileId?: string | null; resetCamembert?: boolean }) => {
+    if (!gameId) return true;
+    try {
+      const res = await fetch('/api/update-game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId, ...fields }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setError(`Mise à jour de la partie impossible : ${data.error ?? res.status}`);
+        return false;
+      }
+      return true;
+    } catch (e: any) {
+      setError(`Mise à jour de la partie impossible : ${e?.message ?? e}`);
+      return false;
+    }
+  };
+
   const selectMode = async (mode: string) => {
     setActiveMode(mode);
 
@@ -209,23 +226,18 @@ export default function ConsolePage() {
       const currentIsEligible = eligible.some((p) => p.id === selectedProfileId);
       if (!currentIsEligible && eligible.length > 0) {
         setSelectedProfileId(eligible[0].id);
-        if (gameId) await supabase.from('games').update({ profile_id: eligible[0].id }).eq('id', gameId);
+        await updateGame({ profileId: eligible[0].id, resetCamembert: true });
       }
     }
 
-    if (gameId) {
-      await supabase.from('games').update({ mode }).eq('id', gameId);
-    }
+    await updateGame({ mode });
   };
 
   const selectProfile = async (profileId: string) => {
     setSelectedProfileId(profileId);
-    if (gameId) {
-      await supabase
-        .from('games')
-        .update({ profile_id: profileId || null, camembert_categories: [] })
-        .eq('id', gameId);
-    }
+    // On efface aussi les thèmes Trivial Poursuit déjà mémorisés pour
+    // cette partie : ils appartenaient à l'ancien profil.
+    await updateGame({ profileId: profileId || null, resetCamembert: true });
   };
 
   const fullReset = () => {
@@ -239,6 +251,9 @@ export default function ConsolePage() {
     setShowNewGameChoice(false);
   };
 
+  // Garde le même code et les mêmes équipes : remet juste les scores à zéro
+  // (et les vies, pour le mode Survie) et efface l'historique des
+  // questions posées pour repartir sur un pool de questions neuf.
   const restartSameTeams = async () => {
     setShowNewGameChoice(false);
     if (!gameId) return;
@@ -250,7 +265,7 @@ export default function ConsolePage() {
     await supabase.from('answers').delete().eq('game_id', gameId);
     await supabase
       .from('games')
-      .update({ status: 'lobby', current_question_id: null, camembert_categories: [], profile_id: selectedProfileId || null })
+      .update({ status: 'lobby', current_question_id: null, camembert_categories: [] })
       .eq('id', gameId);
 
     const { data: refreshedTeams } = await supabase.from('teams').select('*').eq('game_id', gameId);
@@ -268,10 +283,6 @@ export default function ConsolePage() {
     }
 
     setCreating(true);
-
-    // Détermine le profil exact à envoyer : la sélection active ou le premier profil disponible
-    const profileToUse = selectedProfileId || profiles.find((p) => p.is_default)?.id || profiles[0]?.id || null;
-
     const res = await fetch('/api/create-game', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -280,7 +291,7 @@ export default function ConsolePage() {
         visualTheme: 'espace',
         levelIds: ['CM1'],
         categoryIds: [],
-        profileId: profileToUse,
+        profileId: selectedProfileId || null,
       }),
     });
     const data = await res.json();
@@ -304,6 +315,9 @@ export default function ConsolePage() {
       setError(`Impossible de déconnecter l'équipe (${error.message}).`);
       return;
     }
+    // Retrait immédiat côté client : la tuile disparaît sans délai et les
+    // autres remontent (flexbox column), le nom redevient aussitôt
+    // disponible pour une nouvelle équipe sur l'écran de jointure.
     setTeams((prev) => prev.filter((t) => t.id !== teamId));
   };
 
@@ -322,7 +336,11 @@ export default function ConsolePage() {
 
   const startGame = async () => {
     if (!gameId) return;
-    await supabase.from('games').update({ mode: activeMode, profile_id: selectedProfileId || null }).eq('id', gameId);
+    // Filet de sécurité final : garantit qu'au moment précis où l'écran de
+    // jeu se lance, la base reflète bien le mode et le profil actuellement
+    // affichés dans la console, quoi qu'il ait pu se passer avant.
+    const ok = await updateGame({ mode: activeMode, profileId: selectedProfileId || null });
+    if (!ok) return; // on ne lance pas la partie avec un mauvais profil
     setGameStarted(true);
   };
 
@@ -363,7 +381,7 @@ export default function ConsolePage() {
       const q = questionById[a.question_id];
       if (!q) return;
       const catName = categoryNameById[q.category_id] ?? 'Sans catégorie';
-      if (!result[a.team_id]) return;
+      if (!result[a.team_id]) return; // équipe supprimée depuis
       if (!result[a.team_id].categories[catName]) {
         result[a.team_id].categories[catName] = { correct: 0, wrong: 0 };
       }
@@ -635,7 +653,7 @@ export default function ConsolePage() {
         )}
       </section>
 
-      {/* Fenêtres de dialogue (Modales) */}
+      {/* Fenêtre de choix Nouvelle partie */}
       {showNewGameChoice && (
         <div
           style={{
@@ -706,6 +724,7 @@ export default function ConsolePage() {
         </div>
       )}
 
+      {/* Fenêtre statistiques */}
       {showStats && (
         <div
           style={{
@@ -794,15 +813,15 @@ export default function ConsolePage() {
                           ))}
                         </div>
                       )}
-                    </div>
-                  )
-                )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
         </div>
       )}
 
+      {/* Fenêtre d'invitation */}
       {showInvite && joinCode && (
         <div
           style={{
