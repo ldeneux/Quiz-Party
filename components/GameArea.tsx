@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
+import CockpitPlate from '@/components/CockpitPlate';
+import CockpitCrawl from '@/components/CockpitCrawl';
 import {
   scoreClassique,
   scoreSurvie,
@@ -93,10 +95,14 @@ export default function GameArea({
   // En mode cockpit, boutons d'action et explication sont injectés dans le pupitre / l'écran droit de la page
   const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null);
   const [explainEl, setExplainEl] = useState<HTMLElement | null>(null);
+  const [rocketEl, setRocketEl] = useState<HTMLElement | null>(null);
+  const [progressEl, setProgressEl] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!cockpit) return;
     setActionsEl(document.getElementById('cockpit-actions'));
     setExplainEl(document.getElementById('cockpit-explain'));
+    setRocketEl(document.getElementById('cockpit-rocket'));
+    setProgressEl(document.getElementById('cockpit-progress'));
   }, [cockpit]);
   const toActions = (node: React.ReactNode) => (cockpit && actionsEl ? createPortal(node, actionsEl) : node);
   const toExplain = (node: React.ReactNode) => (cockpit && explainEl ? createPortal(node, explainEl) : node);
@@ -775,7 +781,25 @@ export default function GameArea({
 
   return (
     <div style={{ position: 'relative' }}>
-      {mode === 'camembert' && wedgeCategories.length > 0 && (
+      {cockpit && rocketEl &&
+        createPortal(
+          (() => {
+            const a =
+              phase === 'lobby'
+                ? { label: 'Démarrer la partie', ok: teams.length > 0, hint: teams.length > 0 ? 'Espace' : 'Aucune équipe connectée' }
+                : phase === 'revealed'
+                  ? { label: 'Question suivante', ok: pendingJokerTeamIds.length === 0, hint: pendingJokerTeamIds.length === 0 ? 'Espace' : 'Des jokers sont à régler' }
+                  : { label: 'Question suivante', ok: false, hint: 'Disponible après la réponse' };
+            return <CockpitPlate id="fusee" label={a.label} hint={a.hint} disabled={!a.ok} pulse={a.ok} onClick={goToNextQuestion} />;
+          })(),
+          rocketEl
+        )}
+      {cockpit && progressEl && mode === 'camembert' && wedgeCategories.length > 0 &&
+        createPortal(
+          <CockpitPlate id="progression" label="Voir la progression" hint="P · toutes les équipes" onClick={() => setShowProgressTable(true)} />,
+          progressEl
+        )}
+      {!cockpit && mode === 'camembert' && wedgeCategories.length > 0 && (
         <button
           onClick={() => setShowProgressTable(true)}
           title="Voir la progression de toutes les équipes"
@@ -809,7 +833,7 @@ export default function GameArea({
             </p>
           )}
 
-          {teams.length > 0 && (
+          {teams.length > 0 && !cockpit && (
             <button style={styles.startBtn} onClick={goToNextQuestion}>
               Démarrer la partie ({teams.length} équipes)
             </button>
@@ -900,18 +924,8 @@ export default function GameArea({
             ))}
           </div>
 
-          {phase === 'revealed' && question.explanation && toExplain(
-            <div
-              className="ck-scroll"
-              style={
-                cockpit
-                  ? { ...styles.explainBox, fontSize: `${Math.max(0.72, Math.min(1.05, 1.05 - (question.explanation.length - 150) / 1000))}cqw`, maxHeight: '100%', overflowY: 'auto' }
-                  : styles.explainBox
-              }
-            >
-              {question.explanation}
-            </div>
-          )}
+          {phase === 'revealed' && question.explanation &&
+            (cockpit ? toExplain(<CockpitCrawl text={question.explanation} />) : <div style={styles.explainBox}>{question.explanation}</div>)}
 
           {/* Seules les réponses et temps sont affichés ici — les scores sont sur les tuiles équipes du menu */}
           <div style={styles.teamsRow}>
@@ -973,9 +987,11 @@ export default function GameArea({
               {loadError && (
                 <p style={{ color: '#ff7a68', fontSize: 14, marginBottom: 12 }}>{loadError}</p>
               )}
-              <button className={cockpit ? 'ck-key' : undefined} style={styles.startBtn} onClick={goToNextQuestion} disabled={pendingJokerTeamIds.length > 0}>
-                Question suivante
-              </button>
+              {!cockpit && (
+                <button style={styles.startBtn} onClick={goToNextQuestion} disabled={pendingJokerTeamIds.length > 0}>
+                  Question suivante
+                </button>
+              )}
               <button
                 onClick={() => setShowQuitConfirm(true)}
                 className={cockpit ? 'ck-key' : undefined}

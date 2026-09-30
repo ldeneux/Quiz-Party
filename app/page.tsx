@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import GameArea from '@/components/GameArea';
-import { ckKey, ckKeyPrimary, ckLed } from '@/lib/cockpitUi';
+import { ckKey, ckLed } from '@/lib/cockpitUi';
+import CockpitPlate from '@/components/CockpitPlate';
 
 const MODES = [
   {
@@ -400,19 +401,24 @@ export default function ConsolePage() {
 
   const activeModeInfo = MODES.find((m) => m.id === activeMode) ?? MODES[0];
   const [profileOpen, setProfileOpen] = useState(false);
-  const iconStyle: React.CSSProperties = { width: '1.35cqw', height: '1.35cqw', display: 'block' };
-  const IconChart = (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={iconStyle}>
-      <path d="M4 20V11M10 20V4M16 20v-6M22 20H2" />
-    </svg>
-  );
-  const IconGear = (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={iconStyle}>
-      <circle cx="12" cy="12" r="3" />
-      <circle cx="12" cy="12" r="7" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" />
-    </svg>
-  );
+  // Raccourcis clavier de l'hôte : Espace = fusée (démarrer / question suivante), S = statistiques, P = progression
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable)) return;
+      const ids: Record<string, string> = { ' ': 'ck-fusee', s: 'ck-stats', p: 'ck-progression' };
+      const target = ids[e.key.toLowerCase()];
+      if (!target) return;
+      const btn = document.getElementById(target) as HTMLElement | null;
+      if (!btn || btn.getAttribute('aria-disabled') === 'true') return;
+      e.preventDefault();
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      btn.click();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
   const eligibleProfiles = activeMode === 'camembert' ? profiles.filter((p) => p.isTrivialEligible) : profiles;
 
@@ -441,6 +447,12 @@ export default function ConsolePage() {
           .ck-scroll::-webkit-scrollbar-track{background:transparent}
           .ck-key:hover:not(:disabled){filter:brightness(1.25)}
           .ck-key:active:not(:disabled){transform:translateY(1px)}
+          .ck-plate{background:none;border:none;padding:0;position:relative;display:block;transition:transform .15s, filter .2s}
+          .ck-plate:hover:not([aria-disabled="true"]){transform:translateY(-0.2cqw) scale(1.06);filter:drop-shadow(0 0 1.1cqw rgba(110,170,255,.9))}
+          .ck-plate:active:not([aria-disabled="true"]){transform:translateY(0.1cqw) scale(1)}
+          .ck-plate:focus-visible{outline:2px solid #7fd1ff;outline-offset:3px;border-radius:1cqw}
+          .ck-pulse{animation:ck-pulse 1.8s ease-in-out infinite}
+          @keyframes ck-pulse{0%,100%{filter:drop-shadow(0 0 .3cqw rgba(160,120,255,.5))}50%{filter:drop-shadow(0 0 1.5cqw rgba(180,140,255,1))}}
         `}</style>
 
         {/* Écran gauche : équipes (nom complet sur la ligne 1, score sur la ligne 2) */}
@@ -495,7 +507,7 @@ export default function ConsolePage() {
         </div>
 
         {/* Écran droit : adresse pour rejoindre (avant la partie) puis explication de la réponse (injectée par GameArea) */}
-        <div className="ck-scroll" style={{ position: 'absolute', left: '84.6%', top: '14.3%', width: '14%', height: '26.5%', overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw' }}>
+        <div style={{ position: 'absolute', left: '84.6%', top: '14.3%', width: '14%', height: '26.5%', overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw' }}>
           {!gameStarted &&
             (joinCode ? (
               <div style={{ textAlign: 'center', fontSize: '1cqw', color: '#9fb2e8', lineHeight: 1.4, marginTop: '1.5cqw' }}>
@@ -506,7 +518,7 @@ export default function ConsolePage() {
             ) : (
               <div style={{ fontSize: '1cqw', color: '#8a97c4', marginTop: '2cqw', textAlign: 'center' }}>Clique sur « Rejoindre le jeu » pour créer un code</div>
             ))}
-          <div id="cockpit-explain" />
+          <div id="cockpit-explain" style={{ position: 'absolute', inset: 0 }} />
         </div>
 
         {/* Petit afficheur sous l'écran droit : code de la partie */}
@@ -550,8 +562,8 @@ export default function ConsolePage() {
           )}
         </div>
 
-        {/* Pupitre du bas : profil et commandes (touches néon du cockpit) */}
-        <div style={{ position: 'absolute', left: '7%', top: '88.6%', width: '86%', height: '9.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8cqw', flexWrap: 'wrap', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: 'linear-gradient(180deg, rgba(8,16,55,0.55), rgba(4,8,30,0.75))', border: '1px solid rgba(90,140,255,0.35)', borderRadius: '1.2cqw', boxShadow: '0 0 1.5cqw rgba(40,90,220,0.3), inset 0 0.1cqw 0.3cqw rgba(140,180,255,0.2)' }}>
+        {/* Choix du profil : en haut au centre, près du halo bleu du plafond */}
+        <div style={{ position: 'absolute', left: '50%', top: '4.3%', transform: 'translateX(-50%)', zIndex: 15 }}>
           {/* Sélecteur de profil (menu personnalisé) */}
           <div style={{ position: 'relative' }}>
             <button
@@ -563,12 +575,12 @@ export default function ConsolePage() {
             >
               <span style={ckLed(selectedProfile ? '#4dffb0' : '#ff9a5a')} />
               <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>Profil · {selectedProfile ? selectedProfile.name : 'à choisir'}</span>
-              <span style={{ fontSize: '0.8cqw' }}>▴</span>
+              <span style={{ fontSize: '0.8cqw' }}>▾</span>
             </button>
             {profileOpen && !gameStarted && (
               <>
                 <div onClick={() => setProfileOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
-                <div className="ck-scroll" style={{ position: 'absolute', bottom: 'calc(100% + 0.7cqw)', left: 0, minWidth: '100%', maxHeight: '22cqw', overflowY: 'auto', zIndex: 20, background: 'rgba(5,10,38,0.97)', border: '1px solid rgba(120,175,255,0.7)', borderRadius: '0.8cqw', boxShadow: '0 0 1.6cqw rgba(60,120,255,0.55)', padding: '0.4cqw' }}>
+                <div className="ck-scroll" style={{ position: 'absolute', top: 'calc(100% + 0.7cqw)', left: 0, minWidth: '100%', maxHeight: '22cqw', overflowY: 'auto', zIndex: 20, background: 'rgba(5,10,38,0.97)', border: '1px solid rgba(120,175,255,0.7)', borderRadius: '0.8cqw', boxShadow: '0 0 1.6cqw rgba(60,120,255,0.55)', padding: '0.4cqw' }}>
                   {[{ id: '', name: 'Aucun profil (toutes les questions)', is_default: false, is_favorite: false } as Profile, ...eligibleProfiles].map((p) => {
                     const sel = p.id === selectedProfileId;
                     return (
@@ -588,6 +600,10 @@ export default function ConsolePage() {
               </>
             )}
           </div>
+        </div>
+
+        {/* Pupitre du bas : profil et commandes (touches néon du cockpit) */}
+        <div style={{ position: 'absolute', left: '7%', top: '88.6%', width: '86%', height: '9.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8cqw', flexWrap: 'wrap', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: 'linear-gradient(180deg, rgba(8,16,55,0.55), rgba(4,8,30,0.75))', border: '1px solid rgba(90,140,255,0.35)', borderRadius: '1.2cqw', boxShadow: '0 0 1.5cqw rgba(40,90,220,0.3), inset 0 0.1cqw 0.3cqw rgba(140,180,255,0.2)' }}>
           {activeMode === 'camembert' && eligibleProfiles.length === 0 && (
             <span style={{ color: '#ff9a8a', fontSize: '0.95cqw', fontWeight: 700 }}>Aucun profil éligible (10 catégories distinctes requises)</span>
           )}
@@ -597,28 +613,34 @@ export default function ConsolePage() {
               {creating ? 'Création…' : 'Rejoindre le jeu'}
             </button>
           )}
-          {teams.length > 0 && !gameStarted && (
-            <button className="ck-key" onClick={startGame} style={ckKeyPrimary}>
-              Démarrer ({teams.length} équipe{teams.length > 1 ? 's' : ''})
-            </button>
-          )}
           {gameId && (
             <button className="ck-key" onClick={() => setShowNewGameChoice(true)} title="Oublier cette partie et repartir de zéro" style={ckKey}>
               Nouvelle partie
             </button>
           )}
 
-          {/* Boutons « Question suivante / Quitter » injectés par GameArea */}
+          {/* Cadre « progression » injecté par GameArea (mode Trivial Poursuit) */}
+          <div id="cockpit-progress" style={{ display: 'flex' }} />
+
+          {/* Fusée : Démarrer avant la partie, puis « Question suivante » (injectée par GameArea) */}
+          {!gameStarted ? (
+            <CockpitPlate
+              id="fusee"
+              label="Démarrer la partie"
+              hint={teams.length > 0 ? 'Espace' : 'Aucune équipe connectée'}
+              disabled={teams.length === 0}
+              pulse={teams.length > 0}
+              onClick={startGame}
+            />
+          ) : (
+            <div id="cockpit-rocket" style={{ display: 'flex' }} />
+          )}
+
+          {/* Bouton « Quitter la partie » injecté par GameArea */}
           <div id="cockpit-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.8cqw' }} />
 
-          {gameId && (
-            <button className="ck-key" onClick={openStats} title="Statistiques par équipe et par catégorie" aria-label="Statistiques" style={{ ...ckKey, padding: '0.55cqw 0.9cqw' }}>
-              {IconChart}
-            </button>
-          )}
-          <a className="ck-key" href="/parametrage" title="Paramétrage" aria-label="Paramétrage" style={{ ...ckKey, padding: '0.55cqw 0.9cqw' }}>
-            {IconGear}
-          </a>
+          {gameId && <CockpitPlate id="stats" label="Statistiques" hint="S · par équipe et par catégorie" onClick={openStats} />}
+          <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />
           {error && <span style={{ color: '#ff9a8a', fontSize: '0.95cqw', fontWeight: 700 }}>{error}</span>}
         </div>
       </div>
