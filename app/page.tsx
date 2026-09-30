@@ -42,6 +42,8 @@ const MODES = [
   },
 ];
 
+const PLANET_WIDTH: Record<string, number> = { classique: 11.2, defi: 8.2, survie: 8.6, participatif: 10.9, camembert: 8.2 };
+
 type Team = {
   id: string;
   name: string;
@@ -395,263 +397,161 @@ export default function ConsolePage() {
     setStatsData(result);
   };
 
-  return (
-    <main style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif', background: '#f4f6fb' }}>
-      {/* Colonne gauche : modes + invitation + équipes */}
-      <aside style={{ width: 270, background: '#eef0f8', padding: '28px 22px' }}>
-        <div style={pillLabel}>Mode de jeu</div>
+  const activeModeInfo = MODES.find((m) => m.id === activeMode) ?? MODES[0];
+  const barBtn: React.CSSProperties = {
+    background: 'rgba(20,35,90,0.85)',
+    color: '#e8eeff',
+    border: '1px solid rgba(120,170,255,0.55)',
+    borderRadius: 999,
+    padding: '0.5cqw 1.3cqw',
+    fontWeight: 700,
+    fontSize: '1.15cqw',
+    cursor: 'pointer',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap',
+  };
+  const eligibleProfiles = activeMode === 'camembert' ? profiles.filter((p) => p.isTrivialEligible) : profiles;
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
-          {MODES.map((m) => (
-            <div key={m.id}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <button
-                  onClick={() => !gameStarted && selectMode(m.id)}
-                  disabled={gameStarted}
-                  title={gameStarted ? 'Impossible de changer de mode en cours de partie' : ''}
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 14px',
-                    borderRadius: 999,
-                    border: activeMode === m.id ? `2px solid ${m.color}` : '2px solid transparent',
-                    background: activeMode === m.id ? m.color + '18' : '#fff',
-                    fontWeight: 700,
-                    fontSize: 13.5,
-                    cursor: gameStarted ? 'not-allowed' : 'pointer',
-                    textAlign: 'left',
-                    color: activeMode === m.id ? '#1f2440' : '#7a819c',
-                    opacity: gameStarted && activeMode !== m.id ? 0.5 : 1,
-                  }}
+  return (
+    <main style={{ minHeight: '100vh', background: '#03040c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif' }}>
+      {/* Scène cockpit : ratio fixe de l'image, tout est positionné en % (et texte en cqw) pour rester aligné */}
+      <div
+        style={
+          {
+            position: 'relative',
+            width: 'min(100vw, calc(100vh * 1536 / 944))',
+            aspectRatio: '1536 / 944',
+            containerType: 'size',
+            backgroundImage: 'url(/cockpit.webp)',
+            backgroundSize: '100% 100%',
+            color: '#e8eeff',
+            overflow: 'hidden',
+          } as React.CSSProperties
+        }
+      >
+        {/* Écran gauche : équipes et scores */}
+        <div style={{ position: 'absolute', left: '1.6%', top: '14.3%', width: '13.4%', height: '26.5%', overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw' }}>
+          <div style={{ fontSize: '0.9cqw', fontWeight: 800, color: '#7fd1ff', letterSpacing: '0.1cqw', marginBottom: '0.4cqw' }}>ÉQUIPES</div>
+          {teams.length === 0 && <div style={{ fontSize: '0.9cqw', color: '#8a97c4' }}>Aucune équipe connectée</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35cqw' }}>
+            {teams.map((t) => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4cqw', border: `1px solid ${t.color}`, borderRadius: 999, padding: '0.15cqw 0.4cqw 0.15cqw 0.6cqw', fontWeight: 700, fontSize: '0.95cqw', background: 'rgba(10,18,50,0.7)' }}>
+                <span>{t.avatar}</span>
+                <span
+                  onClick={() => copyTeamLink(t.id)}
+                  title="Copier le lien de récupération de cette équipe"
+                  style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}
                 >
-                  <span style={{ fontSize: 17 }}>{m.emoji}</span> {m.label}
-                </button>
-                <button
-                  onClick={() => setInfoMode(infoMode === m.id ? null : m.id)}
-                  title="Règles du mode"
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    color: '#9aa1c2',
-                    cursor: 'pointer',
-                    fontSize: 15,
-                    width: 22,
-                    flexShrink: 0,
-                  }}
-                >
-                  ⓘ
+                  {copiedTeamId === t.id ? 'Lien copié ✓' : t.name}
+                </span>
+                <span style={{ color: '#ffd166', fontWeight: 800, flexShrink: 0 }}>
+                  {t.score ?? 0}
+                  {activeMode === 'camembert' && ` · 🥧${(t.camembert_won ?? []).length}${(t.camembert_jokers ?? 0) > 0 ? `🤡${t.camembert_jokers}` : ''}`}
+                </span>
+                <button onClick={() => removeTeam(t.id)} title="Déconnecter l'équipe" style={{ border: 'none', background: 'rgba(255,255,255,0.12)', borderRadius: '50%', width: '1.3cqw', height: '1.3cqw', fontSize: '0.7cqw', cursor: 'pointer', color: '#c8d3ff', flexShrink: 0, padding: 0 }}>
+                  ✕
                 </button>
               </div>
-              {infoMode === m.id && (
-                <p style={{ fontSize: 12, color: '#7a819c', lineHeight: 1.5, margin: '6px 4px 0' }}>{m.desc}</p>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <button
-          onClick={inviteTeams}
-          disabled={creating}
-          style={{ ...pillLabel, border: 'none', cursor: 'pointer' }}
-        >
-          {creating ? 'Création…' : 'Rejoindre le jeu'}
-        </button>
-
-        {error && <p style={{ color: '#ff7a68', fontSize: 12.5, marginBottom: 12 }}>{error}</p>}
-
-        {/* Équipes déjà enrôlées, avec leur score */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {teams.map((t) => (
-            <div
-              key={t.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: '#fff',
-                border: `2px solid ${t.color}`,
-                borderRadius: 999,
-                padding: '6px 6px 6px 12px',
-                fontWeight: 700,
-                fontSize: 13,
-              }}
-            >
-              <span style={{ fontSize: 16 }}>{t.avatar}</span>
-              <span
-                onClick={() => copyTeamLink(t.id)}
-                title="Copier le lien de récupération de cette équipe"
-                style={{
-                  flex: 1,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  cursor: 'pointer',
-                }}
-              >
-                {copiedTeamId === t.id ? 'Lien copié ✓' : t.name}
-              </span>
-              <span style={{ color: '#7a819c', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
-                {t.score ?? 0} pts
-                {activeMode === 'camembert' &&
-                  ` · 🥧×${(t.camembert_won ?? []).length}${(t.camembert_jokers ?? 0) > 0 ? ` · 🤡×${t.camembert_jokers}` : ''}`}
-              </span>
-              <button
-                onClick={() => removeTeam(t.id)}
-                title="Déconnecter l'équipe"
-                style={{
-                  border: 'none',
-                  background: 'rgba(0,0,0,0.06)',
-                  borderRadius: '50%',
-                  width: 18,
-                  height: 18,
-                  fontSize: 10,
-                  cursor: 'pointer',
-                  color: '#7a819c',
-                  flexShrink: 0,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      </aside>
-
-      {/* Zone centrale */}
-      <section style={{ flex: 1, padding: '28px 40px' }}>
-        <header style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <span style={{ fontSize: 22 }}>🎯</span> Quiz Party
+            ))}
           </div>
+        </div>
 
+        {/* Écran droit : code de partie + explication de la réponse (alimentée par GameArea) */}
+        <div style={{ position: 'absolute', left: '84.6%', top: '14.3%', width: '14%', height: '26.5%', overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw', textAlign: 'center' }}>
+          {joinCode ? (
+            <>
+              <div style={{ fontSize: '0.85cqw', color: '#8a97c4' }}>Rejoindre sur {origin.replace(/^https?:\/\//, '')}/join</div>
+              <div style={{ fontSize: '2.6cqw', fontWeight: 800, letterSpacing: '0.3cqw', color: '#7fd1ff', textShadow: '0 0 1cqw #2aa8ff' }}>{joinCode}</div>
+            </>
+          ) : (
+            <div style={{ fontSize: '1cqw', color: '#8a97c4', marginTop: '2cqw' }}>Clique sur « Rejoindre le jeu » pour créer un code</div>
+          )}
+          <div id="cockpit-explain" style={{ marginTop: '0.5cqw', textAlign: 'left' }} />
+        </div>
+
+        {/* Hublot : menu des modes (planètes) ou écran de jeu */}
+        <div style={{ position: 'absolute', left: '20%', top: '11.7%', width: '60%', height: '33.9%', boxSizing: 'border-box' }}>
+          {!gameStarted ? (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end' }}>
+                {MODES.map((m) => {
+                  const sel = activeMode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => selectMode(m.id)}
+                      title={m.label}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5cqw', opacity: sel ? 1 : 0.72, transform: sel ? 'scale(1.15)' : 'scale(1)', transition: 'transform .25s, opacity .25s, filter .25s', filter: sel ? `drop-shadow(0 0 1.1cqw ${m.color})` : 'none' }}
+                    >
+                      <img src={`/planets/${m.id}.png`} alt="" draggable={false} style={{ width: `${PLANET_WIDTH[m.id]}cqw`, display: 'block' }} />
+                      <span style={{ fontWeight: 800, fontSize: '1.3cqw', color: sel ? '#fff' : '#a9b6e6', textShadow: '0 0 0.8cqw #000' }}>
+                        {m.emoji} {m.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{ textAlign: 'center', fontSize: '1.15cqw', lineHeight: 1.35, color: '#c8d3ff', margin: '1.2cqw 2cqw 0', textShadow: '0 0 0.6cqw #000' }}>
+                {activeModeInfo.desc}
+              </p>
+            </div>
+          ) : (
+            gameId && (
+              <GameArea gameId={gameId} initialMode={activeMode} cockpit onRestart={() => setShowNewGameChoice(true)} onClose={() => setGameStarted(false)} />
+            )
+          )}
+        </div>
+
+        {/* Pupitre du bas : profil et commandes */}
+        <div style={{ position: 'absolute', left: '5%', top: '88%', width: '90%', height: '11%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.9cqw', flexWrap: 'wrap' }}>
           <select
             value={selectedProfileId}
             onChange={(e) => selectProfile(e.target.value)}
             disabled={gameStarted}
             title={gameStarted ? 'Impossible de changer de profil en cours de partie' : ''}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              maxWidth: 520,
-              padding: '10px 14px',
-              borderRadius: 999,
-              border: '1px solid #eaedf6',
-              fontSize: 13,
-              fontWeight: 700,
-              color: gameStarted ? '#9aa1c2' : '#1f2440',
-              background: gameStarted ? '#f4f6fb' : '#fff',
-              cursor: gameStarted ? 'not-allowed' : 'pointer',
-            }}
+            style={{ ...barBtn, maxWidth: '22cqw', cursor: gameStarted ? 'not-allowed' : 'pointer', opacity: gameStarted ? 0.6 : 1 }}
           >
             <option value="">— Choisir un profil —</option>
-            {(activeMode === 'camembert' ? profiles.filter((p) => p.isTrivialEligible) : profiles).map((p) => (
+            {eligibleProfiles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.is_default ? '🏠 ' : p.is_favorite ? '⭐ ' : ''}{p.name}
               </option>
             ))}
           </select>
-          {activeMode === 'camembert' && profiles.filter((p) => p.isTrivialEligible).length === 0 && (
-            <span style={{ color: '#ff7a68', fontSize: 12, fontWeight: 700 }}>
-              Aucun profil éligible (10 catégories distinctes requises)
-            </span>
+          {activeMode === 'camembert' && eligibleProfiles.length === 0 && (
+            <span style={{ color: '#ff9a8a', fontSize: '1cqw', fontWeight: 700 }}>Aucun profil éligible (10 catégories distinctes requises)</span>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
-            {gameId && (
-              <button
-                onClick={() => setShowNewGameChoice(true)}
-                title="Oublier cette partie et repartir de zéro"
-                style={{
-                  background: 'none',
-                  border: '1px solid #eaedf6',
-                  borderRadius: 999,
-                  padding: '8px 14px',
-                  fontWeight: 700,
-                  fontSize: 12.5,
-                  color: '#7a819c',
-                  cursor: 'pointer',
-                }}
-              >
-                Nouvelle partie
-              </button>
-            )}
+          {!gameStarted && (
+            <button onClick={inviteTeams} disabled={creating} style={barBtn}>
+              {creating ? 'Création…' : 'Rejoindre le jeu'}
+            </button>
+          )}
+          {teams.length > 0 && !gameStarted && (
+            <button onClick={startGame} style={{ ...barBtn, background: 'linear-gradient(135deg,#3b82f6,#7c5cff)', boxShadow: '0 0 1cqw rgba(80,140,255,.7)' }}>
+              Démarrer la partie ({teams.length} équipe{teams.length > 1 ? 's' : ''})
+            </button>
+          )}
+          {gameId && (
+            <button onClick={() => setShowNewGameChoice(true)} title="Oublier cette partie et repartir de zéro" style={barBtn}>
+              Nouvelle partie
+            </button>
+          )}
 
-            {teams.length > 0 && !gameStarted && (
-              <button
-                onClick={startGame}
-                style={{
-                  background: '#6c7bf7',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 999,
-                  padding: '12px 22px',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                }}
-              >
-                Démarrer la partie ({teams.length} équipe{teams.length > 1 ? 's' : ''})
-              </button>
-            )}
+          {/* Boutons « Question suivante / Quitter » injectés par GameArea */}
+          <div id="cockpit-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.8cqw' }} />
 
-            {gameId && (
-              <button
-                onClick={openStats}
-                title="Statistiques par équipe et par catégorie"
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  background: '#fff',
-                  border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 18,
-                  boxShadow: '0 4px 12px rgba(31,36,64,0.08)',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-              >
-                📊
-              </button>
-            )}
-
-            <a
-              href="/parametrage"
-              title="Paramétrage"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-                background: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 18,
-                boxShadow: '0 4px 12px rgba(31,36,64,0.08)',
-                textDecoration: 'none',
-                flexShrink: 0,
-              }}
-            >
-              ⚙️
-            </a>
-          </div>
-        </header>
-
-        {gameStarted && gameId && (
-          <div style={{ marginTop: 28 }}>
-            <GameArea
-              gameId={gameId}
-              initialMode={activeMode}
-              onRestart={() => setShowNewGameChoice(true)}
-              onClose={() => setGameStarted(false)}
-            />
-          </div>
-        )}
-      </section>
+          {gameId && (
+            <button onClick={openStats} title="Statistiques par équipe et par catégorie" style={barBtn}>
+              📊
+            </button>
+          )}
+          <a href="/parametrage" title="Paramétrage" style={barBtn}>
+            ⚙️
+          </a>
+          {error && <span style={{ color: '#ff9a8a', fontSize: '1cqw', fontWeight: 700 }}>{error}</span>}
+        </div>
+      </div>
 
       {/* Fenêtre de choix Nouvelle partie */}
       {showNewGameChoice && (

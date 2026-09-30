@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabaseClient';
 import {
   scoreClassique,
@@ -54,17 +55,50 @@ const CHOICE_COLORS: Record<'a' | 'b' | 'c' | 'd', string> = {
   d: '#ff7a68',
 };
 
+
+// Variante « cockpit » : texte en cqw (1cqw = 1 % de la largeur de la scène), fond translucide néon
+const cockpitStyles: Record<string, React.CSSProperties> = {
+  lobbyCard: { textAlign: 'center', color: '#e8eeff', padding: '1cqw' },
+  joinCode: { fontSize: '4cqw', fontWeight: 800, letterSpacing: '0.5cqw', margin: '0.8cqw 0', color: '#7fd1ff', textShadow: '0 0 1.2cqw #2aa8ff' },
+  startBtn: { background: 'linear-gradient(135deg,#3b82f6,#7c5cff)', color: '#fff', border: 'none', borderRadius: 999, padding: '0.6cqw 1.6cqw', fontWeight: 700, fontSize: '1.2cqw', cursor: 'pointer', marginTop: '0.5cqw', boxShadow: '0 0 1cqw rgba(80,140,255,.6)' },
+  mainCard: { color: '#e8eeff', padding: '0.6cqw 1cqw', height: '100%', boxSizing: 'border-box', overflow: 'auto' },
+  qHead: { display: 'flex', alignItems: 'center', gap: '0.8cqw', marginBottom: '0.7cqw' },
+  qTag: { background: 'rgba(80,170,255,.18)', color: '#8fd0ff', fontWeight: 800, padding: '0.25cqw 0.8cqw', borderRadius: 999, fontSize: '1cqw', border: '1px solid rgba(120,190,255,.4)' },
+  timer: { marginLeft: 'auto', fontWeight: 800, fontSize: '2cqw', color: '#ffd166', textShadow: '0 0 1cqw #ff9f1c' },
+  questionText: { fontSize: '1.9cqw', fontWeight: 800, marginBottom: '0.8cqw', lineHeight: 1.2 },
+  choices: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7cqw', marginBottom: '0.7cqw' },
+  choice: { background: 'rgba(15,25,70,.7)', border: '1px solid rgba(120,160,255,.45)', borderRadius: '0.8cqw', padding: '0.6cqw 0.9cqw', fontWeight: 700, fontSize: '1.35cqw', lineHeight: 1.2 },
+  choiceCorrect: { background: 'rgba(30,160,120,.35)', borderColor: '#35e0b0', boxShadow: '0 0 1cqw rgba(53,224,176,.6)' },
+  explainBox: { background: 'rgba(30,160,120,.18)', border: '1px solid rgba(53,224,176,.5)', borderRadius: '0.6cqw', padding: '0.6cqw', fontSize: '0.95cqw', lineHeight: 1.3, color: '#dffcf3' },
+  teamsRow: { display: 'flex', flexWrap: 'wrap', gap: '0.5cqw' },
+  teamTile: { border: '1px solid rgba(120,160,255,.35)', borderRadius: '0.7cqw', padding: '0.3cqw 0.7cqw', fontWeight: 700, fontSize: '1cqw', background: 'rgba(10,18,50,.6)' },
+  teamAnswered: { borderColor: '#7fd1ff', background: 'rgba(60,120,220,.35)' },
+};
+
 export default function GameArea({
   gameId,
   initialMode,
+  cockpit = false,
   onRestart,
   onClose,
 }: {
   gameId: string;
   initialMode?: string;
+  cockpit?: boolean;
   onRestart?: () => void;
   onClose?: () => void;
 }) {
+  const styles = cockpit ? cockpitStyles : baseStyles;
+  // En mode cockpit, boutons d'action et explication sont injectés dans le pupitre / l'écran droit de la page
+  const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null);
+  const [explainEl, setExplainEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!cockpit) return;
+    setActionsEl(document.getElementById('cockpit-actions'));
+    setExplainEl(document.getElementById('cockpit-explain'));
+  }, [cockpit]);
+  const toActions = (node: React.ReactNode) => (cockpit && actionsEl ? createPortal(node, actionsEl) : node);
+  const toExplain = (node: React.ReactNode) => (cockpit && explainEl ? createPortal(node, explainEl) : node);
   const [joinCode, setJoinCode] = useState<string>('');
   const [mode, setMode] = useState<string>(initialMode ?? 'classique');
   const [teams, setTeams] = useState<Team[]>([]);
@@ -746,8 +780,9 @@ export default function GameArea({
           title="Voir la progression de toutes les équipes"
           style={{
             position: 'absolute',
-            top: -44,
+            top: cockpit ? 0 : -44,
             right: 0,
+            zIndex: 2,
             width: 36,
             height: 36,
             borderRadius: '50%',
@@ -864,9 +899,7 @@ export default function GameArea({
             ))}
           </div>
 
-          {phase === 'revealed' && question.explanation && (
-            <div style={styles.explainBox}>{question.explanation}</div>
-          )}
+          {phase === 'revealed' && question.explanation && toExplain(<div style={styles.explainBox}>{question.explanation}</div>)}
 
           {/* Seules les réponses et temps sont affichés ici — les scores sont sur les tuiles équipes du menu */}
           <div style={styles.teamsRow}>
@@ -882,10 +915,10 @@ export default function GameArea({
                   style={{
                     ...styles.teamTile,
                     ...(mode === 'defi' && t.id === challengerTeamId && phase === 'question'
-                      ? { borderColor: '#ffb648', background: '#fff3e0' }
+                      ? { borderColor: '#ffb648', background: cockpit ? 'rgba(255,182,72,0.28)' : '#fff3e0' }
                       : {}),
                     ...(mode === 'participatif' && t.id === participatifTurnTeamId && phase === 'question'
-                      ? { borderColor: '#ffb648', background: '#fff3e0' }
+                      ? { borderColor: '#ffb648', background: cockpit ? 'rgba(255,182,72,0.28)' : '#fff3e0' }
                       : {}),
                     ...(phase === 'question' && hasAnswered ? styles.teamAnswered : {}),
                     ...(phase === 'revealed' && choiceColor
@@ -923,7 +956,7 @@ export default function GameArea({
             })}
           </div>
 
-          {phase === 'revealed' && (
+          {phase === 'revealed' && toActions(
             <>
               {loadError && (
                 <p style={{ color: '#ff7a68', fontSize: 14, marginBottom: 12 }}>{loadError}</p>
@@ -949,7 +982,7 @@ export default function GameArea({
               </button>
 
               {showQuitConfirm && (
-                <div style={{ marginTop: 14, background: '#f4f6fb', borderRadius: 14, padding: 16 }}>
+                <div style={cockpit ? { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', zIndex: 60, background: '#f4f6fb', color: '#1f2440', borderRadius: 14, padding: 16, boxShadow: '0 20px 50px rgba(0,0,0,.5)' } : { marginTop: 14, background: '#f4f6fb', borderRadius: 14, padding: 16 }}>
                   <p style={{ fontSize: 13.5, marginBottom: 10 }}>
                     Terminer la partie maintenant — que faire des scores actuels ?
                   </p>
@@ -1163,7 +1196,7 @@ async function loadNextQuestion(
   startQuestion(randomQuestion as Question);
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const baseStyles: Record<string, React.CSSProperties> = {
   lobbyCard: {
     maxWidth: 600,
     textAlign: 'center',
