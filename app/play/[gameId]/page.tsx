@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { getRandomPresets, TeamPreset } from '@/lib/teamPresets';
+import { getTeamBackground, TeamBg } from '@/lib/teamBackgrounds';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const MODE_META: Record<string, { label: string; emoji: string }> = {
@@ -38,11 +39,13 @@ function TeamHeader({
   avatar,
   name,
   lives,
+  themed = false,
 }: {
   mode: string | null;
   avatar: string;
   name: string;
   lives?: number | null;
+  themed?: boolean;
 }) {
   const meta = mode ? MODE_META[mode] : null;
   return (
@@ -55,7 +58,8 @@ function TeamHeader({
         marginBottom: 14,
         fontSize: 12.5,
         fontWeight: 800,
-        color: '#7a819c',
+        color: themed ? '#b9c6f2' : '#7a819c',
+        textShadow: themed ? '0 1px 6px rgba(0,0,0,0.7)' : undefined,
       }}
     >
       <span>{meta ? `${meta.emoji} ${meta.label}` : ''}</span>
@@ -66,6 +70,43 @@ function TeamHeader({
         )}
       </span>
     </div>
+  );
+}
+
+
+// Fond d'écran de l'équipe : image portrait/paysage selon l'orientation de l'appareil
+function TeamBackdrop({ bg }: { bg: TeamBg }) {
+  const css =
+    `.tb-bg{position:fixed;inset:0;z-index:0;background-color:#050818;` +
+    `background-image:linear-gradient(rgba(3,6,20,.15),rgba(3,6,20,.35)),url(${bg.portrait});` +
+    `background-size:cover;background-position:center top;background-repeat:no-repeat}` +
+    // sans version paysage : on recadre le fond portrait sur le haut de l'image
+    `@media (orientation:landscape){.tb-bg{background-position:center 8%` +
+    (bg.landscape ? `;background-image:linear-gradient(rgba(3,6,20,.15),rgba(3,6,20,.35)),url(${bg.landscape});background-position:center` : '') +
+    `}}` +
+    // en portrait, le contenu commence sous l'emblème de l'équipe
+    `@media (orientation:portrait){.tb-content{padding-top:31vh !important}}`;
+  return (
+    <>
+      <style>{css}</style>
+      <div className="tb-bg" />
+    </>
+  );
+}
+
+// Équivalent de <main> : ajoute le fond de l'équipe (s'il existe) et un texte clair
+function Shell({ bg, style, children }: { bg: TeamBg | null; style: React.CSSProperties; children: React.ReactNode }) {
+  if (!bg) return <main style={style}>{children}</main>;
+  return (
+    <>
+      <TeamBackdrop bg={bg} />
+      <main
+        className="tb-content"
+        style={{ ...style, marginTop: 0, position: 'relative', zIndex: 1, minHeight: '100vh', boxSizing: 'border-box', color: '#e8eeff' }}
+      >
+        {children}
+      </main>
+    </>
   );
 }
 
@@ -359,6 +400,8 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     });
   };
 
+  const teamBg = team ? getTeamBackground(team.preset.name) : null;
+
   // --- Écran : équipe expulsée par l'hôte ---
   if (kicked) {
     return (
@@ -437,8 +480,8 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   if (categoryChoicePrompt) {
     const isChooser = categoryChoicePrompt.chooserTeamId === team.id;
     return (
-      <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
-        <TeamHeader mode={gameMode} avatar={team.preset.avatar} name={team.preset.name} lives={myTeamData?.lives} />
+      <Shell bg={teamBg} style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+        <TeamHeader themed={!!teamBg} mode={gameMode} avatar={team.preset.avatar} name={team.preset.name} lives={myTeamData?.lives} />
         {isChooser ? (
           <>
             <h2 style={{ fontWeight: 800, fontSize: 18, marginBottom: 16 }}>🥧 Choisis une catégorie</h2>
@@ -478,15 +521,15 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
             <p style={{ color: '#7a819c' }}>{categoryChoicePrompt.chooserTeamName} choisit une catégorie…</p>
           </>
         )}
-      </main>
+      </Shell>
     );
   }
 
   // --- Écran : offre de Joker (mode Camemberts) ---
   if (jokerOffer) {
     return (
-      <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
-        <TeamHeader mode={gameMode} avatar={team.preset.avatar} name={team.preset.name} lives={myTeamData?.lives} />
+      <Shell bg={teamBg} style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+        <TeamHeader themed={!!teamBg} mode={gameMode} avatar={team.preset.avatar} name={team.preset.name} lives={myTeamData?.lives} />
         <div style={{ fontSize: 32, marginBottom: 8 }}>🤡</div>
         <h2 style={{ fontWeight: 800, fontSize: 17, marginBottom: 10 }}>
           Votre progression sur "{jokerOffer.categoryName}" va être perdue
@@ -514,14 +557,14 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
             <p style={{ color: '#7a819c', fontSize: 13 }}>Sinon la progression sera remise à zéro.</p>
           </>
         )}
-      </main>
+      </Shell>
     );
   }
 
   // --- Écran 2 : en attente de question ---
   if (!question) {
     return (
-      <main style={{ textAlign: 'center', marginTop: 40, fontFamily: 'Inter, sans-serif' }}>
+      <Shell bg={teamBg} style={{ textAlign: 'center', marginTop: 40, fontFamily: 'Inter, sans-serif' }}>
         <ModeLabel mode={gameMode} />
         <div style={{ fontSize: 36 }}>{team.preset.avatar}</div>
         <h2 style={{ fontWeight: 800 }}>{team.preset.name}</h2>
@@ -547,14 +590,14 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
         >
           Quitter la partie
         </button>
-      </main>
+      </Shell>
     );
   }
 
   // --- Écran 3 : réponse ---
   return (
-    <main style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto' }}>
-      <TeamHeader mode={gameMode} avatar={team.preset.avatar} name={team.preset.name} lives={myTeamData?.lives} />
+    <Shell bg={teamBg} style={{ padding: 24, fontFamily: 'Inter, sans-serif', maxWidth: 480, margin: '0 auto' }}>
+      <TeamHeader themed={!!teamBg} mode={gameMode} avatar={team.preset.avatar} name={team.preset.name} lives={myTeamData?.lives} />
 
       {submitError && (
         <p style={{ textAlign: 'center', color: '#ff7a68', fontSize: 13, marginBottom: 12 }}>{submitError}</p>
@@ -583,7 +626,9 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
                   border: 'none',
                   fontWeight: 700,
                   fontSize: 16,
-                  background: '#eef0f8',
+                  background: teamBg ? 'rgba(15,25,70,0.75)' : '#eef0f8',
+                  color: teamBg ? '#e8eeff' : undefined,
+                  boxShadow: teamBg ? 'inset 0 0 0 1px rgba(120,160,255,0.5)' : undefined,
                   cursor: 'pointer',
                   textAlign: 'left',
                 }}
@@ -594,6 +639,6 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
           </div>
         </>
       )}
-    </main>
+    </Shell>
   );
 }
