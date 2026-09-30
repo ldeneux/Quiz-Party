@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabaseClient';
+import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
 import {
   scoreClassique,
   scoreSurvie,
@@ -60,7 +61,7 @@ const CHOICE_COLORS: Record<'a' | 'b' | 'c' | 'd', string> = {
 const cockpitStyles: Record<string, React.CSSProperties> = {
   lobbyCard: { textAlign: 'center', color: '#e8eeff', padding: '1cqw' },
   joinCode: { fontSize: '4cqw', fontWeight: 800, letterSpacing: '0.5cqw', margin: '0.8cqw 0', color: '#7fd1ff', textShadow: '0 0 1.2cqw #2aa8ff' },
-  startBtn: { background: 'linear-gradient(135deg,#3b82f6,#7c5cff)', color: '#fff', border: 'none', borderRadius: 999, padding: '0.6cqw 1.6cqw', fontWeight: 700, fontSize: '1.2cqw', cursor: 'pointer', marginTop: '0.5cqw', boxShadow: '0 0 1cqw rgba(80,140,255,.6)' },
+  startBtn: { ...ckKeyPrimary },
   mainCard: { color: '#e8eeff', padding: '0.6cqw 1cqw', height: '100%', boxSizing: 'border-box', overflow: 'auto' },
   qHead: { display: 'flex', alignItems: 'center', gap: '0.8cqw', marginBottom: '0.7cqw' },
   qTag: { background: 'rgba(80,170,255,.18)', color: '#8fd0ff', fontWeight: 800, padding: '0.25cqw 0.8cqw', borderRadius: 999, fontSize: '1cqw', border: '1px solid rgba(120,190,255,.4)' },
@@ -69,7 +70,7 @@ const cockpitStyles: Record<string, React.CSSProperties> = {
   choices: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7cqw', marginBottom: '0.7cqw' },
   choice: { background: 'rgba(15,25,70,.7)', border: '1px solid rgba(120,160,255,.45)', borderRadius: '0.8cqw', padding: '0.6cqw 0.9cqw', fontWeight: 700, fontSize: '1.35cqw', lineHeight: 1.2 },
   choiceCorrect: { background: 'rgba(30,160,120,.35)', borderColor: '#35e0b0', boxShadow: '0 0 1cqw rgba(53,224,176,.6)' },
-  explainBox: { background: 'rgba(30,160,120,.18)', border: '1px solid rgba(53,224,176,.5)', borderRadius: '0.6cqw', padding: '0.6cqw', fontSize: '0.95cqw', lineHeight: 1.3, color: '#dffcf3' },
+  explainBox: { background: 'rgba(30,160,120,.18)', border: '1px solid rgba(53,224,176,.5)', borderRadius: '0.6cqw', padding: '0.5cqw', fontSize: '0.95cqw', lineHeight: 1.3, color: '#dffcf3' },
   teamsRow: { display: 'flex', flexWrap: 'wrap', gap: '0.5cqw' },
   teamTile: { border: '1px solid rgba(120,160,255,.35)', borderRadius: '0.7cqw', padding: '0.3cqw 0.7cqw', fontWeight: 700, fontSize: '1cqw', background: 'rgba(10,18,50,.6)' },
   teamAnswered: { borderColor: '#7fd1ff', background: 'rgba(60,120,220,.35)' },
@@ -899,7 +900,18 @@ export default function GameArea({
             ))}
           </div>
 
-          {phase === 'revealed' && question.explanation && toExplain(<div style={styles.explainBox}>{question.explanation}</div>)}
+          {phase === 'revealed' && question.explanation && toExplain(
+            <div
+              className="ck-scroll"
+              style={
+                cockpit
+                  ? { ...styles.explainBox, fontSize: `${Math.max(0.72, Math.min(1.05, 1.05 - (question.explanation.length - 150) / 1000))}cqw`, maxHeight: '100%', overflowY: 'auto' }
+                  : styles.explainBox
+              }
+            >
+              {question.explanation}
+            </div>
+          )}
 
           {/* Seules les réponses et temps sont affichés ici — les scores sont sur les tuiles équipes du menu */}
           <div style={styles.teamsRow}>
@@ -961,22 +973,27 @@ export default function GameArea({
               {loadError && (
                 <p style={{ color: '#ff7a68', fontSize: 14, marginBottom: 12 }}>{loadError}</p>
               )}
-              <button style={styles.startBtn} onClick={goToNextQuestion} disabled={pendingJokerTeamIds.length > 0}>
+              <button className={cockpit ? 'ck-key' : undefined} style={styles.startBtn} onClick={goToNextQuestion} disabled={pendingJokerTeamIds.length > 0}>
                 Question suivante
               </button>
               <button
                 onClick={() => setShowQuitConfirm(true)}
-                style={{
-                  marginLeft: 10,
-                  background: 'none',
-                  border: '1px solid #eaedf6',
-                  borderRadius: 999,
-                  padding: '13px 20px',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  color: '#7a819c',
-                  cursor: 'pointer',
-                }}
+                className={cockpit ? 'ck-key' : undefined}
+                style={
+                  cockpit
+                    ? ckKeyDanger
+                    : {
+                        marginLeft: 10,
+                        background: 'none',
+                        border: '1px solid #eaedf6',
+                        borderRadius: 999,
+                        padding: '13px 20px',
+                        fontWeight: 700,
+                        fontSize: 14,
+                        color: '#7a819c',
+                        cursor: 'pointer',
+                      }
+                }
               >
                 Quitter la partie
               </button>
