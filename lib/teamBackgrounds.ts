@@ -14,7 +14,7 @@ const bg = (slug: string, contentTop = '9vh'): TeamBg => ({
 });
 
 export const TEAM_BACKGROUNDS: Record<string, TeamBg> = {
-  'Les Explorateurs': { portrait: '/bg/explorateurs-portrait.webp', contentTop: '31vh' }, // paysage à venir
+  'Les Explorateurs': bg('explorateurs'),
   'Team Nova': bg('nova'),
   Galaxie: bg('galaxie'),
   'Team Lune': bg('lune'),
@@ -22,10 +22,10 @@ export const TEAM_BACKGROUNDS: Record<string, TeamBg> = {
   'Les Comètes': bg('cometes'),
   'Les Martiens': bg('martiens'),
   'Les Astronautes': bg('astronautes'),
+  'Les Météores': bg('meteores'),
   Zenith: bg('zenith'),
   'Les Étoiles Filantes': bg('etoiles-filantes'),
-  Orbit: bg('orbit'),
-  // 'Les Météores' : à venir
+  Orbit: bg('astronautes'), // en attendant un fond dédié : même image que les Astronautes
 };
 
 export function getTeamBackground(teamName: string): TeamBg | null {

@@ -267,7 +267,20 @@ export default function ParametragePage() {
   };
 
   return (
-    <main style={{ fontFamily: 'Inter, sans-serif', background: '#f4f6fb', minHeight: '100vh', padding: '28px 40px' }}>
+    <main
+      style={{
+        fontFamily: 'Inter, sans-serif',
+        minHeight: '100vh',
+        padding: '28px 40px',
+        backgroundColor: '#050818',
+        backgroundImage: 'linear-gradient(rgba(3,6,20,0.25), rgba(3,6,20,0.45)), url(/bg/parametrage.webp)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }}
+    >
+      {/* Panneau clair translucide : garde les cartes et textes lisibles sur le décor */}
+      <div style={{ maxWidth: 1180, margin: '0 auto', background: 'rgba(244,246,251,0.94)', borderRadius: 24, padding: '24px 32px 40px', boxShadow: '0 0 60px rgba(40,90,220,0.45)' }}>
       <a href="/" style={{ color: '#7a819c', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>← Retour</a>
 
       <h1 style={{ fontSize: 22, fontWeight: 800, margin: '16px 0 24px' }}>⚙️ Paramétrage</h1>
@@ -517,6 +530,7 @@ export default function ParametragePage() {
           </div>
         </div>
       )}
+      </div>
     </main>
   );
 }

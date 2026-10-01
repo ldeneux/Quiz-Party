@@ -3,8 +3,7 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 
 // Texte qui défile façon « Star Wars » (incliné, il s'éloigne en haut) dans l'écran droit du cockpit.
-// - texte court : affiché fixe, centré
-// - texte long : défilement en boucle, 2 s de pause (écran vide) puis on recommence ; clic = pause / reprise
+// Défilement en boucle, 2 s de pause (écran vide) puis on recommence ; clic = pause / reprise
 export default function CockpitCrawl({ text }: { text: string }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -25,7 +24,8 @@ export default function CockpitCrawl({ text }: { text: string }) {
   }, [text]);
 
   const { H, h } = dims;
-  const crawl = H > 0 && h > H - 4;
+  // Toujours animé (même court) : certains textes dépassent, on évite tout cas particulier
+  const crawl = H > 0;
   // ~11 caractères par seconde, 14 s minimum ; puis 2 s de pause écran vide
   const T = Math.max(14, text.length / 11);
   const D = T + 2;

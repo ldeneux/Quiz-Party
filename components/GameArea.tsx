@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
 import CockpitPlate from '@/components/CockpitPlate';
 import CockpitCrawl from '@/components/CockpitCrawl';
+import CockpitMsgBox from '@/components/CockpitMsgBox';
+import CockpitTicker from '@/components/CockpitTicker';
 import {
   scoreClassique,
   scoreSurvie,
@@ -772,11 +774,11 @@ export default function GameArea({
   if (phase === 'finished') {
     const ranked = [...teams].sort((a, b) => b.score - a.score);
     const winner = camembertWinnerId ? teams.find((t) => t.id === camembertWinnerId) : null;
-    const grayed = (el: HTMLElement | null, id: 'fusee' | 'progression' | 'quitter', label: string) =>
+    const grayed = (el: HTMLElement | null, id: 'suivante' | 'progression' | 'quitter', label: string) =>
       cockpit && el ? createPortal(<CockpitPlate id={id} label={label} hint="Partie terminée" disabled />, el) : null;
     return (
       <>
-        {grayed(rocketEl, 'fusee', 'Question suivante')}
+        {grayed(rocketEl, 'suivante', 'Question suivante')}
         {grayed(progressEl, 'progression', 'Voir la progression')}
         {grayed(quitEl, 'quitter', 'Quitter la partie')}
       <div style={styles.mainCard}>
@@ -820,6 +822,42 @@ export default function GameArea({
       </>
     );
   }
+
+  const progressTable = (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: cockpit ? '1.15cqw' : 13 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: 8 }}></th>
+                    {teams.map((t) => (
+                      <th key={t.id} style={{ padding: 8, fontWeight: 800, whiteSpace: 'nowrap' }}>
+                        {t.avatar} {t.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {wedgeCategories.map((c) => (
+                    <tr key={c.id}>
+                      <td style={{ padding: 8, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {c.emoji} {c.name}
+                      </td>
+                      {teams.map((t) => {
+                        const won = (t.camembert_won ?? []).includes(c.id);
+                        const progress = t.camembert_progress?.[c.id] ?? 0;
+                        const icon = won ? '💚' : progress === 2 ? '🩵' : progress === 1 ? '🩶' : '';
+                        return (
+                          <td key={t.id} style={{ padding: 8, textAlign: 'center', fontSize: cockpit ? '1.7cqw' : 18 }}>
+                            {icon}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+  );
 
   const quitConfirmNode = showQuitConfirm ? (
 <div style={cockpit ? { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', zIndex: 60, background: '#f4f6fb', color: '#1f2440', borderRadius: 14, padding: 16, boxShadow: '0 20px 50px rgba(0,0,0,.5)' } : { marginTop: 14, background: '#f4f6fb', borderRadius: 14, padding: 16 }}>
@@ -866,7 +904,18 @@ export default function GameArea({
 
   return (
     <div style={{ position: 'relative' }}>
-      {cockpit && quitConfirmNode}
+      {cockpit && showQuitConfirm && (
+        <CockpitMsgBox
+          title="Terminer la partie ?"
+          validateLabel="Garder les scores"
+          onValidate={quitKeepingScores}
+          extra={[{ label: 'Remettre à zéro', onClick: quitResettingScores }]}
+          cancelLabel="Annuler"
+          onCancel={() => setShowQuitConfirm(false)}
+        >
+          Que faire des scores actuels ?
+        </CockpitMsgBox>
+      )}
       {cockpit && rocketEl &&
         createPortal(
           (() => {
@@ -876,7 +925,7 @@ export default function GameArea({
                 : phase === 'revealed'
                   ? { label: 'Question suivante', ok: pendingJokerTeamIds.length === 0, hint: pendingJokerTeamIds.length === 0 ? 'Espace' : 'Des jokers sont à régler' }
                   : { label: 'Question suivante', ok: false, hint: 'Disponible après la réponse' };
-            return <CockpitPlate id="fusee" label={a.label} hint={a.hint} disabled={!a.ok} pulse={a.ok} onClick={goToNextQuestion} />;
+            return <CockpitPlate id={phase === 'lobby' ? 'fusee' : 'suivante'} label={a.label} hint={a.hint} disabled={!a.ok} pulse={a.ok} onClick={goToNextQuestion} />;
           })(),
           rocketEl
         )}
@@ -1062,8 +1111,8 @@ export default function GameArea({
             (cockpit ? toExplain(<CockpitCrawl text={question.explanation} />) : <div style={styles.explainBox}>{question.explanation}</div>)}
 
           {/* Seules les réponses et temps sont affichés ici — les scores sont sur les tuiles équipes du menu */}
-          <div style={styles.teamsRow}>
-            {teams.map((t) => {
+          {(() => {
+            const tileList = (cockpit ? [...teams].sort((x, y) => (y.score ?? 0) - (x.score ?? 0) || x.name.localeCompare(y.name, 'fr')) : teams).map((t) => {
               const hasAnswered = answeredTeamIds.has(t.id);
               const info = revealedInfo[t.id];
               const isCorrect = phase === 'revealed' && info?.choice === question.correct_choice;
@@ -1113,8 +1162,9 @@ export default function GameArea({
                   )}
                 </div>
               );
-            })}
-          </div>
+            });
+            return cockpit ? <CockpitTicker items={tileList} /> : <div style={styles.teamsRow}>{tileList}</div>;
+          })()}
 
           {phase === 'revealed' && toActions(
             <>
@@ -1156,7 +1206,29 @@ export default function GameArea({
         </div>
       )}
 
-      {showProgressTable && (
+      {cockpit && showProgressTable && (
+        <div
+          onClick={() => setShowProgressTable(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(2,5,25,0.68)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ position: 'relative', width: '76cqw', aspectRatio: '1400 / 788', backgroundImage: 'url(/ui/frame-espace.webp)', backgroundSize: '100% 100%', color: '#e8eeff' }}
+          >
+            <div style={{ position: 'absolute', left: '6%', right: '6%', top: '9%', bottom: '9%', display: 'flex', flexDirection: 'column', gap: '0.8cqw' }}>
+              <div style={{ fontSize: '1.9cqw', fontWeight: 800, color: '#fff', textShadow: '0 0 1cqw rgba(90,160,255,0.9)' }}>📈 Progression des camemberts</div>
+              <div className="ck-scroll" style={{ flex: 1, overflow: 'auto', background: 'rgba(3,8,35,0.62)', borderRadius: '1cqw', padding: '0.8cqw' }}>
+                {progressTable}
+              </div>
+            </div>
+            <div style={{ position: 'absolute', right: '2.4%', bottom: '3.4%' }}>
+              <CockpitPlate id="annuler" label="Fermer" tipSide="above" onClick={() => setShowProgressTable(false)} height={4} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!cockpit && showProgressTable && (
         <div
           style={{
             position: 'fixed',
@@ -1200,39 +1272,7 @@ export default function GameArea({
               ✕
             </button>
             <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 16 }}>📈 Progression des camemberts</h2>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: 8 }}></th>
-                    {teams.map((t) => (
-                      <th key={t.id} style={{ padding: 8, fontWeight: 800, whiteSpace: 'nowrap' }}>
-                        {t.avatar} {t.name}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {wedgeCategories.map((c) => (
-                    <tr key={c.id}>
-                      <td style={{ padding: 8, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        {c.emoji} {c.name}
-                      </td>
-                      {teams.map((t) => {
-                        const won = (t.camembert_won ?? []).includes(c.id);
-                        const progress = t.camembert_progress?.[c.id] ?? 0;
-                        const icon = won ? '💚' : progress === 2 ? '🩵' : progress === 1 ? '🩶' : '';
-                        return (
-                          <td key={t.id} style={{ padding: 8, textAlign: 'center', fontSize: 18 }}>
-                            {icon}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {progressTable}
           </div>
         </div>
       )}

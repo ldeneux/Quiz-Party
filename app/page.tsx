@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import GameArea from '@/components/GameArea';
 import { ckLed } from '@/lib/cockpitUi';
+import CockpitMsgBox from '@/components/CockpitMsgBox';
 import CockpitPlate, { PLATE_RATIO, PlateId } from '@/components/CockpitPlate';
 import CockpitQR from '@/components/CockpitQR';
 
@@ -418,6 +419,21 @@ export default function ConsolePage() {
   const activeModeInfo = MODES.find((m) => m.id === activeMode) ?? MODES[0];
   const [profileOpen, setProfileOpen] = useState(false);
   const [explainActive, setExplainActive] = useState(false);
+  // Équipes : tri (points décroissants puis ordre alphabétique), infobulle au survol, action au clic
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [teamTip, setTeamTip] = useState<{ t: Team; left: number; top: number } | null>(null);
+  const [teamAction, setTeamAction] = useState<Team | null>(null);
+  const sortedTeams = [...teams].sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || a.name.localeCompare(b.name, 'fr'));
+  const showTeamTip = (e: React.MouseEvent<HTMLElement>, t: Team) => {
+    const st = stageRef.current?.getBoundingClientRect();
+    const r = e.currentTarget.getBoundingClientRect();
+    if (!st) return;
+    setTeamTip({ t, left: ((r.right - st.left) / st.width) * 100 + 0.6, top: ((r.top - st.top) / st.height) * 100 });
+  };
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.();
+  };
   const [copiedJoin, setCopiedJoin] = useState(false);
   const copyJoinUrl = async () => {
     if (!joinCode) return;
@@ -430,19 +446,19 @@ export default function ConsolePage() {
     }
   };
   // Emplacement fixe d'un bouton du pupitre : il ne bouge jamais, seul son état (actif / grisé) change
-  const PH = 5;
+  const PH = 5.2;
   const slot = (id: string, plate: PlateId, children?: React.ReactNode) => (
     <div id={id} style={{ width: `${(PH * PLATE_RATIO[plate]).toFixed(2)}cqw`, height: `${PH}cqw`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       {children}
     </div>
   );
-  // Raccourcis clavier de l'hôte : Espace = fusée (démarrer / question suivante), S = statistiques, P = progression
+  // Raccourcis clavier de l'hôte : Espace = fusée (démarrer / question suivante), S = statistiques, P = progression, F = plein écran
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable)) return;
-      const ids: Record<string, string> = { ' ': 'ck-fusee', s: 'ck-stats', p: 'ck-progression' };
+      const ids: Record<string, string> = { ' ': 'ck-fusee', s: 'ck-stats', p: 'ck-progression', f: 'ck-plein' };
       const target = ids[e.key.toLowerCase()];
       if (!target) return;
       const btn = document.getElementById(target) as HTMLElement | null;
@@ -461,6 +477,7 @@ export default function ConsolePage() {
     <main style={{ minHeight: '100vh', background: '#03040c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif' }}>
       {/* Scène cockpit : ratio fixe de l'image, tout est positionné en % (et texte en cqw) pour rester aligné */}
       <div
+        ref={stageRef}
         style={
           {
             position: 'relative',
@@ -490,48 +507,26 @@ export default function ConsolePage() {
           @keyframes ck-pulse{0%,100%{filter:drop-shadow(0 0 .3cqw rgba(160,120,255,.5))}50%{filter:drop-shadow(0 0 1.5cqw rgba(180,140,255,1))}}
         `}</style>
 
-        {/* Écran gauche : équipes (nom complet sur la ligne 1, score sur la ligne 2) */}
+        {/* Écran gauche : une ligne par équipe (emoji + nom), triées par points puis par ordre alphabétique ; détails en infobulle, clic = actions */}
         <div className="ck-scroll" style={{ position: 'absolute', left: '1.6%', top: '14.3%', width: '13.4%', height: '26.5%', overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw' }}>
           <div style={{ fontSize: '0.9cqw', fontWeight: 800, color: '#7fd1ff', letterSpacing: '0.1cqw', marginBottom: '0.4cqw' }}>ÉQUIPES</div>
           {teams.length === 0 && <div style={{ fontSize: '0.9cqw', color: '#8a97c4' }}>Aucune équipe connectée</div>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35cqw' }}>
-            {teams.map((t) => {
-              const extra = activeMode === 'camembert' ? ` · 🥧${(t.camembert_won ?? []).length}${(t.camembert_jokers ?? 0) > 0 ? ` 🤡${t.camembert_jokers}` : ''}` : '';
-              const removeBtn = (
-                <button onClick={() => removeTeam(t.id)} title="Déconnecter l'équipe" style={{ border: 'none', background: 'rgba(255,255,255,0.12)', borderRadius: '50%', width: '1.3cqw', height: '1.3cqw', fontSize: '0.7cqw', cursor: 'pointer', color: '#c8d3ff', flexShrink: 0, padding: 0 }}>
-                  ✕
-                </button>
-              );
-              const nameEl = (ellipsis: boolean) => (
-                <span
-                  onClick={() => copyTeamLink(t.id)}
-                  title={`${t.name} — copier le lien de récupération`}
-                  style={{ flex: 1, minWidth: 0, cursor: 'pointer', ...(ellipsis ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : { overflowWrap: 'anywhere' }) }}
-                >
-                  {copiedTeamId === t.id ? 'Lien copié ✓' : t.name}
-                </span>
-              );
-              // Plus de 4 équipes : tuiles compactes sur une seule ligne pour tout garder visible
-              return teams.length > 4 ? (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35cqw', borderLeft: `0.3cqw solid ${t.color}`, borderRadius: '0.5cqw', padding: '0.2cqw 0.4cqw', fontWeight: 700, fontSize: '0.9cqw', background: 'rgba(10,18,50,0.75)' }}>
-                  <span>{t.avatar}</span>
-                  {nameEl(true)}
-                  <span style={{ color: '#ffd166', fontWeight: 800, flexShrink: 0 }}>{t.score ?? 0}</span>
-                  {removeBtn}
-                </div>
-              ) : (
-                <div key={t.id} style={{ borderLeft: `0.3cqw solid ${t.color}`, border: `1px solid ${t.color}88`, borderRadius: '0.6cqw', padding: '0.3cqw 0.5cqw', background: 'rgba(10,18,50,0.75)', boxShadow: `0 0 0.6cqw ${t.color}44` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4cqw', fontWeight: 800, fontSize: '1cqw', lineHeight: 1.2 }}>
-                    <span>{t.avatar}</span>
-                    {nameEl(false)}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.15cqw', fontSize: '0.9cqw' }}>
-                    <span style={{ color: '#ffd166', fontWeight: 800 }}>{t.score ?? 0} pts{extra}</span>
-                    {removeBtn}
-                  </div>
-                </div>
-              );
-            })}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3cqw' }}>
+            {sortedTeams.map((t) => (
+              <div
+                key={t.id}
+                onClick={() => {
+                  setTeamTip(null);
+                  setTeamAction(t);
+                }}
+                onMouseEnter={(e) => showTeamTip(e, t)}
+                onMouseLeave={() => setTeamTip(null)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.45cqw', borderLeft: `0.3cqw solid ${t.color}`, borderRadius: '0.5cqw', padding: '0.25cqw 0.5cqw', fontWeight: 700, fontSize: '1cqw', background: 'rgba(10,18,50,0.75)', cursor: 'pointer' }}
+              >
+                <span>{t.avatar}</span>
+                <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -545,7 +540,7 @@ export default function ConsolePage() {
         <div style={{ position: 'absolute', left: '84.6%', top: '14.3%', width: '14%', height: '26.5%', overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw' }}>
           {!explainActive &&
             (joinCode ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4cqw', paddingTop: '2cqw' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4cqw', paddingTop: '3.4cqw' }}>
                 <div onClick={copyJoinUrl} title="Clic : copier le lien pour rejoindre" style={{ width: '8cqw', cursor: 'pointer' }}>
                   <CockpitQR url={`${origin}/join?code=${joinCode}`} />
                 </div>
@@ -604,10 +599,10 @@ export default function ConsolePage() {
         </div>
 
         {/* Choix du profil : bandeau en haut au centre, près du halo bleu du plafond */}
-        <div style={{ position: 'absolute', left: '50%', top: '4.3%', transform: 'translateX(-50%)', zIndex: 15 }}>
+        <div style={{ position: 'absolute', left: '50%', top: '2.2%', transform: 'translateX(-50%)', zIndex: 15 }}>
           <CockpitPlate
             id="profil"
-            height={3.2}
+            height={5.5}
             tipSide="below"
             noTip={profileOpen}
             label="Profil de jeu"
@@ -615,10 +610,10 @@ export default function ConsolePage() {
             disabled={gameStarted}
             onClick={() => setProfileOpen((o) => !o)}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5cqw', maxWidth: '100%', fontSize: '1.05cqw', fontWeight: 800, letterSpacing: '0.1cqw', textTransform: 'uppercase', color: '#e8f0ff', textShadow: '0 0 0.7cqw rgba(0,10,50,0.95), 0 0 0.3cqw #000' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5cqw', maxWidth: '100%', fontSize: '1.35cqw', fontWeight: 800, letterSpacing: '0.1cqw', textTransform: 'uppercase', color: '#e8f0ff', textShadow: '0 0 0.7cqw rgba(0,10,50,0.95), 0 0 0.3cqw #000' }}>
               <span style={ckLed(selectedProfile ? '#4dffb0' : '#ff9a5a')} />
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedProfile ? selectedProfile.name : 'Choisir un profil'}</span>
-              <span style={{ fontSize: '0.8cqw' }}>▾</span>
+              <span style={{ fontSize: '1cqw' }}>▾</span>
             </span>
           </CockpitPlate>
           {profileOpen && !gameStarted && (
@@ -649,14 +644,10 @@ export default function ConsolePage() {
         </div>
 
         {/* Pupitre du bas : emplacements fixes (les boutons ne bougent pas, ils se grisent quand ils sont inutilisables) */}
-        <div style={{ position: 'absolute', left: '7%', top: '88.6%', width: '86%', height: '9.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.9cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: 'linear-gradient(180deg, rgba(8,16,55,0.55), rgba(4,8,30,0.75))', border: '1px solid rgba(90,140,255,0.35)', borderRadius: '1.2cqw', boxShadow: '0 0 1.5cqw rgba(40,90,220,0.3), inset 0 0.1cqw 0.3cqw rgba(140,180,255,0.2)' }}>
+        <div style={{ position: 'absolute', left: '7%', top: '88.6%', width: '86%', height: '9.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: 'linear-gradient(180deg, rgba(8,16,55,0.55), rgba(4,8,30,0.75))', border: '1px solid rgba(90,140,255,0.35)', borderRadius: '1.2cqw', boxShadow: '0 0 1.5cqw rgba(40,90,220,0.3), inset 0 0.1cqw 0.3cqw rgba(140,180,255,0.2)' }}>
           <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />
           <CockpitPlate id="stats" label="Statistiques" hint="S · par équipe et par catégorie" disabled={!gameId} onClick={openStats} />
-          {slot(
-            'cockpit-progress',
-            'progression',
-            !gameStarted && <CockpitPlate id="progression" label="Voir la progression" hint="Mode Trivial Poursuit, pendant la partie" disabled />
-          )}
+          {slot('cockpit-progress', 'progression', !gameStarted && <CockpitPlate id="progression" label="Voir la progression" hint="Mode Trivial Poursuit, pendant la partie" disabled />)}
 
           {/* Fusée : Démarrer avant la partie, puis « Question suivante » (injectée par GameArea) */}
           {slot(
@@ -676,83 +667,61 @@ export default function ConsolePage() {
 
           <CockpitPlate id="nouvelle" label="Nouvelle partie" hint="Oublier la partie actuelle" disabled={!gameId} onClick={() => setShowNewGameChoice(true)} />
           {slot('cockpit-quit', 'quitter', !gameStarted && <CockpitPlate id="quitter" label="Quitter la partie" hint="Aucune partie en cours" disabled />)}
+          <CockpitPlate id="plein" label="Plein écran" hint="F" onClick={toggleFullscreen} />
 
           {/* Messages d'erreur : au-dessus du pupitre, sans décaler les boutons */}
           <div id="cockpit-actions" style={{ position: 'absolute', bottom: 'calc(100% + 0.3cqw)', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }} />
           {error && <span style={{ position: 'absolute', bottom: 'calc(100% + 0.3cqw)', left: 0, right: 0, textAlign: 'center', color: '#ff9a8a', fontSize: '0.95cqw', fontWeight: 700 }}>{error}</span>}
         </div>
-      </div>
 
-      {/* Fenêtre de choix Nouvelle partie */}
-      {showNewGameChoice && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(31,36,64,0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 24,
-              padding: 32,
-              maxWidth: 420,
-              width: '90%',
-              textAlign: 'center',
-              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
-            }}
-          >
-            <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 20 }}>Nouvelle partie</h2>
-            <button
-              onClick={restartSameTeams}
-              style={{
-                display: 'block',
-                width: '100%',
-                background: '#6c7bf7',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 999,
-                padding: '14px 20px',
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: 'pointer',
-                marginBottom: 10,
-              }}
-            >
-              Garder les mêmes équipes (même code, scores à zéro)
-            </button>
-            <button
-              onClick={fullReset}
-              style={{
-                display: 'block',
-                width: '100%',
-                background: '#eef0f8',
-                color: '#1f2440',
-                border: 'none',
-                borderRadius: 999,
-                padding: '14px 20px',
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: 'pointer',
-                marginBottom: 10,
-              }}
-            >
-              Changer d'équipes (nouveau code)
-            </button>
-            <button
-              onClick={() => setShowNewGameChoice(false)}
-              style={{ background: 'none', border: 'none', color: '#7a819c', fontWeight: 700, cursor: 'pointer' }}
-            >
-              Annuler
-            </button>
+        {/* Infobulle d'équipe (détails masqués dans la liste) */}
+        {teamTip && (
+          <div style={{ position: 'absolute', left: `${teamTip.left}%`, top: `${teamTip.top}%`, zIndex: 40, pointerEvents: 'none', padding: '0.5cqw 0.9cqw', borderRadius: '0.6cqw', background: 'rgba(4,9,36,0.97)', border: '1px solid rgba(120,175,255,0.75)', boxShadow: '0 0 1.2cqw rgba(60,120,255,0.55)', color: '#dfe9ff', fontSize: '0.95cqw', lineHeight: 1.45, whiteSpace: 'nowrap' }}>
+            <div style={{ fontWeight: 800 }}>{teamTip.t.avatar} {teamTip.t.name}</div>
+            <div>{teamTip.t.score ?? 0} point{(teamTip.t.score ?? 0) > 1 ? 's' : ''}</div>
+            {activeMode === 'camembert' && (
+              <div>
+                🥧 {(teamTip.t.camembert_won ?? []).length} part{(teamTip.t.camembert_won ?? []).length > 1 ? 's' : ''}
+                {(teamTip.t.camembert_jokers ?? 0) > 0 ? ` · 🤡 ×${teamTip.t.camembert_jokers}` : ''}
+              </div>
+            )}
+            <div style={{ fontSize: '0.8cqw', color: '#8fb4ff' }}>Clic : déconnecter ou copier le lien</div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* MSGBOX : actions sur une équipe */}
+        {teamAction && (
+          <CockpitMsgBox
+            title={`Déconnecter « ${teamAction.name} » ?`}
+            validateLabel="Déconnecter l'équipe"
+            onValidate={async () => {
+              await removeTeam(teamAction.id);
+              setTeamAction(null);
+            }}
+            extra={[{ label: copiedTeamId === teamAction.id ? 'Lien copié ✓' : 'Copier le lien de récupération', onClick: () => copyTeamLink(teamAction.id) }]}
+            cancelLabel="Fermer"
+            onCancel={() => setTeamAction(null)}
+          >
+            <span>
+              {teamAction.avatar} {teamAction.score ?? 0} point{(teamAction.score ?? 0) > 1 ? 's' : ''}
+            </span>
+          </CockpitMsgBox>
+        )}
+
+        {/* MSGBOX : nouvelle partie */}
+        {showNewGameChoice && (
+          <CockpitMsgBox
+            title="Nouvelle partie"
+            validateLabel="Garder les mêmes équipes"
+            onValidate={restartSameTeams}
+            extra={[{ label: "Changer d'équipes (nouveau code)", onClick: fullReset }]}
+            cancelLabel="Annuler"
+            onCancel={() => setShowNewGameChoice(false)}
+          >
+            Garder les mêmes équipes : même code, scores remis à zéro.
+          </CockpitMsgBox>
+        )}
+      </div>
 
       {/* Fenêtre statistiques */}
       {showStats && (
