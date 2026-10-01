@@ -1,36 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import { PlateId } from '@/lib/themes';
+import { useTheme } from '@/lib/useTheme';
 
-export type PlateId =
-  | 'fusee' // démarrer la partie
-  | 'suivante' // question suivante
-  | 'stats'
-  | 'parametrage'
-  | 'progression'
-  | 'nouvelle'
-  | 'quitter'
-  | 'plein'
-  | 'valider'
-  | 'annuler'
-  | 'profil';
-
-// Rapport largeur / hauteur de chaque image (sert aussi à réserver la place des boutons dans le pupitre)
-export const PLATE_RATIO: Record<PlateId, number> = {
-  fusee: 1.28,
-  suivante: 1.28,
-  stats: 1.284,
-  parametrage: 1.292,
-  progression: 1.292,
-  nouvelle: 1.304,
-  quitter: 1.28,
-  plein: 1.321,
-  valider: 1.317,
-  annuler: 1.308,
-  profil: 7.33,
-};
-
-const SRC = (id: PlateId) => (id === 'profil' ? '/ui/banner-profil.webp' : `/ui/plate-${id}.webp`);
+export type { PlateId } from '@/lib/themes';
 
 // Bouton « cadre holographique » du cockpit : image + infobulle néon (libellé + raccourci clavier).
 // aria-disabled (et non disabled) : l'infobulle reste visible même quand le bouton est grisé.
@@ -50,11 +24,13 @@ type Props = {
 
 export default function CockpitPlate({ id, label, hint, onClick, href, disabled = false, pulse = false, height = 5.2, tipSide = 'above', noTip = false, children }: Props) {
   const [show, setShow] = useState(false);
+  const { theme } = useTheme();
+  const def = theme.plates[id];
   const common = {
     // « suivante » reprend l'identifiant de « fusee » : même emplacement, même raccourci (Espace)
     id: id === 'suivante' ? 'ck-fusee' : `ck-${id}`,
     className: `ck-plate${pulse && !disabled ? ' ck-pulse' : ''}`,
-    style: { width: `${(height * PLATE_RATIO[id]).toFixed(2)}cqw`, cursor: disabled ? 'not-allowed' : 'pointer' } as React.CSSProperties,
+    style: { width: `${(height * (def.scale ?? 1) * def.ratio).toFixed(2)}cqw`, cursor: disabled ? 'not-allowed' : 'pointer' } as React.CSSProperties,
     'aria-label': label,
     'aria-disabled': disabled,
     onMouseEnter: () => setShow(true),
@@ -62,13 +38,16 @@ export default function CockpitPlate({ id, label, hint, onClick, href, disabled 
     onFocus: () => setShow(true),
     onBlur: () => setShow(false),
   };
-  const img = (
+  const img = def.src ? (
     <img
-      src={SRC(id)}
+      src={def.src}
       alt=""
       draggable={false}
       style={{ width: '100%', display: 'block', filter: disabled ? 'grayscale(1) brightness(0.5)' : undefined, opacity: disabled ? 0.8 : 1 }}
     />
+  ) : (
+    // Thème sans image pour ce bouton : on réserve juste la place (le décor fait le cadre)
+    <span style={{ display: 'block', width: '100%', paddingTop: `${(100 / def.ratio).toFixed(2)}%`, opacity: disabled ? 0.5 : 1 }} />
   );
   const overlay = children ? (
     <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12%', pointerEvents: 'none' }}>{children}</span>

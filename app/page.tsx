@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import GameArea from '@/components/GameArea';
 import { ckLed } from '@/lib/cockpitUi';
-import CockpitMsgBox, { CockpitFrameWindow } from '@/components/CockpitMsgBox';
-import CockpitPlate, { PLATE_RATIO, PlateId } from '@/components/CockpitPlate';
+import CockpitMsgBox from '@/components/CockpitMsgBox';
+import CockpitPlate from '@/components/CockpitPlate';
+import { PlateId, rectStyle } from '@/lib/themes';
+import { useTheme } from '@/lib/useTheme';
 import CockpitQR from '@/components/CockpitQR';
 
 const MODES = [
@@ -46,7 +48,6 @@ const MODES = [
   },
 ];
 
-const PLANET_WIDTH: Record<string, number> = { classique: 11.2, defi: 8.2, survie: 8.6, participatif: 10.9, camembert: 8.2 };
 
 type Team = {
   id: string;
@@ -78,6 +79,10 @@ const pillLabel: React.CSSProperties = {
 };
 
 export default function ConsolePage() {
+  const { theme } = useTheme();
+  // Le thème vient du stockage local : on n'affiche la scène qu'une fois monté (évite un flash d'un mauvais décor)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [activeMode, setActiveMode] = useState('classique');
   const [infoMode, setInfoMode] = useState<string | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
@@ -435,7 +440,6 @@ export default function ConsolePage() {
     else document.documentElement.requestFullscreen?.();
   };
   const [copiedJoin, setCopiedJoin] = useState(false);
-  const [modeTip, setModeTip] = useState(false);
   const copyJoinUrl = async () => {
     if (!joinCode) return;
     try {
@@ -449,7 +453,7 @@ export default function ConsolePage() {
   // Emplacement fixe d'un bouton du pupitre : il ne bouge jamais, seul son état (actif / grisé) change
   const PH = 5.2;
   const slot = (id: string, plate: PlateId, children?: React.ReactNode) => (
-    <div id={id} style={{ width: `${(PH * PLATE_RATIO[plate]).toFixed(2)}cqw`, height: `${PH}cqw`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <div id={id} style={{ width: `${(PH * (theme.plates[plate].scale ?? 1) * theme.plates[plate].ratio).toFixed(2)}cqw`, height: `${(PH * (theme.plates[plate].scale ?? 1)).toFixed(2)}cqw`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       {children}
     </div>
   );
@@ -474,18 +478,20 @@ export default function ConsolePage() {
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
   const eligibleProfiles = activeMode === 'camembert' ? profiles.filter((p) => p.isTrivialEligible) : profiles;
 
+  if (!mounted) return <main style={{ minHeight: '100vh', background: '#03040c' }} />;
+
   return (
-    <main style={{ minHeight: '100vh', background: '#03040c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif' }}>
+    <main style={{ minHeight: '100vh', background: theme.stage.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif' }}>
       {/* Scène cockpit : ratio fixe de l'image, tout est positionné en % (et texte en cqw) pour rester aligné */}
       <div
         ref={stageRef}
         style={
           {
             position: 'relative',
-            width: 'min(100vw, calc(100vh * 1536 / 944))',
-            aspectRatio: '1536 / 944',
+            width: `min(100vw, calc(100vh * ${theme.stage.ratio}))`,
+            aspectRatio: `${theme.stage.ratio}`,
             containerType: 'size',
-            backgroundImage: 'url(/cockpit.webp)',
+            backgroundImage: `url(${theme.stage.src})`,
             backgroundSize: '100% 100%',
             color: '#e8eeff',
             overflow: 'hidden',
@@ -505,12 +511,11 @@ export default function ConsolePage() {
           .ck-plate:active:not([aria-disabled="true"]){transform:translateY(0.1cqw) scale(1)}
           .ck-plate:focus-visible{outline:2px solid #7fd1ff;outline-offset:3px;border-radius:1cqw}
           .ck-pulse{animation:ck-pulse 1.8s ease-in-out infinite}
-          @keyframes ck-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-0.35cqw)}}
           @keyframes ck-pulse{0%,100%{filter:drop-shadow(0 0 .3cqw rgba(160,120,255,.5))}50%{filter:drop-shadow(0 0 1.5cqw rgba(180,140,255,1))}}
         `}</style>
 
         {/* Écran gauche : une ligne par équipe (emoji + nom), triées par points puis par ordre alphabétique ; détails en infobulle, clic = actions */}
-        <div className="ck-scroll" style={{ position: 'absolute', left: '1.6%', top: '14.3%', width: '13.4%', height: '26.5%', overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw' }}>
+        <div className="ck-scroll" style={{ position: 'absolute', ...rectStyle(theme.zones.teams), overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw' }}>
           <div style={{ fontSize: '0.9cqw', fontWeight: 800, color: '#7fd1ff', letterSpacing: '0.1cqw', marginBottom: '0.4cqw' }}>ÉQUIPES</div>
           {teams.length === 0 && <div style={{ fontSize: '0.9cqw', color: '#8a97c4' }}>Aucune équipe connectée</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3cqw' }}>
@@ -533,17 +538,17 @@ export default function ConsolePage() {
         </div>
 
         {/* Petit afficheur sous l'écran gauche : nombre d'équipes */}
-        <div style={{ position: 'absolute', left: '2%', top: '42.3%', width: '13%', height: '3.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5cqw', background: 'rgba(3,8,30,0.9)', border: '1px solid rgba(90,170,255,0.55)', borderRadius: '0.4cqw', boxShadow: '0 0 0.8cqw rgba(60,130,255,0.4)', fontSize: '0.85cqw', fontWeight: 800, letterSpacing: '0.12cqw', color: '#9fc4ff' }}>
+        <div style={{ position: 'absolute', ...rectStyle(theme.zones.teamCount), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5cqw', background: 'rgba(3,8,30,0.9)', border: '1px solid rgba(90,170,255,0.55)', borderRadius: '0.4cqw', boxShadow: '0 0 0.8cqw rgba(60,130,255,0.4)', fontSize: '0.85cqw', fontWeight: 800, letterSpacing: '0.12cqw', color: '#9fc4ff' }}>
           <span style={ckLed(teams.length > 0 ? '#4dffb0' : '#ff9a5a')} />
           {teams.length} ÉQUIPE{teams.length > 1 ? 'S' : ''}
         </div>
 
         {/* Écran droit : adresse pour rejoindre (avant la partie) puis explication de la réponse (injectée par GameArea) */}
-        <div style={{ position: 'absolute', left: '84.6%', top: '14.3%', width: '14%', height: '26.5%', overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw' }}>
+        <div style={{ position: 'absolute', ...rectStyle(theme.zones.join), overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw' }}>
           {!explainActive &&
             (joinCode ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4cqw', paddingTop: '3.4cqw' }}>
-                <div onClick={copyJoinUrl} title="Clic : copier le lien pour rejoindre" style={{ width: '8cqw', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4cqw', paddingTop: `${theme.joinPadTop}cqw` }}>
+                <div onClick={copyJoinUrl} title="Clic : copier le lien pour rejoindre" style={{ width: `${theme.qrWidth}cqw`, cursor: 'pointer' }}>
                   <CockpitQR url={`${origin}/join?code=${joinCode}`} />
                 </div>
                 <div style={{ fontSize: '0.75cqw', fontWeight: 800, letterSpacing: '0.04cqw', color: copiedJoin ? '#4dffb0' : '#9fc4ff', textAlign: 'center' }}>
@@ -561,14 +566,14 @@ export default function ConsolePage() {
 
         {/* Petit afficheur sous l'écran droit : code de la partie */}
         {joinCode && (
-          <div style={{ position: 'absolute', left: '85.3%', top: '42.3%', width: '13%', height: '3.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6cqw', background: 'rgba(3,8,30,0.9)', border: '1px solid rgba(90,170,255,0.55)', borderRadius: '0.4cqw', boxShadow: '0 0 0.8cqw rgba(60,130,255,0.4)' }}>
+          <div style={{ position: 'absolute', ...rectStyle(theme.zones.code), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6cqw', background: 'rgba(3,8,30,0.9)', border: '1px solid rgba(90,170,255,0.55)', borderRadius: '0.4cqw', boxShadow: '0 0 0.8cqw rgba(60,130,255,0.4)' }}>
             <span style={{ fontSize: '0.7cqw', fontWeight: 800, letterSpacing: '0.1cqw', color: '#8a97c4' }}>CODE</span>
             <span style={{ fontSize: '1.7cqw', fontWeight: 800, letterSpacing: '0.3cqw', color: '#7fd1ff', textShadow: '0 0 0.9cqw #2aa8ff', fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}>{joinCode}</span>
           </div>
         )}
 
         {/* Hublot : menu des modes (planètes) ou écran de jeu */}
-        <div style={{ position: 'absolute', left: '20%', top: '11.7%', width: '60%', height: '33.9%', boxSizing: 'border-box' }}>
+        <div style={{ position: 'absolute', ...rectStyle(theme.zones.hub), boxSizing: 'border-box' }}>
           {!gameStarted ? (
             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end' }}>
@@ -581,7 +586,7 @@ export default function ConsolePage() {
                       title={m.label}
                       style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5cqw', opacity: sel ? 1 : 0.72, transform: sel ? 'scale(1.15)' : 'scale(1)', transition: 'transform .25s, opacity .25s, filter .25s', filter: sel ? `drop-shadow(0 0 1.1cqw ${m.color})` : 'none' }}
                     >
-                      <img src={`/planets/${m.id}.png`} alt="" draggable={false} style={{ width: `${PLANET_WIDTH[m.id]}cqw`, display: 'block' }} />
+                      <img src={theme.planets[m.id as keyof typeof theme.planets].src} alt="" draggable={false} style={{ width: `${theme.planets[m.id as keyof typeof theme.planets].width}cqw`, display: 'block' }} />
                       <span style={{ fontWeight: 800, fontSize: '1.3cqw', color: sel ? '#fff' : '#a9b6e6', textShadow: '0 0 0.8cqw #000' }}>
                         {m.emoji} {m.label}
                       </span>
@@ -601,7 +606,7 @@ export default function ConsolePage() {
         </div>
 
         {/* Choix du profil : bandeau en haut au centre, près du halo bleu du plafond */}
-        <div style={{ position: 'absolute', left: '50%', top: '2.2%', transform: 'translateX(-50%)', zIndex: 15 }}>
+        <div style={{ position: 'absolute', left: `${theme.zones.profile.left}%`, top: `${theme.zones.profile.top}%`, transform: 'translateX(-50%)', zIndex: 15 }}>
           <CockpitPlate
             id="profil"
             height={5.5}
@@ -646,21 +651,7 @@ export default function ConsolePage() {
         </div>
 
         {/* Pupitre du bas : emplacements fixes (les boutons ne bougent pas, ils se grisent quand ils sont inutilisables) */}
-        <div style={{ position: 'absolute', left: '7%', top: '88.6%', width: '86%', height: '9.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: 'linear-gradient(180deg, rgba(8,16,55,0.55), rgba(4,8,30,0.75))', border: '1px solid rgba(90,140,255,0.35)', borderRadius: '1.2cqw', boxShadow: '0 0 1.5cqw rgba(40,90,220,0.3), inset 0 0.1cqw 0.3cqw rgba(140,180,255,0.2)' }}>
-          {/* Planète du mode de jeu en cours (visible une fois la partie démarrée) */}
-          <div style={{ width: `${(PH * PLATE_RATIO.fusee).toFixed(2)}cqw`, height: `${PH}cqw`, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0 }} onMouseEnter={() => setModeTip(true)} onMouseLeave={() => setModeTip(false)}>
-            {gameStarted && (
-              <>
-                <img src={`/planets/${activeMode}.png`} alt={activeModeInfo.label} draggable={false} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', animation: 'ck-float 4s ease-in-out infinite', filter: `drop-shadow(0 0 0.9cqw ${activeModeInfo.color})` }} />
-                {modeTip && (
-                  <span style={{ position: 'absolute', bottom: 'calc(100% + 0.7cqw)', left: 0, zIndex: 30, pointerEvents: 'none', whiteSpace: 'nowrap', padding: '0.45cqw 0.9cqw', borderRadius: '0.6cqw', background: 'rgba(4,9,36,0.96)', border: '1px solid rgba(120,175,255,0.75)', boxShadow: '0 0 1.2cqw rgba(60,120,255,0.55)', color: '#dfe9ff', fontSize: '0.95cqw', fontWeight: 800 }}>
-                    {activeModeInfo.emoji} {activeModeInfo.label}
-                    <span style={{ display: 'block', fontWeight: 600, fontSize: '0.8cqw', color: '#8fb4ff' }}>Mode de jeu en cours</span>
-                  </span>
-                )}
-              </>
-            )}
-          </div>
+        <div style={{ position: 'absolute', ...rectStyle(theme.zones.bar), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: theme.bar.background, border: theme.bar.border, borderRadius: '1.2cqw', boxShadow: theme.bar.boxShadow }}>
           <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />
           <CockpitPlate id="stats" label="Statistiques" hint="S · par équipe et par catégorie" disabled={!gameId} onClick={openStats} />
           {slot('cockpit-progress', 'progression', !gameStarted && <CockpitPlate id="progression" label="Voir la progression" hint="Mode Trivial Poursuit, pendant la partie" disabled />)}
@@ -708,22 +699,18 @@ export default function ConsolePage() {
         {/* MSGBOX : actions sur une équipe */}
         {teamAction && (
           <CockpitMsgBox
-            title={`${teamAction.avatar} ${teamAction.name}`}
-            actions={[
-              {
-                label: "Déconnecter l'équipe",
-                onClick: async () => {
-                  await removeTeam(teamAction.id);
-                  setTeamAction(null);
-                },
-              },
-              { label: copiedTeamId === teamAction.id ? 'Lien copié ✓' : 'Copier le lien de récupération', onClick: () => copyTeamLink(teamAction.id) },
-            ]}
+            title={`Déconnecter « ${teamAction.name} » ?`}
+            validateLabel="Déconnecter l'équipe"
+            onValidate={async () => {
+              await removeTeam(teamAction.id);
+              setTeamAction(null);
+            }}
+            extra={[{ label: copiedTeamId === teamAction.id ? 'Lien copié ✓' : 'Copier le lien de récupération', onClick: () => copyTeamLink(teamAction.id) }]}
             cancelLabel="Fermer"
             onCancel={() => setTeamAction(null)}
           >
             <span>
-              {teamAction.score ?? 0} point{(teamAction.score ?? 0) > 1 ? 's' : ''}
+              {teamAction.avatar} {teamAction.score ?? 0} point{(teamAction.score ?? 0) > 1 ? 's' : ''}
             </span>
           </CockpitMsgBox>
         )}
@@ -732,59 +719,113 @@ export default function ConsolePage() {
         {showNewGameChoice && (
           <CockpitMsgBox
             title="Nouvelle partie"
-            actions={[
-              { label: 'Garder les mêmes équipes', onClick: restartSameTeams },
-              { label: "Changer d'équipes (nouveau code)", onClick: fullReset },
-            ]}
+            validateLabel="Garder les mêmes équipes"
+            onValidate={restartSameTeams}
+            extra={[{ label: "Changer d'équipes (nouveau code)", onClick: fullReset }]}
             cancelLabel="Annuler"
             onCancel={() => setShowNewGameChoice(false)}
           >
-            Mêmes équipes : même code, scores remis à zéro. Nouvelles équipes : nouveau code et nouveau QR code.
+            Garder les mêmes équipes : même code, scores remis à zéro.
           </CockpitMsgBox>
         )}
-
-        {/* Fenêtre statistiques : cadre « espace », icône graphique en bas à droite pour fermer */}
-        {showStats && (
-          <CockpitFrameWindow frame="espace" width="76cqw" closeId="stats" closeLabel="Fermer les statistiques" onClose={() => setShowStats(false)}>
-            <div style={{ position: 'absolute', left: '6%', right: '6%', top: '9%', bottom: '9%', display: 'flex', flexDirection: 'column', gap: '0.8cqw' }}>
-              <div style={{ fontSize: '1.9cqw', fontWeight: 800, color: '#fff', textShadow: '0 0 1cqw rgba(90,160,255,0.9)' }}>📊 Réponses par équipe et par catégorie</div>
-              <div className="ck-scroll" style={{ flex: 1, overflow: 'auto', background: 'rgba(3,8,35,0.8)', borderRadius: '1cqw', padding: '0.9cqw' }}>
-                {Object.keys(statsData).length === 0 ? (
-                  <p style={{ color: '#9fb2e8', fontSize: '1.2cqw' }}>Aucune réponse enregistrée pour l'instant.</p>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(24cqw, 1fr))', gap: '1cqw' }}>
-                    {Object.entries(statsData).map(
-                      ([teamId, data]: [string, { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }]) => (
-                        <div key={teamId}>
-                          <div style={{ fontWeight: 800, fontSize: '1.2cqw', marginBottom: '0.4cqw' }}>
-                            {data.teamAvatar} {data.teamName}
-                          </div>
-                          {Object.keys(data.categories).length === 0 ? (
-                            <p style={{ color: '#9fb2e8', fontSize: '1cqw' }}>Pas encore de réponse.</p>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25cqw' }}>
-                              {Object.entries(data.categories).map(([catName, counts]: [string, { correct: number; wrong: number }]) => (
-                                <div key={catName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1cqw', background: 'rgba(60,100,200,0.22)', borderRadius: '0.5cqw', padding: '0.3cqw 0.8cqw' }}>
-                                  <span>{catName}</span>
-                                  <span>
-                                    <span style={{ color: '#4dffb0', fontWeight: 700 }}>{counts.correct} ✓</span>
-                                    {'  '}
-                                    <span style={{ color: '#ff8a7a', fontWeight: 700 }}>{counts.wrong} ✕</span>
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </CockpitFrameWindow>
-        )}
       </div>
+
+      {/* Fenêtre statistiques */}
+      {showStats && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 32,
+              maxWidth: 640,
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <button
+              onClick={() => setShowStats(false)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                border: 'none',
+                background: '#f4f6fb',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                fontSize: 14,
+                cursor: 'pointer',
+                color: '#7a819c',
+              }}
+            >
+              ✕
+            </button>
+
+            <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 18 }}>📊 Réponses par équipe et par catégorie</h2>
+
+            {Object.keys(statsData).length === 0 ? (
+              <p style={{ color: '#7a819c', fontSize: 13.5 }}>Aucune réponse enregistrée pour l'instant.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {Object.entries(statsData).map(
+                  ([
+                    teamId,
+                    data,
+                  ]: [
+                    string,
+                    { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }
+                  ]) => (
+                    <div key={teamId}>
+                      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
+                        {data.teamAvatar} {data.teamName}
+                      </div>
+                      {Object.keys(data.categories).length === 0 ? (
+                        <p style={{ color: '#7a819c', fontSize: 12.5, marginLeft: 8 }}>Pas encore de réponse.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {Object.entries(data.categories).map(([catName, counts]: [string, { correct: number; wrong: number }]) => (
+                            <div
+                              key={catName}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: 13,
+                                background: '#f4f6fb',
+                                borderRadius: 10,
+                                padding: '6px 12px',
+                              }}
+                            >
+                              <span>{catName}</span>
+                              <span>
+                                <span style={{ color: '#35c2a3', fontWeight: 700 }}>{counts.correct} ✓</span>
+                                {'  '}
+                                <span style={{ color: '#ff7a68', fontWeight: 700 }}>{counts.wrong} ✕</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Fenêtre d'invitation */}
       {showInvite && joinCode && (

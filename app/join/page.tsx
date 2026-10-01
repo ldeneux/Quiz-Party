@@ -3,13 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import QrScanner from '@/components/QrScanner';
 
 export default function JoinPage() {
   const router = useRouter();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(false);
 
   const handleSubmit = async (value: string = code) => {
     setError(null);
@@ -40,23 +38,6 @@ export default function JoinPage() {
   return (
     <main style={{ maxWidth: 400, margin: '80px auto', textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Rejoindre une partie</h1>
-      {scanning ? (
-        <QrScanner
-          onClose={() => setScanning(false)}
-          onCode={(c) => {
-            setScanning(false);
-            setCode(c);
-            handleSubmit(c);
-          }}
-        />
-      ) : (
-        <button
-          onClick={() => setScanning(true)}
-          style={{ width: '100%', marginBottom: 16, padding: '14px 20px', borderRadius: 16, border: '2px dashed #6c7bf7', background: 'none', color: '#6c7bf7', fontWeight: 800, fontSize: 16, cursor: 'pointer' }}
-        >
-          📷 Scanner le QR code
-        </button>
-      )}
       <input
         value={code}
         onChange={(e) => setCode(e.target.value)}
