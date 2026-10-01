@@ -2,25 +2,51 @@
 
 import React, { useState } from 'react';
 
+export type PlateId = 'progression' | 'stats' | 'parametrage' | 'fusee' | 'quitter' | 'nouvelle' | 'profil';
+
+// Rapport largeur / hauteur de chaque image (sert aussi à réserver la place des boutons dans le pupitre)
+export const PLATE_RATIO: Record<PlateId, number> = {
+  progression: 1.79,
+  stats: 1.79,
+  parametrage: 1.78,
+  fusee: 1.78,
+  quitter: 3.11,
+  nouvelle: 3.125,
+  profil: 8.43,
+};
+
+const SRC: Record<PlateId, string> = {
+  progression: '/ui/plate-progression.webp',
+  stats: '/ui/plate-stats.webp',
+  parametrage: '/ui/plate-parametrage.webp',
+  fusee: '/ui/plate-fusee.webp',
+  quitter: '/ui/plate-quitter.webp',
+  nouvelle: '/ui/plate-nouvelle.webp',
+  profil: '/ui/banner-profil.webp',
+};
+
 // Bouton « cadre holographique » du cockpit : image + infobulle néon (libellé + raccourci clavier).
-// On utilise aria-disabled (et non disabled) pour que l'infobulle reste visible même quand le bouton est grisé.
+// aria-disabled (et non disabled) : l'infobulle reste visible même quand le bouton est grisé.
 type Props = {
-  id: 'progression' | 'stats' | 'parametrage' | 'fusee';
+  id: PlateId;
   label: string;
   hint?: string;
   onClick?: () => void;
   href?: string;
   disabled?: boolean;
   pulse?: boolean;
-  width?: string;
+  height?: number; // en cqw
+  tipSide?: 'above' | 'below';
+  noTip?: boolean;
+  children?: React.ReactNode; // contenu superposé au centre de l'image (ex. nom du profil)
 };
 
-export default function CockpitPlate({ id, label, hint, onClick, href, disabled = false, pulse = false, width = '8.6cqw' }: Props) {
+export default function CockpitPlate({ id, label, hint, onClick, href, disabled = false, pulse = false, height = 5, tipSide = 'above', noTip = false, children }: Props) {
   const [show, setShow] = useState(false);
   const common = {
     id: `ck-${id}`,
     className: `ck-plate${pulse && !disabled ? ' ck-pulse' : ''}`,
-    style: { width, cursor: disabled ? 'not-allowed' : 'pointer' } as React.CSSProperties,
+    style: { width: `${(height * PLATE_RATIO[id]).toFixed(2)}cqw`, cursor: disabled ? 'not-allowed' : 'pointer' } as React.CSSProperties,
     'aria-label': label,
     'aria-disabled': disabled,
     onMouseEnter: () => setShow(true),
@@ -30,43 +56,48 @@ export default function CockpitPlate({ id, label, hint, onClick, href, disabled 
   };
   const img = (
     <img
-      src={`/ui/plate-${id}.webp`}
+      src={SRC[id]}
       alt=""
       draggable={false}
       style={{ width: '100%', display: 'block', filter: disabled ? 'grayscale(1) brightness(0.5)' : undefined, opacity: disabled ? 0.8 : 1 }}
     />
   );
-  const tip = show && (
-    <span
-      role="tooltip"
-      style={{
-        position: 'absolute',
-        bottom: 'calc(100% + 0.7cqw)',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 30,
-        pointerEvents: 'none',
-        whiteSpace: 'nowrap',
-        padding: '0.45cqw 0.9cqw',
-        borderRadius: '0.6cqw',
-        background: 'rgba(4,9,36,0.96)',
-        border: '1px solid rgba(120,175,255,0.75)',
-        boxShadow: '0 0 1.2cqw rgba(60,120,255,0.55)',
-        color: '#dfe9ff',
-        fontSize: '0.95cqw',
-        fontWeight: 800,
-        textAlign: 'center',
-        lineHeight: 1.3,
-      }}
-    >
-      {label}
-      {hint && <span style={{ display: 'block', fontWeight: 600, fontSize: '0.8cqw', color: '#8fb4ff' }}>{hint}</span>}
-    </span>
-  );
+  const overlay = children ? (
+    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12%', pointerEvents: 'none' }}>{children}</span>
+  ) : null;
+  const tip =
+    show && !noTip ? (
+      <span
+        role="tooltip"
+        style={{
+          position: 'absolute',
+          ...(tipSide === 'above' ? { bottom: 'calc(100% + 0.7cqw)' } : { top: 'calc(100% + 0.7cqw)' }),
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 30,
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+          padding: '0.45cqw 0.9cqw',
+          borderRadius: '0.6cqw',
+          background: 'rgba(4,9,36,0.96)',
+          border: '1px solid rgba(120,175,255,0.75)',
+          boxShadow: '0 0 1.2cqw rgba(60,120,255,0.55)',
+          color: '#dfe9ff',
+          fontSize: '0.95cqw',
+          fontWeight: 800,
+          textAlign: 'center',
+          lineHeight: 1.3,
+        }}
+      >
+        {label}
+        {hint && <span style={{ display: 'block', fontWeight: 600, fontSize: '0.8cqw', color: '#8fb4ff' }}>{hint}</span>}
+      </span>
+    ) : null;
   if (href && !disabled) {
     return (
       <a href={href} {...common}>
         {img}
+        {overlay}
         {tip}
       </a>
     );
@@ -74,6 +105,7 @@ export default function CockpitPlate({ id, label, hint, onClick, href, disabled 
   return (
     <button type="button" onClick={disabled ? undefined : onClick} {...common}>
       {img}
+      {overlay}
       {tip}
     </button>
   );

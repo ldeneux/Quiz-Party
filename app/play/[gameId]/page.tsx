@@ -85,7 +85,7 @@ function TeamBackdrop({ bg }: { bg: TeamBg }) {
     (bg.landscape ? `;background-image:linear-gradient(rgba(3,6,20,.15),rgba(3,6,20,.35)),url(${bg.landscape});background-position:center` : '') +
     `}}` +
     // en portrait, le contenu commence sous l'emblème de l'équipe
-    `@media (orientation:portrait){.tb-content{padding-top:31vh !important}}`;
+    `@media (orientation:portrait){.tb-content{padding-top:${bg.contentTop ?? '31vh'} !important}}`;
   return (
     <>
       <style>{css}</style>

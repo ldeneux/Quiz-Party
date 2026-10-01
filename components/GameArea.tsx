@@ -82,12 +82,14 @@ export default function GameArea({
   gameId,
   initialMode,
   cockpit = false,
+  onExplainChange,
   onRestart,
   onClose,
 }: {
   gameId: string;
   initialMode?: string;
   cockpit?: boolean;
+  onExplainChange?: (active: boolean) => void;
   onRestart?: () => void;
   onClose?: () => void;
 }) {
@@ -97,12 +99,14 @@ export default function GameArea({
   const [explainEl, setExplainEl] = useState<HTMLElement | null>(null);
   const [rocketEl, setRocketEl] = useState<HTMLElement | null>(null);
   const [progressEl, setProgressEl] = useState<HTMLElement | null>(null);
+  const [quitEl, setQuitEl] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!cockpit) return;
     setActionsEl(document.getElementById('cockpit-actions'));
     setExplainEl(document.getElementById('cockpit-explain'));
     setRocketEl(document.getElementById('cockpit-rocket'));
     setProgressEl(document.getElementById('cockpit-progress'));
+    setQuitEl(document.getElementById('cockpit-quit'));
   }, [cockpit]);
   const toActions = (node: React.ReactNode) => (cockpit && actionsEl ? createPortal(node, actionsEl) : node);
   const toExplain = (node: React.ReactNode) => (cockpit && explainEl ? createPortal(node, explainEl) : node);
@@ -481,6 +485,14 @@ export default function GameArea({
     loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
   }, [mode, pickNextChallenger, pickNextParticipatifTurn, finishParticipatif, startCategoryChoice, beginCamembertSetup, gameId, startQuestion]);
 
+  // Le parent masque le QR code tant que l'explication de la réponse occupe l'écran droit
+  const explainVisible = cockpit && phase === 'revealed' && !!question?.explanation;
+  useEffect(() => {
+    onExplainChange?.(explainVisible);
+    return () => onExplainChange?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [explainVisible]);
+
   // Décompte 3-2-1-décollage avant la toute première question (mode cockpit uniquement)
   const [countdown, setCountdown] = useState<number | null>(null);
   const goNextRef = useRef(goToNextQuestion);
@@ -802,8 +814,52 @@ export default function GameArea({
     );
   }
 
+  const quitConfirmNode = showQuitConfirm ? (
+<div style={cockpit ? { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', zIndex: 60, background: '#f4f6fb', color: '#1f2440', borderRadius: 14, padding: 16, boxShadow: '0 20px 50px rgba(0,0,0,.5)' } : { marginTop: 14, background: '#f4f6fb', borderRadius: 14, padding: 16 }}>
+                  <p style={{ fontSize: 13.5, marginBottom: 10 }}>
+                    Terminer la partie maintenant — que faire des scores actuels ?
+                  </p>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={quitKeepingScores}
+                      style={{ ...styles.startBtn, marginTop: 0, fontSize: 13, padding: '10px 16px' }}
+                    >
+                      Garder les scores
+                    </button>
+                    <button
+                      onClick={quitResettingScores}
+                      style={{
+                        ...styles.startBtn,
+                        marginTop: 0,
+                        fontSize: 13,
+                        padding: '10px 16px',
+                        background: '#eef0f8',
+                        color: '#1f2440',
+                      }}
+                    >
+                      Remettre à zéro
+                    </button>
+                    <button
+                      onClick={() => setShowQuitConfirm(false)}
+                      style={{
+                        marginTop: 0,
+                        fontSize: 13,
+                        padding: '10px 16px',
+                        background: 'none',
+                        border: 'none',
+                        color: '#7a819c',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+  ) : null;
+
   return (
     <div style={{ position: 'relative' }}>
+      {cockpit && quitConfirmNode}
       {cockpit && rocketEl &&
         createPortal(
           (() => {
@@ -817,10 +873,32 @@ export default function GameArea({
           })(),
           rocketEl
         )}
-      {cockpit && progressEl && mode === 'camembert' && wedgeCategories.length > 0 &&
+      {cockpit && progressEl &&
         createPortal(
-          <CockpitPlate id="progression" label="Voir la progression" hint="P · toutes les équipes" onClick={() => setShowProgressTable(true)} />,
+          (() => {
+            const ok = mode === 'camembert' && wedgeCategories.length > 0;
+            return (
+              <CockpitPlate
+                id="progression"
+                label="Voir la progression"
+                hint={ok ? 'P · toutes les équipes' : 'Mode Trivial Poursuit uniquement'}
+                disabled={!ok}
+                onClick={() => setShowProgressTable(true)}
+              />
+            );
+          })(),
           progressEl
+        )}
+      {cockpit && quitEl &&
+        createPortal(
+          <CockpitPlate
+            id="quitter"
+            label="Quitter la partie"
+            hint={phase === 'finished' ? 'Partie terminée' : 'Garder ou remettre à zéro les scores'}
+            disabled={phase === 'finished'}
+            onClick={() => setShowQuitConfirm(true)}
+          />,
+          quitEl
         )}
       {!cockpit && mode === 'camembert' && wedgeCategories.length > 0 && (
         <button
@@ -846,7 +924,7 @@ export default function GameArea({
       )}
 
       {phase === 'lobby' && cockpit && countdown !== null && (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', position: 'relative', overflow: 'hidden', boxSizing: 'border-box', paddingTop: '2.8cqw' }}>
           <style>{`
             @keyframes ck-pop{0%{transform:scale(1.9);opacity:0}30%{opacity:1}100%{transform:scale(0.92);opacity:.9}}
             @keyframes ck-launch{0%{transform:translateY(3cqw) scale(1);opacity:0}15%{opacity:1}100%{transform:translateY(-22cqw) scale(1.5);opacity:0}}
@@ -856,12 +934,12 @@ export default function GameArea({
             {countdown > 0 ? 'PRÉPAREZ-VOUS' : 'C’EST PARTI !'}
           </div>
           {countdown > 0 ? (
-            <div key={countdown} className="ck-cd-num" style={{ fontSize: '12cqw', lineHeight: 1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9), 0 0 6cqw rgba(255,120,40,0.5)', animation: 'ck-pop 1s ease-out' }}>
+            <div key={countdown} className="ck-cd-num" style={{ padding: '1cqw 6cqw', fontSize: '11cqw', lineHeight: 1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9), 0 0 6cqw rgba(255,120,40,0.5)', animation: 'ck-pop 1s ease-out' }}>
               {countdown}
             </div>
           ) : (
             <>
-              <div className="ck-cd-num" style={{ fontSize: '6cqw', lineHeight: 1.1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9)', animation: 'ck-pop 0.6s ease-out' }}>
+              <div className="ck-cd-num" style={{ padding: '1cqw 6cqw', fontSize: '6cqw', lineHeight: 1.1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9)', animation: 'ck-pop 0.6s ease-out' }}>
                 DÉCOLLAGE
               </div>
               <div className="ck-cd-rocket" style={{ position: 'absolute', bottom: '0.5cqw', fontSize: '5cqw', animation: 'ck-launch 1.1s ease-in forwards' }}>
@@ -1042,6 +1120,7 @@ export default function GameArea({
                   Question suivante
                 </button>
               )}
+              {!cockpit && (
               <button
                 onClick={() => setShowQuitConfirm(true)}
                 className={cockpit ? 'ck-key' : undefined}
@@ -1063,49 +1142,9 @@ export default function GameArea({
               >
                 Quitter la partie
               </button>
-
-              {showQuitConfirm && (
-                <div style={cockpit ? { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', zIndex: 60, background: '#f4f6fb', color: '#1f2440', borderRadius: 14, padding: 16, boxShadow: '0 20px 50px rgba(0,0,0,.5)' } : { marginTop: 14, background: '#f4f6fb', borderRadius: 14, padding: 16 }}>
-                  <p style={{ fontSize: 13.5, marginBottom: 10 }}>
-                    Terminer la partie maintenant — que faire des scores actuels ?
-                  </p>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button
-                      onClick={quitKeepingScores}
-                      style={{ ...styles.startBtn, marginTop: 0, fontSize: 13, padding: '10px 16px' }}
-                    >
-                      Garder les scores
-                    </button>
-                    <button
-                      onClick={quitResettingScores}
-                      style={{
-                        ...styles.startBtn,
-                        marginTop: 0,
-                        fontSize: 13,
-                        padding: '10px 16px',
-                        background: '#eef0f8',
-                        color: '#1f2440',
-                      }}
-                    >
-                      Remettre à zéro
-                    </button>
-                    <button
-                      onClick={() => setShowQuitConfirm(false)}
-                      style={{
-                        marginTop: 0,
-                        fontSize: 13,
-                        padding: '10px 16px',
-                        background: 'none',
-                        border: 'none',
-                        color: '#7a819c',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Annuler
-                    </button>
-                  </div>
-                </div>
               )}
+
+              {!cockpit && quitConfirmNode}
             </>
           )}
         </div>

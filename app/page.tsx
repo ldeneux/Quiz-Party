@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import GameArea from '@/components/GameArea';
-import { ckKey, ckLed } from '@/lib/cockpitUi';
-import CockpitPlate from '@/components/CockpitPlate';
+import { ckLed } from '@/lib/cockpitUi';
+import CockpitPlate, { PLATE_RATIO, PlateId } from '@/components/CockpitPlate';
 import CockpitQR from '@/components/CockpitQR';
 
 const MODES = [
@@ -83,6 +83,8 @@ export default function ConsolePage() {
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [creating, setCreating] = useState(false);
+  const [bootstrapped, setBootstrapped] = useState(false);
+  const autoCreating = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
   const [showInvite, setShowInvite] = useState(false);
@@ -151,9 +153,22 @@ export default function ConsolePage() {
           } else {
             localStorage.removeItem('quiz-party-game-id');
           }
+          setBootstrapped(true);
         });
+    } else {
+      setBootstrapped(true);
     }
   }, []);
+
+  // Une partie (donc un code et un QR code) est créée toute seule dès l'ouverture, et après chaque remise à zéro
+  useEffect(() => {
+    if (!bootstrapped || gameId || autoCreating.current) return;
+    autoCreating.current = true;
+    inviteTeams(false).finally(() => {
+      autoCreating.current = false;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootstrapped, gameId]);
 
   // Charge + écoute les équipes (jointure, départ, ET score en direct)
   useEffect(() => {
@@ -279,11 +294,11 @@ export default function ConsolePage() {
     setGameStarted(false);
   };
 
-  const inviteTeams = async () => {
+  const inviteTeams = async (openInvite = true) => {
     setError(null);
 
     if (gameId) {
-      setShowInvite(true);
+      if (openInvite) setShowInvite(true);
       return;
     }
 
@@ -311,7 +326,7 @@ export default function ConsolePage() {
     setJoinCode(data.game.join_code);
     localStorage.setItem('quiz-party-game-id', data.game.id);
     setCreating(false);
-    setShowInvite(true);
+    if (openInvite) setShowInvite(true);
   };
 
   const removeTeam = async (teamId: string) => {
@@ -402,6 +417,25 @@ export default function ConsolePage() {
 
   const activeModeInfo = MODES.find((m) => m.id === activeMode) ?? MODES[0];
   const [profileOpen, setProfileOpen] = useState(false);
+  const [explainActive, setExplainActive] = useState(false);
+  const [copiedJoin, setCopiedJoin] = useState(false);
+  const copyJoinUrl = async () => {
+    if (!joinCode) return;
+    try {
+      await navigator.clipboard.writeText(`${origin}/join?code=${joinCode}`);
+      setCopiedJoin(true);
+      setTimeout(() => setCopiedJoin(false), 1800);
+    } catch {
+      setError("Impossible de copier le lien (autorisation du presse-papiers refusée)");
+    }
+  };
+  // Emplacement fixe d'un bouton du pupitre : il ne bouge jamais, seul son état (actif / grisé) change
+  const PH = 5;
+  const slot = (id: string, plate: PlateId, children?: React.ReactNode) => (
+    <div id={id} style={{ width: `${(PH * PLATE_RATIO[plate]).toFixed(2)}cqw`, height: `${PH}cqw`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      {children}
+    </div>
+  );
   // Raccourcis clavier de l'hôte : Espace = fusée (démarrer / question suivante), S = statistiques, P = progression
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -509,19 +543,21 @@ export default function ConsolePage() {
 
         {/* Écran droit : adresse pour rejoindre (avant la partie) puis explication de la réponse (injectée par GameArea) */}
         <div style={{ position: 'absolute', left: '84.6%', top: '14.3%', width: '14%', height: '26.5%', overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw' }}>
-          {!gameStarted &&
+          {!explainActive &&
             (joinCode ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.45cqw', paddingTop: '0.5cqw' }}>
-                <div style={{ width: '9cqw' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4cqw', paddingTop: '2cqw' }}>
+                <div onClick={copyJoinUrl} title="Clic : copier le lien pour rejoindre" style={{ width: '8cqw', cursor: 'pointer' }}>
                   <CockpitQR url={`${origin}/join?code=${joinCode}`} />
                 </div>
-                <div style={{ fontSize: '0.85cqw', fontWeight: 800, letterSpacing: '0.08cqw', color: '#9fc4ff' }}>SCANNE POUR REJOINDRE</div>
-                <div style={{ fontSize: '0.7cqw', color: '#8a97c4', wordBreak: 'break-all', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.75cqw', fontWeight: 800, letterSpacing: '0.04cqw', color: copiedJoin ? '#4dffb0' : '#9fc4ff', textAlign: 'center' }}>
+                  {copiedJoin ? 'LIEN COPIÉ ✓' : 'SCANNE POUR REJOINDRE'}
+                </div>
+                <div style={{ fontSize: '0.65cqw', color: '#8a97c4', wordBreak: 'break-all', textAlign: 'center', lineHeight: 1.3 }}>
                   ou saisis le code sur {origin.replace(/^https?:\/\//, '')}/join
                 </div>
               </div>
             ) : (
-              <div style={{ fontSize: '1cqw', color: '#8a97c4', marginTop: '2cqw', textAlign: 'center' }}>Clique sur « Rejoindre le jeu » pour créer un code</div>
+              <div style={{ fontSize: '1cqw', color: '#8a97c4', marginTop: '3cqw', textAlign: 'center' }}>Création de la partie…</div>
             ))}
           <div id="cockpit-explain" style={{ position: 'absolute', inset: 0 }} />
         </div>
@@ -562,91 +598,88 @@ export default function ConsolePage() {
             </div>
           ) : (
             gameId && (
-              <GameArea gameId={gameId} initialMode={activeMode} cockpit onRestart={() => setShowNewGameChoice(true)} onClose={() => setGameStarted(false)} />
+              <GameArea gameId={gameId} initialMode={activeMode} cockpit onExplainChange={setExplainActive} onRestart={() => setShowNewGameChoice(true)} onClose={() => setGameStarted(false)} />
             )
           )}
         </div>
 
-        {/* Choix du profil : en haut au centre, près du halo bleu du plafond */}
+        {/* Choix du profil : bandeau en haut au centre, près du halo bleu du plafond */}
         <div style={{ position: 'absolute', left: '50%', top: '4.3%', transform: 'translateX(-50%)', zIndex: 15 }}>
-          {/* Sélecteur de profil (menu personnalisé) */}
-          <div style={{ position: 'relative' }}>
-            <button
-              className="ck-key"
-              disabled={gameStarted}
-              onClick={() => setProfileOpen((o) => !o)}
-              title={gameStarted ? 'Impossible de changer de profil en cours de partie' : 'Choisir le profil de jeu'}
-              style={{ ...ckKey, minWidth: '16cqw', maxWidth: '24cqw', justifyContent: 'space-between', opacity: gameStarted ? 0.55 : 1, cursor: gameStarted ? 'not-allowed' : 'pointer' }}
-            >
+          <CockpitPlate
+            id="profil"
+            height={3.2}
+            tipSide="below"
+            noTip={profileOpen}
+            label="Profil de jeu"
+            hint={gameStarted ? 'Impossible de changer en cours de partie' : 'Choisir les questions de la partie'}
+            disabled={gameStarted}
+            onClick={() => setProfileOpen((o) => !o)}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5cqw', maxWidth: '100%', fontSize: '1.05cqw', fontWeight: 800, letterSpacing: '0.1cqw', textTransform: 'uppercase', color: '#e8f0ff', textShadow: '0 0 0.7cqw rgba(0,10,50,0.95), 0 0 0.3cqw #000' }}>
               <span style={ckLed(selectedProfile ? '#4dffb0' : '#ff9a5a')} />
-              <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>Profil · {selectedProfile ? selectedProfile.name : 'à choisir'}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedProfile ? selectedProfile.name : 'Choisir un profil'}</span>
               <span style={{ fontSize: '0.8cqw' }}>▾</span>
-            </button>
-            {profileOpen && !gameStarted && (
-              <>
-                <div onClick={() => setProfileOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
-                <div className="ck-scroll" style={{ position: 'absolute', top: 'calc(100% + 0.7cqw)', left: 0, minWidth: '100%', maxHeight: '22cqw', overflowY: 'auto', zIndex: 20, background: 'rgba(5,10,38,0.97)', border: '1px solid rgba(120,175,255,0.7)', borderRadius: '0.8cqw', boxShadow: '0 0 1.6cqw rgba(60,120,255,0.55)', padding: '0.4cqw' }}>
-                  {[{ id: '', name: 'Aucun profil (toutes les questions)', is_default: false, is_favorite: false } as Profile, ...eligibleProfiles].map((p) => {
-                    const sel = p.id === selectedProfileId;
-                    return (
-                      <div
-                        key={p.id || 'none'}
-                        onClick={async () => {
-                          setProfileOpen(false);
-                          await selectProfile(p.id);
-                        }}
-                        style={{ padding: '0.5cqw 0.9cqw', borderRadius: '0.5cqw', fontSize: '1cqw', fontWeight: sel ? 800 : 600, color: sel ? '#fff' : '#c8d6ff', background: sel ? 'linear-gradient(90deg, rgba(80,140,255,0.55), rgba(110,90,255,0.35))' : 'transparent', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                      >
-                        {p.is_default ? '🏠 ' : p.is_favorite ? '⭐ ' : ''}{p.name}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
+            </span>
+          </CockpitPlate>
+          {profileOpen && !gameStarted && (
+            <>
+              <div onClick={() => setProfileOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+              <div className="ck-scroll" style={{ position: 'absolute', top: 'calc(100% + 0.6cqw)', left: '50%', transform: 'translateX(-50%)', minWidth: '60%', maxHeight: '22cqw', overflowY: 'auto', zIndex: 20, background: 'rgba(5,10,38,0.97)', border: '1px solid rgba(120,175,255,0.7)', borderRadius: '0.8cqw', boxShadow: '0 0 1.6cqw rgba(60,120,255,0.55)', padding: '0.4cqw' }}>
+                {[{ id: '', name: 'Aucun profil (toutes les questions)', is_default: false, is_favorite: false } as Profile, ...eligibleProfiles].map((p) => {
+                  const sel = p.id === selectedProfileId;
+                  return (
+                    <div
+                      key={p.id || 'none'}
+                      onClick={async () => {
+                        setProfileOpen(false);
+                        await selectProfile(p.id);
+                      }}
+                      style={{ padding: '0.5cqw 0.9cqw', borderRadius: '0.5cqw', fontSize: '1cqw', fontWeight: sel ? 800 : 600, color: sel ? '#fff' : '#c8d6ff', background: sel ? 'linear-gradient(90deg, rgba(80,140,255,0.55), rgba(110,90,255,0.35))' : 'transparent', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      {p.is_default ? '🏠 ' : p.is_favorite ? '⭐ ' : ''}{p.name}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          {activeMode === 'camembert' && eligibleProfiles.length === 0 && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 0.4cqw)', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', color: '#ff9a8a', fontSize: '0.95cqw', fontWeight: 700 }}>Aucun profil éligible (10 catégories distinctes requises)</div>
+          )}
         </div>
 
-        {/* Pupitre du bas : profil et commandes (touches néon du cockpit) */}
-        <div style={{ position: 'absolute', left: '7%', top: '88.6%', width: '86%', height: '9.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8cqw', flexWrap: 'wrap', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: 'linear-gradient(180deg, rgba(8,16,55,0.55), rgba(4,8,30,0.75))', border: '1px solid rgba(90,140,255,0.35)', borderRadius: '1.2cqw', boxShadow: '0 0 1.5cqw rgba(40,90,220,0.3), inset 0 0.1cqw 0.3cqw rgba(140,180,255,0.2)' }}>
-          {activeMode === 'camembert' && eligibleProfiles.length === 0 && (
-            <span style={{ color: '#ff9a8a', fontSize: '0.95cqw', fontWeight: 700 }}>Aucun profil éligible (10 catégories distinctes requises)</span>
+        {/* Pupitre du bas : emplacements fixes (les boutons ne bougent pas, ils se grisent quand ils sont inutilisables) */}
+        <div style={{ position: 'absolute', left: '7%', top: '88.6%', width: '86%', height: '9.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.9cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: 'linear-gradient(180deg, rgba(8,16,55,0.55), rgba(4,8,30,0.75))', border: '1px solid rgba(90,140,255,0.35)', borderRadius: '1.2cqw', boxShadow: '0 0 1.5cqw rgba(40,90,220,0.3), inset 0 0.1cqw 0.3cqw rgba(140,180,255,0.2)' }}>
+          <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />
+          <CockpitPlate id="stats" label="Statistiques" hint="S · par équipe et par catégorie" disabled={!gameId} onClick={openStats} />
+          {slot(
+            'cockpit-progress',
+            'progression',
+            !gameStarted && <CockpitPlate id="progression" label="Voir la progression" hint="Mode Trivial Poursuit, pendant la partie" disabled />
           )}
-
-          {!gameStarted && (
-            <button className="ck-key" onClick={inviteTeams} disabled={creating} style={ckKey}>
-              {creating ? 'Création…' : 'Rejoindre le jeu'}
-            </button>
-          )}
-          {gameId && (
-            <button className="ck-key" onClick={() => setShowNewGameChoice(true)} title="Oublier cette partie et repartir de zéro" style={ckKey}>
-              Nouvelle partie
-            </button>
-          )}
-
-          {/* Cadre « progression » injecté par GameArea (mode Trivial Poursuit) */}
-          <div id="cockpit-progress" style={{ display: 'flex' }} />
 
           {/* Fusée : Démarrer avant la partie, puis « Question suivante » (injectée par GameArea) */}
-          {!gameStarted ? (
-            <CockpitPlate
-              id="fusee"
-              label="Démarrer la partie"
-              hint={teams.length > 0 ? 'Espace' : 'Aucune équipe connectée'}
-              disabled={teams.length === 0}
-              pulse={teams.length > 0}
-              onClick={startGame}
-            />
-          ) : (
-            <div id="cockpit-rocket" style={{ display: 'flex' }} />
+          {slot(
+            'cockpit-rocket',
+            'fusee',
+            !gameStarted && (
+              <CockpitPlate
+                id="fusee"
+                label="Démarrer la partie"
+                hint={teams.length > 0 ? 'Espace' : 'Aucune équipe connectée'}
+                disabled={teams.length === 0}
+                pulse={teams.length > 0}
+                onClick={startGame}
+              />
+            )
           )}
 
-          {/* Bouton « Quitter la partie » injecté par GameArea */}
-          <div id="cockpit-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.8cqw' }} />
+          <CockpitPlate id="nouvelle" label="Nouvelle partie" hint="Oublier la partie actuelle" disabled={!gameId} onClick={() => setShowNewGameChoice(true)} />
+          {slot('cockpit-quit', 'quitter', !gameStarted && <CockpitPlate id="quitter" label="Quitter la partie" hint="Aucune partie en cours" disabled />)}
 
-          {gameId && <CockpitPlate id="stats" label="Statistiques" hint="S · par équipe et par catégorie" onClick={openStats} />}
-          <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />
-          {error && <span style={{ color: '#ff9a8a', fontSize: '0.95cqw', fontWeight: 700 }}>{error}</span>}
+          {/* Messages d'erreur : au-dessus du pupitre, sans décaler les boutons */}
+          <div id="cockpit-actions" style={{ position: 'absolute', bottom: 'calc(100% + 0.3cqw)', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }} />
+          {error && <span style={{ position: 'absolute', bottom: 'calc(100% + 0.3cqw)', left: 0, right: 0, textAlign: 'center', color: '#ff9a8a', fontSize: '0.95cqw', fontWeight: 700 }}>{error}</span>}
         </div>
       </div>
 
