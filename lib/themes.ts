@@ -3,7 +3,7 @@
 // + les images des modes (« planètes ») et des boutons (« plates »).
 // Le thème « espace » reprend exactement l'habillage historique : rien ne change tant qu'on ne choisit pas autre chose.
 
-export type ThemeId = 'espace' | 'jungle';
+export type ThemeId = 'espace' | 'jungle' | 'marins';
 export type ModeId = 'classique' | 'defi' | 'survie' | 'participatif' | 'camembert';
 
 export type PlateId =
@@ -163,7 +163,62 @@ const jungle: Theme = {
   },
 };
 
-export const THEMES: Record<ThemeId, Theme> = { espace, jungle };
-export const THEME_LIST: Theme[] = [espace, jungle];
+// ───────────────────────── Fonds marins ─────────────────────────
+const M = '/themes/marins';
+const mIcon = (name: string, ratio: number, scale = 1.45): PlateDef => ({ src: `${M}/icons/${name}.webp`, ratio, scale });
+
+const marins: Theme = {
+  id: 'marins',
+  label: 'Fonds marins',
+  emoji: '🐠',
+  description: 'Un cockpit d’avion englouti : épave, poissons, pieuvre et ruines sous-marines.',
+  preview: `${M}/preview.webp`,
+  stage: { src: `${M}/stage.webp`, ratio: 1536 / 1024, bg: '#020a14' },
+  zones: {
+    teams: { left: 3.7, top: 34.2, width: 14.4, height: 26.9 },
+    teamCount: { left: 3.6, top: 63.8, width: 14.6, height: 3.4 },
+    join: { left: 82, top: 34.2, width: 14.2, height: 27.5 },
+    code: { left: 81.9, top: 63.8, width: 14.4, height: 3.4 },
+    hub: { left: 24.7, top: 37.5, width: 50.6, height: 25.7 },
+    bar: { left: 22, top: 80, width: 56, height: 15 },
+    profile: { left: 49.5, top: 7.9 },
+  },
+  joinPadTop: 2.2,
+  qrWidth: 8.6,
+  bar: {
+    background: 'linear-gradient(180deg, rgba(2,14,28,0.5), rgba(1,8,18,0.75))',
+    border: '1px solid rgba(90,200,255,0.4)',
+    boxShadow: '0 0 1.5cqw rgba(40,160,255,0.28), inset 0 0.1cqw 0.3cqw rgba(160,225,255,0.2)',
+  },
+  planets: {
+    classique: { src: `${M}/icons/porte.webp`, width: 6.9 },
+    defi: { src: `${M}/icons/trophee.webp`, width: 6.7 },
+    survie: { src: `${M}/icons/tente.webp`, width: 7.5 },
+    participatif: { src: `${M}/icons/dauphins.webp`, width: 7.7 },
+    camembert: { src: `${M}/icons/tresor.webp`, width: 8.1 },
+  },
+  plates: {
+    fusee: mIcon('sousmarin', 0.852),
+    suivante: mIcon('boussole', 0.752),
+    stats: mIcon('carte', 0.709),
+    parametrage: mIcon('engrenage', 0.798),
+    progression: mIcon('ponton', 0.814),
+    nouvelle: mIcon('murene', 0.731),
+    quitter: mIcon('mine', 0.783),
+    valider: mIcon('coquillage', 0.754),
+    annuler: mIcon('harpons', 0.537),
+    // Provisoire : pas encore d'icône dédiée au plein écran
+    plein: mIcon('porte', 0.732),
+    // Le décor porte déjà le cadre du haut : on n'affiche que le nom du profil
+    profil: { src: null, ratio: 6.24, scale: 1.05 },
+  },
+  frames: {
+    progress: { src: `${M}/frame.webp`, ratio: 860 / 330, width: 80 },
+    msg: { src: `${M}/frame.webp`, ratio: 860 / 330, width: 66 },
+  },
+};
+
+export const THEMES: Record<ThemeId, Theme> = { espace, jungle, marins };
+export const THEME_LIST: Theme[] = [espace, jungle, marins];
 export const DEFAULT_THEME_ID: ThemeId = 'espace';
 export const THEME_STORAGE_KEY = 'quiz-party-theme';
