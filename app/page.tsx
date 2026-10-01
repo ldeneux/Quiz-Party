@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import GameArea from '@/components/GameArea';
 import { ckLed } from '@/lib/cockpitUi';
-import CockpitMsgBox from '@/components/CockpitMsgBox';
+import CockpitMsgBox, { CockpitFrameWindow } from '@/components/CockpitMsgBox';
 import CockpitPlate, { PLATE_RATIO, PlateId } from '@/components/CockpitPlate';
 import CockpitQR from '@/components/CockpitQR';
 
@@ -435,6 +435,7 @@ export default function ConsolePage() {
     else document.documentElement.requestFullscreen?.();
   };
   const [copiedJoin, setCopiedJoin] = useState(false);
+  const [modeTip, setModeTip] = useState(false);
   const copyJoinUrl = async () => {
     if (!joinCode) return;
     try {
@@ -504,6 +505,7 @@ export default function ConsolePage() {
           .ck-plate:active:not([aria-disabled="true"]){transform:translateY(0.1cqw) scale(1)}
           .ck-plate:focus-visible{outline:2px solid #7fd1ff;outline-offset:3px;border-radius:1cqw}
           .ck-pulse{animation:ck-pulse 1.8s ease-in-out infinite}
+          @keyframes ck-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-0.35cqw)}}
           @keyframes ck-pulse{0%,100%{filter:drop-shadow(0 0 .3cqw rgba(160,120,255,.5))}50%{filter:drop-shadow(0 0 1.5cqw rgba(180,140,255,1))}}
         `}</style>
 
@@ -645,6 +647,20 @@ export default function ConsolePage() {
 
         {/* Pupitre du bas : emplacements fixes (les boutons ne bougent pas, ils se grisent quand ils sont inutilisables) */}
         <div style={{ position: 'absolute', left: '7%', top: '88.6%', width: '86%', height: '9.6%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: 'linear-gradient(180deg, rgba(8,16,55,0.55), rgba(4,8,30,0.75))', border: '1px solid rgba(90,140,255,0.35)', borderRadius: '1.2cqw', boxShadow: '0 0 1.5cqw rgba(40,90,220,0.3), inset 0 0.1cqw 0.3cqw rgba(140,180,255,0.2)' }}>
+          {/* Planète du mode de jeu en cours (visible une fois la partie démarrée) */}
+          <div style={{ width: `${(PH * PLATE_RATIO.fusee).toFixed(2)}cqw`, height: `${PH}cqw`, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0 }} onMouseEnter={() => setModeTip(true)} onMouseLeave={() => setModeTip(false)}>
+            {gameStarted && (
+              <>
+                <img src={`/planets/${activeMode}.png`} alt={activeModeInfo.label} draggable={false} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', animation: 'ck-float 4s ease-in-out infinite', filter: `drop-shadow(0 0 0.9cqw ${activeModeInfo.color})` }} />
+                {modeTip && (
+                  <span style={{ position: 'absolute', bottom: 'calc(100% + 0.7cqw)', left: 0, zIndex: 30, pointerEvents: 'none', whiteSpace: 'nowrap', padding: '0.45cqw 0.9cqw', borderRadius: '0.6cqw', background: 'rgba(4,9,36,0.96)', border: '1px solid rgba(120,175,255,0.75)', boxShadow: '0 0 1.2cqw rgba(60,120,255,0.55)', color: '#dfe9ff', fontSize: '0.95cqw', fontWeight: 800 }}>
+                    {activeModeInfo.emoji} {activeModeInfo.label}
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: '0.8cqw', color: '#8fb4ff' }}>Mode de jeu en cours</span>
+                  </span>
+                )}
+              </>
+            )}
+          </div>
           <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />
           <CockpitPlate id="stats" label="Statistiques" hint="S · par équipe et par catégorie" disabled={!gameId} onClick={openStats} />
           {slot('cockpit-progress', 'progression', !gameStarted && <CockpitPlate id="progression" label="Voir la progression" hint="Mode Trivial Poursuit, pendant la partie" disabled />)}
@@ -692,18 +708,22 @@ export default function ConsolePage() {
         {/* MSGBOX : actions sur une équipe */}
         {teamAction && (
           <CockpitMsgBox
-            title={`Déconnecter « ${teamAction.name} » ?`}
-            validateLabel="Déconnecter l'équipe"
-            onValidate={async () => {
-              await removeTeam(teamAction.id);
-              setTeamAction(null);
-            }}
-            extra={[{ label: copiedTeamId === teamAction.id ? 'Lien copié ✓' : 'Copier le lien de récupération', onClick: () => copyTeamLink(teamAction.id) }]}
+            title={`${teamAction.avatar} ${teamAction.name}`}
+            actions={[
+              {
+                label: "Déconnecter l'équipe",
+                onClick: async () => {
+                  await removeTeam(teamAction.id);
+                  setTeamAction(null);
+                },
+              },
+              { label: copiedTeamId === teamAction.id ? 'Lien copié ✓' : 'Copier le lien de récupération', onClick: () => copyTeamLink(teamAction.id) },
+            ]}
             cancelLabel="Fermer"
             onCancel={() => setTeamAction(null)}
           >
             <span>
-              {teamAction.avatar} {teamAction.score ?? 0} point{(teamAction.score ?? 0) > 1 ? 's' : ''}
+              {teamAction.score ?? 0} point{(teamAction.score ?? 0) > 1 ? 's' : ''}
             </span>
           </CockpitMsgBox>
         )}
@@ -712,113 +732,59 @@ export default function ConsolePage() {
         {showNewGameChoice && (
           <CockpitMsgBox
             title="Nouvelle partie"
-            validateLabel="Garder les mêmes équipes"
-            onValidate={restartSameTeams}
-            extra={[{ label: "Changer d'équipes (nouveau code)", onClick: fullReset }]}
+            actions={[
+              { label: 'Garder les mêmes équipes', onClick: restartSameTeams },
+              { label: "Changer d'équipes (nouveau code)", onClick: fullReset },
+            ]}
             cancelLabel="Annuler"
             onCancel={() => setShowNewGameChoice(false)}
           >
-            Garder les mêmes équipes : même code, scores remis à zéro.
+            Mêmes équipes : même code, scores remis à zéro. Nouvelles équipes : nouveau code et nouveau QR code.
           </CockpitMsgBox>
         )}
-      </div>
 
-      {/* Fenêtre statistiques */}
-      {showStats && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(31,36,64,0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 24,
-              padding: 32,
-              maxWidth: 640,
-              width: '90%',
-              maxHeight: '80vh',
-              overflowY: 'auto',
-              position: 'relative',
-              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
-            }}
-          >
-            <button
-              onClick={() => setShowStats(false)}
-              style={{
-                position: 'absolute',
-                top: 16,
-                right: 16,
-                border: 'none',
-                background: '#f4f6fb',
-                borderRadius: '50%',
-                width: 32,
-                height: 32,
-                fontSize: 14,
-                cursor: 'pointer',
-                color: '#7a819c',
-              }}
-            >
-              ✕
-            </button>
-
-            <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 18 }}>📊 Réponses par équipe et par catégorie</h2>
-
-            {Object.keys(statsData).length === 0 ? (
-              <p style={{ color: '#7a819c', fontSize: 13.5 }}>Aucune réponse enregistrée pour l'instant.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                {Object.entries(statsData).map(
-                  ([
-                    teamId,
-                    data,
-                  ]: [
-                    string,
-                    { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }
-                  ]) => (
-                    <div key={teamId}>
-                      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
-                        {data.teamAvatar} {data.teamName}
-                      </div>
-                      {Object.keys(data.categories).length === 0 ? (
-                        <p style={{ color: '#7a819c', fontSize: 12.5, marginLeft: 8 }}>Pas encore de réponse.</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          {Object.entries(data.categories).map(([catName, counts]: [string, { correct: number; wrong: number }]) => (
-                            <div
-                              key={catName}
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: 13,
-                                background: '#f4f6fb',
-                                borderRadius: 10,
-                                padding: '6px 12px',
-                              }}
-                            >
-                              <span>{catName}</span>
-                              <span>
-                                <span style={{ color: '#35c2a3', fontWeight: 700 }}>{counts.correct} ✓</span>
-                                {'  '}
-                                <span style={{ color: '#ff7a68', fontWeight: 700 }}>{counts.wrong} ✕</span>
-                              </span>
+        {/* Fenêtre statistiques : cadre « espace », icône graphique en bas à droite pour fermer */}
+        {showStats && (
+          <CockpitFrameWindow frame="espace" width="76cqw" closeId="stats" closeLabel="Fermer les statistiques" onClose={() => setShowStats(false)}>
+            <div style={{ position: 'absolute', left: '6%', right: '6%', top: '9%', bottom: '9%', display: 'flex', flexDirection: 'column', gap: '0.8cqw' }}>
+              <div style={{ fontSize: '1.9cqw', fontWeight: 800, color: '#fff', textShadow: '0 0 1cqw rgba(90,160,255,0.9)' }}>📊 Réponses par équipe et par catégorie</div>
+              <div className="ck-scroll" style={{ flex: 1, overflow: 'auto', background: 'rgba(3,8,35,0.8)', borderRadius: '1cqw', padding: '0.9cqw' }}>
+                {Object.keys(statsData).length === 0 ? (
+                  <p style={{ color: '#9fb2e8', fontSize: '1.2cqw' }}>Aucune réponse enregistrée pour l'instant.</p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(24cqw, 1fr))', gap: '1cqw' }}>
+                    {Object.entries(statsData).map(
+                      ([teamId, data]: [string, { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }]) => (
+                        <div key={teamId}>
+                          <div style={{ fontWeight: 800, fontSize: '1.2cqw', marginBottom: '0.4cqw' }}>
+                            {data.teamAvatar} {data.teamName}
+                          </div>
+                          {Object.keys(data.categories).length === 0 ? (
+                            <p style={{ color: '#9fb2e8', fontSize: '1cqw' }}>Pas encore de réponse.</p>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25cqw' }}>
+                              {Object.entries(data.categories).map(([catName, counts]: [string, { correct: number; wrong: number }]) => (
+                                <div key={catName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1cqw', background: 'rgba(60,100,200,0.22)', borderRadius: '0.5cqw', padding: '0.3cqw 0.8cqw' }}>
+                                  <span>{catName}</span>
+                                  <span>
+                                    <span style={{ color: '#4dffb0', fontWeight: 700 }}>{counts.correct} ✓</span>
+                                    {'  '}
+                                    <span style={{ color: '#ff8a7a', fontWeight: 700 }}>{counts.wrong} ✕</span>
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
-                      )}
+                      )
+                    )}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      )}
+            </div>
+          </CockpitFrameWindow>
+        )}
+      </div>
 
       {/* Fenêtre d'invitation */}
       {showInvite && joinCode && (

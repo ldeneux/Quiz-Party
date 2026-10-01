@@ -74,6 +74,38 @@ function TeamHeader({
 }
 
 
+const QUESTION_TIME_SECONDS = 20; // même durée que sur l'écran principal (GameArea)
+
+// Décompte des secondes (anneau + chiffre), comme sur l'écran principal
+function CountdownRing({ seconds, themed }: { seconds: number; themed: boolean }) {
+  const r = 30;
+  const c = 2 * Math.PI * r;
+  const frac = Math.max(0, Math.min(1, seconds / QUESTION_TIME_SECONDS));
+  const low = seconds <= 5;
+  return (
+    <div style={{ position: 'relative', width: 76, height: 76, margin: '0 auto 14px' }} aria-label={`${seconds} secondes restantes`}>
+      <svg width="76" height="76" viewBox="0 0 76 76" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="38" cy="38" r={r} fill="none" stroke={themed ? 'rgba(255,255,255,0.18)' : '#eaedf6'} strokeWidth="6" />
+        <circle
+          cx="38"
+          cy="38"
+          r={r}
+          fill="none"
+          stroke={low ? '#ff7a68' : '#6c7bf7'}
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - frac)}
+          style={{ transition: 'stroke-dashoffset 0.25s linear, stroke 0.3s' }}
+        />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 26, color: low ? '#ff7a68' : themed ? '#fff' : '#1f2440', textShadow: themed ? '0 0 10px rgba(0,0,0,0.7)' : undefined }}>
+        {seconds}
+      </div>
+    </div>
+  );
+}
+
 // Fond d'écran de l'équipe : image portrait/paysage selon l'orientation de l'appareil
 function TeamBackdrop({ bg }: { bg: TeamBg }) {
   const css =
@@ -152,6 +184,22 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [turnTeamId, setTurnTeamId] = useState<string | null>(null);
   const [kicked, setKicked] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // Décompte : calculé à partir de l'instant où CE téléphone reçoit la question (insensible aux horloges différentes)
+  const localStartRef = useRef<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!question) {
+      setSecondsLeft(null);
+      return;
+    }
+    const tick = () => {
+      if (localStartRef.current == null) return;
+      setSecondsLeft(Math.max(0, QUESTION_TIME_SECONDS - Math.floor((Date.now() - localStartRef.current) / 1000)));
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [question]);
 
   // Mode Camemberts
   const [categoryChoicePrompt, setCategoryChoicePrompt] = useState<{
@@ -279,6 +327,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     channel.on('broadcast', { event: 'question:show' }, ({ payload }) => {
       setQuestion(payload.question);
       setQuestionStartedAt(payload.startedAt);
+      localStartRef.current = Date.now();
       setHasAnswered(false);
       setTurnTeamId(payload.turnTeamId ?? null);
       setCamembertCategory(payload.camembertCategory ?? null);
@@ -602,6 +651,8 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       {submitError && (
         <p style={{ textAlign: 'center', color: '#ff7a68', fontSize: 13, marginBottom: 12 }}>{submitError}</p>
       )}
+
+      {secondsLeft !== null && <CountdownRing seconds={secondsLeft} themed={!!teamBg} />}
 
       {hasAnswered ? (
         <p style={{ textAlign: 'center', fontWeight: 800, fontSize: 18 }}>Réponse envoyée ✓</p>

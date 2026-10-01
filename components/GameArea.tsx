@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
 import CockpitPlate from '@/components/CockpitPlate';
 import CockpitCrawl from '@/components/CockpitCrawl';
-import CockpitMsgBox from '@/components/CockpitMsgBox';
+import CockpitMsgBox, { CockpitFrameWindow } from '@/components/CockpitMsgBox';
 import CockpitTicker from '@/components/CockpitTicker';
 import {
   scoreClassique,
@@ -907,9 +907,10 @@ export default function GameArea({
       {cockpit && showQuitConfirm && (
         <CockpitMsgBox
           title="Terminer la partie ?"
-          validateLabel="Garder les scores"
-          onValidate={quitKeepingScores}
-          extra={[{ label: 'Remettre à zéro', onClick: quitResettingScores }]}
+          actions={[
+            { label: 'Garder les scores', onClick: quitKeepingScores },
+            { label: 'Remettre à zéro', onClick: quitResettingScores },
+          ]}
           cancelLabel="Annuler"
           onCancel={() => setShowQuitConfirm(false)}
         >
@@ -1207,25 +1208,14 @@ export default function GameArea({
       )}
 
       {cockpit && showProgressTable && (
-        <div
-          onClick={() => setShowProgressTable(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(2,5,25,0.68)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ position: 'relative', width: '76cqw', aspectRatio: '1400 / 788', backgroundImage: 'url(/ui/frame-espace.webp)', backgroundSize: '100% 100%', color: '#e8eeff' }}
-          >
-            <div style={{ position: 'absolute', left: '6%', right: '6%', top: '9%', bottom: '9%', display: 'flex', flexDirection: 'column', gap: '0.8cqw' }}>
-              <div style={{ fontSize: '1.9cqw', fontWeight: 800, color: '#fff', textShadow: '0 0 1cqw rgba(90,160,255,0.9)' }}>📈 Progression des camemberts</div>
-              <div className="ck-scroll" style={{ flex: 1, overflow: 'auto', background: 'rgba(3,8,35,0.62)', borderRadius: '1cqw', padding: '0.8cqw' }}>
-                {progressTable}
-              </div>
-            </div>
-            <div style={{ position: 'absolute', right: '2.4%', bottom: '3.4%' }}>
-              <CockpitPlate id="annuler" label="Fermer" tipSide="above" onClick={() => setShowProgressTable(false)} height={4} />
+        <CockpitFrameWindow frame="espace" width="76cqw" closeId="progression" closeLabel="Fermer la progression" onClose={() => setShowProgressTable(false)}>
+          <div style={{ position: 'absolute', left: '6%', right: '6%', top: '9%', bottom: '9%', display: 'flex', flexDirection: 'column', gap: '0.8cqw' }}>
+            <div style={{ fontSize: '1.9cqw', fontWeight: 800, color: '#fff', textShadow: '0 0 1cqw rgba(90,160,255,0.9)' }}>📈 Progression des camemberts</div>
+            <div className="ck-scroll" style={{ flex: 1, overflow: 'auto', background: 'rgba(3,8,35,0.8)', borderRadius: '1cqw', padding: '0.8cqw' }}>
+              {progressTable}
             </div>
           </div>
-        </div>
+        </CockpitFrameWindow>
       )}
 
       {!cockpit && showProgressTable && (

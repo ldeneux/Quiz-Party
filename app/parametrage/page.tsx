@@ -273,17 +273,17 @@ export default function ParametragePage() {
         minHeight: '100vh',
         padding: '28px 40px',
         backgroundColor: '#050818',
-        backgroundImage: 'linear-gradient(rgba(3,6,20,0.25), rgba(3,6,20,0.45)), url(/bg/parametrage.webp)',
+        backgroundImage: 'linear-gradient(rgba(3,6,20,0.1), rgba(3,6,20,0.3)), url(/bg/parametrage.webp)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',
       }}
     >
-      {/* Panneau clair translucide : garde les cartes et textes lisibles sur le décor */}
-      <div style={{ maxWidth: 1180, margin: '0 auto', background: 'rgba(244,246,251,0.94)', borderRadius: 24, padding: '24px 32px 40px', boxShadow: '0 0 60px rgba(40,90,220,0.45)' }}>
-      <a href="/" style={{ color: '#7a819c', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>← Retour</a>
+      {/* Les cartes blanches se détachent du décor ; le titre et le lien restent lisibles par-dessus */}
+      <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+      <a href="/" style={{ color: '#cfe0ff', fontWeight: 700, fontSize: 14, textDecoration: 'none', textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>← Retour</a>
 
-      <h1 style={{ fontSize: 22, fontWeight: 800, margin: '16px 0 24px' }}>⚙️ Paramétrage</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, margin: '16px 0 24px', color: '#fff', textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}>⚙️ Paramétrage</h1>
 
       {loadNotice && (
         <p style={{ color: '#ff7a68', fontSize: 13, marginBottom: 16, maxWidth: 600 }}>{loadNotice}</p>
