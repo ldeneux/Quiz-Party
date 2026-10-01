@@ -30,7 +30,7 @@ export default function CockpitPlate({ id, label, hint, onClick, href, disabled 
     // « suivante » reprend l'identifiant de « fusee » : même emplacement, même raccourci (Espace)
     id: id === 'suivante' ? 'ck-fusee' : `ck-${id}`,
     className: `ck-plate${pulse && !disabled ? ' ck-pulse' : ''}`,
-    style: { width: `${(height * (def.scale ?? 1) * def.ratio).toFixed(2)}cqw`, cursor: disabled ? 'not-allowed' : 'pointer' } as React.CSSProperties,
+    style: { width: `${(height * (def.scale ?? 1) * def.ratio).toFixed(2)}cqw`, cursor: disabled ? 'not-allowed' : 'pointer', ...def.boxStyle } as React.CSSProperties,
     'aria-label': label,
     'aria-disabled': disabled,
     onMouseEnter: () => setShow(true),

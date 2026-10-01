@@ -573,7 +573,7 @@ export default function ConsolePage() {
         )}
 
         {/* Hublot : menu des modes (planètes) ou écran de jeu */}
-        <div style={{ position: 'absolute', ...rectStyle(theme.zones.hub), boxSizing: 'border-box' }}>
+        <div style={{ position: 'absolute', ...rectStyle(theme.zones.hub), boxSizing: 'border-box', ...theme.hubStyle }}>
           {!gameStarted ? (
             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end' }}>

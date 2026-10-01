@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 // Habillages (thèmes) de l'écran d'accueil de l'animateur.
 // Un thème = une image de fond + les zones où se placent les écrans (en % de l'image)
 // + les images des modes (« planètes ») et des boutons (« plates »).
@@ -26,6 +28,7 @@ export type PlateDef = {
   src: string | null; // null = pas d'image (le décor porte déjà le cadre), seul le contenu est affiché
   ratio: number; // largeur / hauteur de l'image
   scale?: number; // multiplicateur de la hauteur demandée (défaut 1)
+  boxStyle?: CSSProperties; // habillage CSS du bouton lui-même (utile quand il n'y a pas d'image)
 };
 
 export type FrameDef = { src: string; ratio: number; width: number /* en cqw */ };
@@ -46,6 +49,7 @@ export type Theme = {
     bar: Rect; // pupitre des boutons
     profile: { left: number; top: number }; // bandeau du profil : centre horizontal et haut, en %
   };
+  hubStyle?: CSSProperties; // fond du hublot central quand le décor n'en fournit pas
   joinPadTop: number; // cqw : espace au-dessus du QR
   qrWidth: number; // cqw
   bar: { background: string; border: string; boxShadow: string };
@@ -165,56 +169,58 @@ const jungle: Theme = {
 
 // ───────────────────────── Fonds marins ─────────────────────────
 const M = '/themes/marins';
-const mIcon = (name: string, ratio: number, scale = 1.45): PlateDef => ({ src: `${M}/icons/${name}.webp`, ratio, scale });
+const mIcon = (name: string, ratio = 1, scale = 1.3): PlateDef => ({ src: `${M}/icons/${name}.webp`, ratio, scale });
+const marinGlass = {
+  background: 'linear-gradient(180deg, rgba(4,26,54,0.72), rgba(3,16,38,0.8))',
+  border: '2px solid rgba(90,210,255,0.6)',
+  boxShadow: '0 0 2cqw rgba(40,170,255,0.35), inset 0 0 1.4cqw rgba(120,220,255,0.18)',
+};
 
 const marins: Theme = {
   id: 'marins',
   label: 'Fonds marins',
   emoji: '🐠',
-  description: 'Un cockpit d’avion englouti : épave, poissons, pieuvre et ruines sous-marines.',
+  description: 'Une cité engloutie, des rayons de lumière et des récifs colorés.',
   preview: `${M}/preview.webp`,
-  stage: { src: `${M}/stage.webp`, ratio: 1536 / 1024, bg: '#020a14' },
+  stage: { src: `${M}/stage.webp`, ratio: 1672 / 941, bg: '#04223f' },
   zones: {
-    teams: { left: 3.7, top: 34.2, width: 14.4, height: 26.9 },
-    teamCount: { left: 3.6, top: 63.8, width: 14.6, height: 3.4 },
-    join: { left: 82, top: 34.2, width: 14.2, height: 27.5 },
-    code: { left: 81.9, top: 63.8, width: 14.4, height: 3.4 },
-    hub: { left: 24.7, top: 37.5, width: 50.6, height: 25.7 },
-    bar: { left: 22, top: 80, width: 56, height: 15 },
-    profile: { left: 49.5, top: 7.9 },
+    teams: { left: 3.1, top: 30, width: 14.2, height: 29 },
+    teamCount: { left: 3.1, top: 60.3, width: 14.2, height: 3.6 },
+    join: { left: 82.8, top: 30, width: 14.2, height: 29.5 },
+    code: { left: 82.8, top: 61, width: 14.2, height: 3.6 },
+    hub: { left: 22, top: 17, width: 56, height: 36 },
+    bar: { left: 19, top: 82.5, width: 62, height: 14.5 },
+    profile: { left: 50, top: 3.5 },
   },
+  // Le décor n'a pas de grand écran central : on pose un panneau vitré par-dessus la scène
+  hubStyle: { ...marinGlass, borderRadius: '2.2cqw', backdropFilter: 'blur(3px)' },
   joinPadTop: 2.2,
   qrWidth: 8.6,
-  bar: {
-    background: 'linear-gradient(180deg, rgba(2,14,28,0.5), rgba(1,8,18,0.75))',
-    border: '1px solid rgba(90,200,255,0.4)',
-    boxShadow: '0 0 1.5cqw rgba(40,160,255,0.28), inset 0 0.1cqw 0.3cqw rgba(160,225,255,0.2)',
-  },
+  bar: { ...marinGlass, background: 'linear-gradient(180deg, rgba(4,26,54,0.62), rgba(3,16,38,0.78))' },
   planets: {
-    classique: { src: `${M}/icons/porte.webp`, width: 6.9 },
-    defi: { src: `${M}/icons/trophee.webp`, width: 6.7 },
-    survie: { src: `${M}/icons/tente.webp`, width: 7.5 },
-    participatif: { src: `${M}/icons/dauphins.webp`, width: 7.7 },
-    camembert: { src: `${M}/icons/tresor.webp`, width: 8.1 },
+    classique: { src: `${M}/icons/ancre.webp`, width: 8.0 },
+    defi: { src: `${M}/icons/requin.webp`, width: 9.5 },
+    survie: { src: `${M}/icons/bouteille.webp`, width: 8.5 },
+    participatif: { src: `${M}/icons/poissons.webp`, width: 9.6 },
+    camembert: { src: `${M}/icons/nautile.webp`, width: 9.2 },
   },
   plates: {
-    fusee: mIcon('sousmarin', 0.852),
-    suivante: mIcon('boussole', 0.752),
-    stats: mIcon('carte', 0.709),
-    parametrage: mIcon('engrenage', 0.798),
-    progression: mIcon('ponton', 0.814),
-    nouvelle: mIcon('murene', 0.731),
-    quitter: mIcon('mine', 0.783),
-    valider: mIcon('coquillage', 0.754),
-    annuler: mIcon('harpons', 0.537),
-    // Provisoire : pas encore d'icône dédiée au plein écran
-    plein: mIcon('porte', 0.732),
-    // Le décor porte déjà le cadre du haut : on n'affiche que le nom du profil
-    profil: { src: null, ratio: 6.24, scale: 1.05 },
+    fusee: mIcon('plongeur', 0.982),
+    suivante: mIcon('harpon', 0.987),
+    stats: mIcon('nemo', 0.982),
+    parametrage: mIcon('oursin', 0.996),
+    progression: mIcon('coffre', 0.987),
+    nouvelle: mIcon('coquillage', 0.987),
+    quitter: mIcon('pieuvre', 0.996),
+    valider: mIcon('valider'),
+    annuler: mIcon('annuler'),
+    plein: mIcon('plein'),
+    // Pas de cadre dans le décor : le bandeau du profil est un panneau vitré
+    profil: { src: null, ratio: 6.2, boxStyle: { ...marinGlass, borderRadius: '1.6cqw' } },
   },
   frames: {
-    progress: { src: `${M}/frame.webp`, ratio: 860 / 330, width: 80 },
-    msg: { src: `${M}/frame.webp`, ratio: 860 / 330, width: 66 },
+    progress: { src: `${M}/frame.webp`, ratio: 1400 / 614, width: 80 },
+    msg: { src: `${M}/frame.webp`, ratio: 1400 / 614, width: 62 },
   },
 };
 
