@@ -772,7 +772,13 @@ export default function GameArea({
   if (phase === 'finished') {
     const ranked = [...teams].sort((a, b) => b.score - a.score);
     const winner = camembertWinnerId ? teams.find((t) => t.id === camembertWinnerId) : null;
+    const grayed = (el: HTMLElement | null, id: 'fusee' | 'progression' | 'quitter', label: string) =>
+      cockpit && el ? createPortal(<CockpitPlate id={id} label={label} hint="Partie terminée" disabled />, el) : null;
     return (
+      <>
+        {grayed(rocketEl, 'fusee', 'Question suivante')}
+        {grayed(progressEl, 'progression', 'Voir la progression')}
+        {grayed(quitEl, 'quitter', 'Quitter la partie')}
       <div style={styles.mainCard}>
         <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🏁 Partie terminée</h2>
         {winner ? (
@@ -811,6 +817,7 @@ export default function GameArea({
           </div>
         )}
       </div>
+      </>
     );
   }
 
@@ -894,8 +901,7 @@ export default function GameArea({
           <CockpitPlate
             id="quitter"
             label="Quitter la partie"
-            hint={phase === 'finished' ? 'Partie terminée' : 'Garder ou remettre à zéro les scores'}
-            disabled={phase === 'finished'}
+            hint="Garder ou remettre à zéro les scores"
             onClick={() => setShowQuitConfirm(true)}
           />,
           quitEl
