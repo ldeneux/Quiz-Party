@@ -401,10 +401,9 @@ const inventions: Theme = {
 // ───────────────────────── Sciences ─────────────────────────
 const C_sciences = '/themes/sciences';
 const sciencesGlass = {
-  //background: 'linear-gradient(180deg, rgba(10,22,44,0.72), rgba(10,22,44,0.8))',
-  background: 'linear-gradient(180deg, rgba(34,20,8,0.72), rgba(24,13,5,0.8))',
-  border: '2px solid rgba(90,255,170,0.65)',
-  boxShadow: '0 0 2cqw rgba(90,255,170,0.28), inset 0 0 1.4cqw rgba(90,255,170,0.16)',
+background: 'linear-gradient(180deg, rgba(34,20,8,0.72), rgba(24,13,5,0.8))',
+  border: '2px solid rgba(235,180,70,0.7)',
+  boxShadow: '0 0 2cqw rgba(255,180,60,0.3), inset 0 0 1.4cqw rgba(255,210,120,0.18)',
 };
 
 const sciences: Theme = {
@@ -423,11 +422,15 @@ const sciences: Theme = {
     bar: { left: 19, top: 80, width: 62, height: 15 },
     profile: { left: 50, top: 3.2 },
   },
-  hubStyle: { background: 'linear-gradient(180deg, rgba(10,22,44,0.94), rgba(10,22,44,0.96))', border: '2px solid rgba(90,255,170,0.65)', borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(60,230,160,0.3)' },
-  sidePanelStyle: { background: 'rgba(10,22,44,0.94)', border: '1px solid rgba(90,255,170,0.55)', borderRadius: '0.8cqw' },
+  hubStyle: {
+    background: 'radial-gradient(ellipse at center, rgba(34,18,4,0.64) 0%, rgba(34,18,4,0.44) 55%, rgba(34,18,4,0) 100%)',
+    textShadow: '0 1px 4px rgba(20,8,0,0.95), 0 0 10px rgba(20,8,0,0.8)',
+  },
+  sidePanelStyle: { background: 'rgba(30,16,6,0.74)', border: '1px solid rgba(235,180,70,0.55)', borderRadius: '0.8cqw' },
   joinPadTop: 2.2,
   qrWidth: 8.6,
-  bar: { ...sciencesGlass, background: 'linear-gradient(180deg, rgba(10,22,44,0.62), rgba(10,22,44,0.78))' },
+  bar: { ...sciencesGlass, background: 'linear-gradient(180deg, rgba(34,20,8,0.6), rgba(24,13,5,0.78))' },
+  
   planets: {
     classique: { src: `${C_sciences}/icons/classique.webp`, width: 5.6 },
     defi: { src: `${C_sciences}/icons/defi.webp`, width: 9.1 },
@@ -446,13 +449,14 @@ const sciences: Theme = {
     plein: { src: `${C_sciences}/icons/plein.webp`, ratio: 1.0, scale: 1.3 },
     valider: { src: `${C_sciences}/icons/valider.webp`, ratio: 0.98, scale: 1.3 },
     annuler: { src: `${C_sciences}/icons/annuler.webp`, ratio: 0.979, scale: 1.3 },
-    profil: { src: null, ratio: 6.33, boxStyle: { ...sciencesGlass, borderRadius: '1.6cqw' } },
+      profil: { src: null, ratio: 6.2, boxStyle: { ...sciencesGlass, borderRadius: '1.6cqw' } },
   },
   frames: {
     progress: { src: `${C_sciences}/frame.webp`, ratio: 1400 / 614, width: 80 },
     msg: { src: `${C_sciences}/frame.webp`, ratio: 1400 / 614, width: 62 },
   },
 };
+
 
 // ───────────────────────── Centre de la Terre ─────────────────────────
 const C_terre = '/themes/terre';
