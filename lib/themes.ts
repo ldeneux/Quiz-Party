@@ -316,7 +316,7 @@ const art: Theme = {
     profile: { left: 50, top: 3.2 },
   },
 //  hubStyle: { background: 'linear-gradient(180deg, rgba(40,28,68,0.9), rgba(40,28,68,0.93))', border: '2px solid rgba(214,164,244,0.75)',
-  hubStyle: { background: 'transparent', color: '#00f3ff',textShadow: '0 1px 4px rgba(214,164,244,0.6)',border: 'none',
+  hubStyle: { background: 'transparent', color: '#ff007f',textShadow: '0 1px 4px rgba(214,164,244,0.6)',border: 'none',
   borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(190,130,230,0.35)' },
   //sidePanelStyle: { background: 'rgba(40,28,68,0.9)', border: '1px solid rgba(214,164,244,0.6)', borderRadius: '0.8cqw' },
   sidePanelStyle: { background: 'rgba(40,28,68,0.9)', textShadow: '0 1px 4px rgba(214,164,244,0.6)',border: 'transparent', borderRadius: '0.8cqw' },
