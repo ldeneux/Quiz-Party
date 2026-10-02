@@ -298,7 +298,7 @@ export default function ParametragePage() {
         <p style={{ color: '#7a819c', fontSize: 13, marginBottom: 16 }}>
           Choisis le décor et les boutons de l'écran de l'animateur. Le choix est mémorisé sur cet appareil.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
           {THEME_LIST.map((t) => {
             const selected = t.id === themeId;
             return (
@@ -317,7 +317,9 @@ export default function ParametragePage() {
                   fontFamily: 'inherit',
                 }}
               >
-                <img src={t.preview} alt="" draggable={false} style={{ width: '100%', display: 'block', borderRadius: 10, aspectRatio: '3 / 2', objectFit: 'cover' }} />
+                <div style={{ background: '#f1f3fa', borderRadius: 10, padding: 8 }}>
+                  <img src={t.preview} alt="" draggable={false} style={{ width: '100%', display: 'block', aspectRatio: '3 / 2', objectFit: 'contain' }} />
+                </div>
                 <div style={{ fontWeight: 800, fontSize: 14, marginTop: 8, color: '#1f2440' }}>
                   {t.emoji} {t.label} {selected && <span style={{ color: '#6c7bf7' }}>✓</span>}
                 </div>

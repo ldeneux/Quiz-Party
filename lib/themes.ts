@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react';
 // + les images des modes (« planètes ») et des boutons (« plates »).
 // Le thème « espace » reprend exactement l'habillage historique : rien ne change tant qu'on ne choisit pas autre chose.
 
-export type ThemeId = 'espace' | 'jungle' | 'marins' | 'egypte';
+export type ThemeId = 'espace' | 'jungle' | 'marins' | 'egypte' | 'art' | 'inventions' | 'sciences' | 'terre' | 'fantasy';
 export type ModeId = 'classique' | 'defi' | 'survie' | 'participatif' | 'camembert';
 
 export type PlateId =
@@ -114,57 +114,56 @@ const espace: Theme = {
 };
 
 // ───────────────────────── Jungle ─────────────────────────
-const J = '/themes/jungle';
-const jIcon = (name: string, ratio: number, scale = 1.45): PlateDef => ({ src: `${J}/icons/${name}.webp`, ratio, scale });
+const C_jungle = '/themes/jungle';
+const jungleGlass = {
+  background: 'linear-gradient(180deg, rgba(6,28,14,0.72), rgba(6,28,14,0.8))',
+  border: '2px solid rgba(160,230,110,0.65)',
+  boxShadow: '0 0 2cqw rgba(160,230,110,0.28), inset 0 0 1.4cqw rgba(160,230,110,0.16)',
+};
 
 const jungle: Theme = {
   id: 'jungle',
   label: 'Jungle',
   emoji: '🌴',
-  description: 'Un cockpit envahi par la jungle : lianes, perroquets et temples perdus.',
-  preview: `${J}/preview.webp`,
-  stage: { src: `${J}/stage.webp`, ratio: 1536 / 1024, bg: '#050d08' },
+  description: 'Un cockpit rouillé envahi par la jungle : lianes, toucan et temples perdus.',
+  preview: `${C_jungle}/preview.webp`,
+  stage: { src: `${C_jungle}/stage.webp`, ratio: 1.7768, bg: '#0a1a0c' },
   zones: {
-    teams: { left: 3.4, top: 23.8, width: 14.2, height: 33 },
-    teamCount: { left: 3.3, top: 60.6, width: 14.4, height: 3.6 },
-    join: { left: 82.6, top: 23.8, width: 14.2, height: 33 },
-    code: { left: 82.5, top: 60.6, width: 14.4, height: 3.6 },
-    hub: { left: 23.9, top: 30.6, width: 52.2, height: 29.8 },
-    bar: { left: 18, top: 78.5, width: 64, height: 15 },
-    profile: { left: 49.6, top: 5.5 },
+    teams: { left: 3.4, top: 49.5, width: 14, height: 24 },
+    teamCount: { left: 3.4, top: 74.4, width: 14, height: 3.5 },
+    join: { left: 82.9, top: 49.5, width: 13.8, height: 24.5 },
+    code: { left: 82.9, top: 74.4, width: 13.8, height: 3.5 },
+    hub: { left: 22, top: 14, width: 56, height: 42 },
+    bar: { left: 19, top: 82, width: 62, height: 15 },
+    profile: { left: 50, top: 3.2 },
   },
+  hubStyle: { background: 'radial-gradient(ellipse at center, rgba(6,28,12,0.6) 0%, rgba(6,28,12,0.36) 55%, rgba(6,28,12,0) 100%)', textShadow: '0 1px 4px rgba(0,20,4,0.95), 0 0 10px rgba(0,20,4,0.8)' },
   joinPadTop: 2.2,
   qrWidth: 8.6,
-  bar: {
-    background: 'linear-gradient(180deg, rgba(8,20,12,0.5), rgba(4,10,6,0.72))',
-    border: '1px solid rgba(255,190,90,0.4)',
-    boxShadow: '0 0 1.5cqw rgba(255,160,40,0.25), inset 0 0.1cqw 0.3cqw rgba(255,220,150,0.2)',
-  },
+  bar: { ...jungleGlass, background: 'linear-gradient(180deg, rgba(6,28,14,0.62), rgba(6,28,14,0.78))' },
   planets: {
-    classique: { src: `${J}/icons/pyramide.webp`, width: 7.6 },
-    defi: { src: `${J}/icons/trophee.webp`, width: 7.5 },
-    survie: { src: `${J}/icons/feu.webp`, width: 7.7 },
-    participatif: { src: `${J}/icons/masques.webp`, width: 8.9 },
-    camembert: { src: `${J}/icons/tresor.webp`, width: 7.8 },
+    classique: { src: `${C_jungle}/icons/classique.webp`, width: 7.9 },
+    defi: { src: `${C_jungle}/icons/defi.webp`, width: 8.5 },
+    survie: { src: `${C_jungle}/icons/survie.webp`, width: 9.2 },
+    participatif: { src: `${C_jungle}/icons/participatif.webp`, width: 8.6 },
+    camembert: { src: `${C_jungle}/icons/camembert.webp`, width: 8.6 },
   },
   plates: {
-    fusee: jIcon('arc', 0.878),
-    suivante: jIcon('boussole', 0.841),
-    stats: jIcon('carte', 0.913),
-    parametrage: jIcon('engrenage', 0.762),
-    progression: jIcon('pont', 1.043),
-    nouvelle: jIcon('serpent', 0.753),
-    quitter: jIcon('piege', 0.971),
-    // Provisoire : pas encore d'icône dédiée pour ces trois-là
-    plein: jIcon('pyramide', 0.743),
-    valider: jIcon('trophee', 0.739),
-    annuler: jIcon('piege', 0.971),
-    // Le décor porte déjà le cadre du haut : on n'affiche que le nom du profil
-    profil: { src: null, ratio: 6.23, scale: 1.08 },
+    fusee: { src: `${C_jungle}/icons/fusee.webp`, ratio: 0.957, scale: 1.3 },
+    suivante: { src: `${C_jungle}/icons/suivante.webp`, ratio: 0.903, scale: 1.3 },
+    stats: { src: `${C_jungle}/icons/stats.webp`, ratio: 0.942, scale: 1.3 },
+    parametrage: { src: `${C_jungle}/icons/parametrage.webp`, ratio: 0.942, scale: 1.3 },
+    progression: { src: `${C_jungle}/icons/progression.webp`, ratio: 0.977, scale: 1.3 },
+    nouvelle: { src: `${C_jungle}/icons/nouvelle.webp`, ratio: 0.973, scale: 1.3 },
+    quitter: { src: `${C_jungle}/icons/quitter.webp`, ratio: 1.0, scale: 1.3 },
+    plein: { src: `${C_jungle}/icons/plein.webp`, ratio: 1.0, scale: 1.3 },
+    valider: { src: `${C_jungle}/icons/valider.webp`, ratio: 0.955, scale: 1.3 },
+    annuler: { src: `${C_jungle}/icons/annuler.webp`, ratio: 1.0, scale: 1.3 },
+    profil: { src: null, ratio: 6.33, boxStyle: { ...jungleGlass, borderRadius: '1.6cqw' } },
   },
   frames: {
-    progress: { src: `${J}/frame.webp`, ratio: 899 / 394, width: 82 },
-    msg: { src: `${J}/frame.webp`, ratio: 899 / 394, width: 62 },
+    progress: { src: `${C_jungle}/frame.webp`, ratio: 1400 / 614, width: 80 },
+    msg: { src: `${C_jungle}/frame.webp`, ratio: 1400 / 614, width: 62 },
   },
 };
 
@@ -289,7 +288,282 @@ const egypte: Theme = {
   },
 };
 
-export const THEMES: Record<ThemeId, Theme> = { espace, jungle, marins, egypte };
-export const THEME_LIST: Theme[] = [espace, jungle, marins, egypte];
+// ───────────────────────── Arts ─────────────────────────
+const C_art = '/themes/art';
+const artGlass = {
+  background: 'linear-gradient(180deg, rgba(40,28,68,0.72), rgba(40,28,68,0.8))',
+  border: '2px solid rgba(214,164,244,0.65)',
+  boxShadow: '0 0 2cqw rgba(214,164,244,0.28), inset 0 0 1.4cqw rgba(214,164,244,0.16)',
+};
+
+const art: Theme = {
+  id: 'art',
+  label: 'Arts',
+  emoji: '🎨',
+  description: 'Un atelier de peintre lumineux : chevalet, palette et statues antiques.',
+  preview: `${C_art}/preview.webp`,
+  stage: { src: `${C_art}/stage.webp`, ratio: 1.7917, bg: '#efe3cf' },
+  zones: {
+    teams: { left: 9.4, top: 17.5, width: 12.3, height: 50 },
+    teamCount: { left: 9.4, top: 69.2, width: 12.3, height: 4.8 },
+    join: { left: 83.2, top: 20.5, width: 10.7, height: 31 },
+    code: { left: 83.2, top: 52, width: 10.7, height: 5.6 },
+    hub: { left: 24, top: 17, width: 52, height: 50 },
+    bar: { left: 19, top: 82, width: 62, height: 15 },
+    profile: { left: 50, top: 3.2 },
+  },
+  hubStyle: { background: 'linear-gradient(180deg, rgba(40,28,68,0.9), rgba(40,28,68,0.93))', border: '2px solid rgba(214,164,244,0.75)', borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(190,130,230,0.35)' },
+  sidePanelStyle: { background: 'rgba(40,28,68,0.9)', border: '1px solid rgba(214,164,244,0.6)', borderRadius: '0.8cqw' },
+  joinPadTop: 1.6,
+  qrWidth: 7,
+  bar: { ...artGlass, background: 'linear-gradient(180deg, rgba(40,28,68,0.62), rgba(40,28,68,0.78))' },
+  planets: {
+    classique: { src: `${C_art}/icons/classique.webp`, width: 8.1 },
+    defi: { src: `${C_art}/icons/defi.webp`, width: 8.1 },
+    survie: { src: `${C_art}/icons/survie.webp`, width: 8.1 },
+    participatif: { src: `${C_art}/icons/participatif.webp`, width: 8.1 },
+    camembert: { src: `${C_art}/icons/camembert.webp`, width: 8.1 },
+  },
+  plates: {
+    fusee: { src: `${C_art}/icons/fusee.webp`, ratio: 0.991, scale: 1.3 },
+    suivante: { src: `${C_art}/icons/suivante.webp`, ratio: 0.991, scale: 1.3 },
+    stats: { src: `${C_art}/icons/stats.webp`, ratio: 0.983, scale: 1.3 },
+    parametrage: { src: `${C_art}/icons/parametrage.webp`, ratio: 0.987, scale: 1.3 },
+    progression: { src: `${C_art}/icons/progression.webp`, ratio: 0.992, scale: 1.3 },
+    nouvelle: { src: `${C_art}/icons/nouvelle.webp`, ratio: 0.987, scale: 1.3 },
+    quitter: { src: `${C_art}/icons/quitter.webp`, ratio: 0.987, scale: 1.3 },
+    plein: { src: `${C_art}/icons/plein.webp`, ratio: 1.0, scale: 1.3 },
+    valider: { src: `${C_art}/icons/valider.webp`, ratio: 0.992, scale: 1.3 },
+    annuler: { src: `${C_art}/icons/annuler.webp`, ratio: 1.0, scale: 1.3 },
+    profil: { src: null, ratio: 6.33, boxStyle: { ...artGlass, borderRadius: '1.6cqw' } },
+  },
+  frames: {
+    progress: { src: `${C_art}/frame.webp`, ratio: 1400 / 614, width: 80 },
+    msg: { src: `${C_art}/frame.webp`, ratio: 1400 / 614, width: 62 },
+  },
+};
+
+// ───────────────────────── Inventions ─────────────────────────
+const C_inventions = '/themes/inventions';
+const inventionsGlass = {
+  background: 'linear-gradient(180deg, rgba(36,22,10,0.72), rgba(36,22,10,0.8))',
+  border: '2px solid rgba(220,150,70,0.65)',
+  boxShadow: '0 0 2cqw rgba(220,150,70,0.28), inset 0 0 1.4cqw rgba(220,150,70,0.16)',
+};
+
+const inventions: Theme = {
+  id: 'inventions',
+  label: 'Inventions',
+  emoji: '⚙️',
+  description: 'Un atelier steampunk : engrenages, tuyaux de cuivre et éclairs.',
+  preview: `${C_inventions}/preview.webp`,
+  stage: { src: `${C_inventions}/stage.webp`, ratio: 1.7917, bg: '#241608' },
+  zones: {
+    teams: { left: 8.2, top: 30.5, width: 12.4, height: 28 },
+    teamCount: { left: 8.2, top: 60, width: 12.4, height: 4.6 },
+    join: { left: 79, top: 34.8, width: 13.8, height: 25 },
+    code: { left: 79, top: 60.2, width: 13.8, height: 4.6 },
+    hub: { left: 24, top: 20, width: 52, height: 46 },
+    bar: { left: 19, top: 82, width: 62, height: 15 },
+    profile: { left: 50, top: 3.2 },
+  },
+  hubStyle: { background: 'radial-gradient(ellipse at center, rgba(32,18,6,0.8) 0%, rgba(32,18,6,0.52) 55%, rgba(32,18,6,0) 100%)', textShadow: '0 1px 4px rgba(20,8,0,0.95), 0 0 10px rgba(20,8,0,0.8)' },
+  sidePanelStyle: { background: 'rgba(36,22,10,0.84)', border: '1px solid rgba(220,150,70,0.6)', borderRadius: '0.8cqw' },
+  joinPadTop: 2.2,
+  qrWidth: 8,
+  bar: { ...inventionsGlass, background: 'linear-gradient(180deg, rgba(36,22,10,0.62), rgba(36,22,10,0.78))' },
+  planets: {
+    classique: { src: `${C_inventions}/icons/classique.webp`, width: 7.4 },
+    defi: { src: `${C_inventions}/icons/defi.webp`, width: 7.8 },
+    survie: { src: `${C_inventions}/icons/survie.webp`, width: 8.6 },
+    participatif: { src: `${C_inventions}/icons/participatif.webp`, width: 8.1 },
+    camembert: { src: `${C_inventions}/icons/camembert.webp`, width: 8.5 },
+  },
+  plates: {
+    fusee: { src: `${C_inventions}/icons/fusee.webp`, ratio: 0.984, scale: 1.3 },
+    suivante: { src: `${C_inventions}/icons/suivante.webp`, ratio: 0.933, scale: 1.3 },
+    stats: { src: `${C_inventions}/icons/stats.webp`, ratio: 1.004, scale: 1.3 },
+    parametrage: { src: `${C_inventions}/icons/parametrage.webp`, ratio: 0.983, scale: 1.3 },
+    progression: { src: `${C_inventions}/icons/progression.webp`, ratio: 0.979, scale: 1.3 },
+    nouvelle: { src: `${C_inventions}/icons/nouvelle.webp`, ratio: 0.988, scale: 1.3 },
+    quitter: { src: `${C_inventions}/icons/quitter.webp`, ratio: 0.975, scale: 1.3 },
+    plein: { src: `${C_inventions}/icons/plein.webp`, ratio: 1.0, scale: 1.3 },
+    valider: { src: `${C_inventions}/icons/valider.webp`, ratio: 0.96, scale: 1.3 },
+    annuler: { src: `${C_inventions}/icons/annuler.webp`, ratio: 1.0, scale: 1.3 },
+    profil: { src: null, ratio: 6.33, boxStyle: { ...inventionsGlass, borderRadius: '1.6cqw' } },
+  },
+  frames: {
+    progress: { src: `${C_inventions}/frame.webp`, ratio: 1400 / 614, width: 80 },
+    msg: { src: `${C_inventions}/frame.webp`, ratio: 1400 / 614, width: 62 },
+  },
+};
+
+// ───────────────────────── Sciences ─────────────────────────
+const C_sciences = '/themes/sciences';
+const sciencesGlass = {
+  background: 'linear-gradient(180deg, rgba(10,22,44,0.72), rgba(10,22,44,0.8))',
+  border: '2px solid rgba(90,255,170,0.65)',
+  boxShadow: '0 0 2cqw rgba(90,255,170,0.28), inset 0 0 1.4cqw rgba(90,255,170,0.16)',
+};
+
+const sciences: Theme = {
+  id: 'sciences',
+  label: 'Sciences',
+  emoji: '🧪',
+  description: 'Un laboratoire aux couleurs néon. (Fond blanc provisoire.)',
+  preview: `${C_sciences}/preview.webp`,
+  stage: { src: '/themes/blanc/stage.webp', ratio: 1.7768, bg: '#ffffff' },
+  zones: {
+    teams: { left: 3, top: 20, width: 15, height: 38 },
+    teamCount: { left: 3, top: 60, width: 15, height: 4 },
+    join: { left: 82, top: 20, width: 15, height: 38 },
+    code: { left: 82, top: 60, width: 15, height: 4 },
+    hub: { left: 22, top: 14, width: 56, height: 44 },
+    bar: { left: 19, top: 80, width: 62, height: 15 },
+    profile: { left: 50, top: 3.2 },
+  },
+  hubStyle: { background: 'linear-gradient(180deg, rgba(10,22,44,0.94), rgba(10,22,44,0.96))', border: '2px solid rgba(90,255,170,0.65)', borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(60,230,160,0.3)' },
+  sidePanelStyle: { background: 'rgba(10,22,44,0.94)', border: '1px solid rgba(90,255,170,0.55)', borderRadius: '0.8cqw' },
+  joinPadTop: 2.2,
+  qrWidth: 8.6,
+  bar: { ...sciencesGlass, background: 'linear-gradient(180deg, rgba(10,22,44,0.62), rgba(10,22,44,0.78))' },
+  planets: {
+    classique: { src: `${C_sciences}/icons/classique.webp`, width: 5.6 },
+    defi: { src: `${C_sciences}/icons/defi.webp`, width: 9.1 },
+    survie: { src: `${C_sciences}/icons/survie.webp`, width: 9.3 },
+    participatif: { src: `${C_sciences}/icons/participatif.webp`, width: 9.3 },
+    camembert: { src: `${C_sciences}/icons/camembert.webp`, width: 8.9 },
+  },
+  plates: {
+    fusee: { src: `${C_sciences}/icons/fusee.webp`, ratio: 0.992, scale: 1.3 },
+    suivante: { src: `${C_sciences}/icons/suivante.webp`, ratio: 0.996, scale: 1.3 },
+    stats: { src: `${C_sciences}/icons/stats.webp`, ratio: 0.979, scale: 1.3 },
+    parametrage: { src: `${C_sciences}/icons/parametrage.webp`, ratio: 0.975, scale: 1.3 },
+    progression: { src: `${C_sciences}/icons/progression.webp`, ratio: 0.983, scale: 1.3 },
+    nouvelle: { src: `${C_sciences}/icons/nouvelle.webp`, ratio: 1.009, scale: 1.3 },
+    quitter: { src: `${C_sciences}/icons/quitter.webp`, ratio: 0.979, scale: 1.3 },
+    plein: { src: `${C_sciences}/icons/plein.webp`, ratio: 1.0, scale: 1.3 },
+    valider: { src: `${C_sciences}/icons/valider.webp`, ratio: 0.98, scale: 1.3 },
+    annuler: { src: `${C_sciences}/icons/annuler.webp`, ratio: 0.979, scale: 1.3 },
+    profil: { src: null, ratio: 6.33, boxStyle: { ...sciencesGlass, borderRadius: '1.6cqw' } },
+  },
+  frames: {
+    progress: { src: `${C_sciences}/frame.webp`, ratio: 1400 / 614, width: 80 },
+    msg: { src: `${C_sciences}/frame.webp`, ratio: 1400 / 614, width: 62 },
+  },
+};
+
+// ───────────────────────── Centre de la Terre ─────────────────────────
+const C_terre = '/themes/terre';
+const terreGlass = {
+  background: 'linear-gradient(180deg, rgba(34,14,6,0.72), rgba(34,14,6,0.8))',
+  border: '2px solid rgba(255,150,50,0.65)',
+  boxShadow: '0 0 2cqw rgba(255,150,50,0.28), inset 0 0 1.4cqw rgba(255,150,50,0.16)',
+};
+
+const terre: Theme = {
+  id: 'terre',
+  label: 'Centre de la Terre',
+  emoji: '🌋',
+  description: 'Grottes, lave et cristaux. (Fond blanc provisoire.)',
+  preview: `${C_terre}/preview.webp`,
+  stage: { src: '/themes/blanc/stage.webp', ratio: 1.7768, bg: '#ffffff' },
+  zones: {
+    teams: { left: 3, top: 20, width: 15, height: 38 },
+    teamCount: { left: 3, top: 60, width: 15, height: 4 },
+    join: { left: 82, top: 20, width: 15, height: 38 },
+    code: { left: 82, top: 60, width: 15, height: 4 },
+    hub: { left: 22, top: 14, width: 56, height: 44 },
+    bar: { left: 19, top: 80, width: 62, height: 15 },
+    profile: { left: 50, top: 3.2 },
+  },
+  hubStyle: { background: 'linear-gradient(180deg, rgba(34,14,6,0.94), rgba(34,14,6,0.96))', border: '2px solid rgba(255,150,50,0.65)', borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(255,120,30,0.3)' },
+  sidePanelStyle: { background: 'rgba(34,14,6,0.94)', border: '1px solid rgba(255,150,50,0.55)', borderRadius: '0.8cqw' },
+  joinPadTop: 2.2,
+  qrWidth: 8.6,
+  bar: { ...terreGlass, background: 'linear-gradient(180deg, rgba(34,14,6,0.62), rgba(34,14,6,0.78))' },
+  planets: {
+    classique: { src: `${C_terre}/icons/classique.webp`, width: 7.4 },
+    defi: { src: `${C_terre}/icons/defi.webp`, width: 7.9 },
+    survie: { src: `${C_terre}/icons/survie.webp`, width: 8.8 },
+    participatif: { src: `${C_terre}/icons/participatif.webp`, width: 9.7 },
+    camembert: { src: `${C_terre}/icons/camembert.webp`, width: 9.0 },
+  },
+  plates: {
+    fusee: { src: `${C_terre}/icons/fusee.webp`, ratio: 0.991, scale: 1.3 },
+    suivante: { src: `${C_terre}/icons/suivante.webp`, ratio: 1.009, scale: 1.3 },
+    stats: { src: `${C_terre}/icons/stats.webp`, ratio: 0.987, scale: 1.3 },
+    parametrage: { src: `${C_terre}/icons/parametrage.webp`, ratio: 0.979, scale: 1.3 },
+    progression: { src: `${C_terre}/icons/progression.webp`, ratio: 0.973, scale: 1.3 },
+    nouvelle: { src: `${C_terre}/icons/nouvelle.webp`, ratio: 0.987, scale: 1.3 },
+    quitter: { src: `${C_terre}/icons/quitter.webp`, ratio: 0.979, scale: 1.3 },
+    plein: { src: `${C_terre}/icons/plein.webp`, ratio: 1.0, scale: 1.3 },
+    valider: { src: `${C_terre}/icons/valider.webp`, ratio: 0.839, scale: 1.3 },
+    annuler: { src: `${C_terre}/icons/annuler.webp`, ratio: 0.936, scale: 1.3 },
+    profil: { src: null, ratio: 6.33, boxStyle: { ...terreGlass, borderRadius: '1.6cqw' } },
+  },
+  frames: {
+    progress: { src: `${C_terre}/frame.webp`, ratio: 1400 / 614, width: 80 },
+    msg: { src: `${C_terre}/frame.webp`, ratio: 1400 / 614, width: 62 },
+  },
+};
+
+// ───────────────────────── Fantasy ─────────────────────────
+const C_fantasy = '/themes/fantasy';
+const fantasyGlass = {
+  background: 'linear-gradient(180deg, rgba(24,12,48,0.72), rgba(24,12,48,0.8))',
+  border: '2px solid rgba(200,150,255,0.65)',
+  boxShadow: '0 0 2cqw rgba(200,150,255,0.28), inset 0 0 1.4cqw rgba(200,150,255,0.16)',
+};
+
+const fantasy: Theme = {
+  id: 'fantasy',
+  label: 'Fantasy',
+  emoji: '🐉',
+  description: 'Un royaume enchanté : dragon, licorne et ruines flottantes.',
+  preview: `${C_fantasy}/preview.webp`,
+  stage: { src: `${C_fantasy}/stage.webp`, ratio: 1.7917, bg: '#1a1038' },
+  zones: {
+    teams: { left: 11, top: 31.5, width: 9.8, height: 28 },
+    teamCount: { left: 11, top: 60.5, width: 9.8, height: 3.8 },
+    join: { left: 79, top: 34.8, width: 13.8, height: 25 },
+    code: { left: 79, top: 60.2, width: 13.8, height: 4.6 },
+    hub: { left: 25, top: 22, width: 52, height: 46 },
+    bar: { left: 19, top: 82, width: 62, height: 15 },
+    profile: { left: 50, top: 3.2 },
+  },
+  hubStyle: { background: 'radial-gradient(ellipse at center, rgba(22,10,48,0.8) 0%, rgba(22,10,48,0.52) 55%, rgba(22,10,48,0) 100%)', textShadow: '0 1px 4px rgba(10,0,30,0.95), 0 0 10px rgba(10,0,30,0.8)' },
+  sidePanelStyle: { background: 'rgba(24,12,48,0.82)', border: '1px solid rgba(200,150,255,0.6)', borderRadius: '0.8cqw' },
+  joinPadTop: 2.2,
+  qrWidth: 8,
+  bar: { ...fantasyGlass, background: 'linear-gradient(180deg, rgba(24,12,48,0.62), rgba(24,12,48,0.78))' },
+  planets: {
+    classique: { src: `${C_fantasy}/icons/classique.webp`, width: 7.9 },
+    defi: { src: `${C_fantasy}/icons/defi.webp`, width: 6.7 },
+    survie: { src: `${C_fantasy}/icons/survie.webp`, width: 8.6 },
+    participatif: { src: `${C_fantasy}/icons/participatif.webp`, width: 10.4 },
+    camembert: { src: `${C_fantasy}/icons/camembert.webp`, width: 9.0 },
+  },
+  plates: {
+    fusee: { src: `${C_fantasy}/icons/fusee.webp`, ratio: 0.847, scale: 1.3 },
+    suivante: { src: `${C_fantasy}/icons/suivante.webp`, ratio: 1.004, scale: 1.3 },
+    stats: { src: `${C_fantasy}/icons/stats.webp`, ratio: 0.992, scale: 1.3 },
+    parametrage: { src: `${C_fantasy}/icons/parametrage.webp`, ratio: 0.979, scale: 1.3 },
+    progression: { src: `${C_fantasy}/icons/progression.webp`, ratio: 0.996, scale: 1.3 },
+    nouvelle: { src: `${C_fantasy}/icons/nouvelle.webp`, ratio: 1.215, scale: 1.3 },
+    quitter: { src: `${C_fantasy}/icons/quitter.webp`, ratio: 0.983, scale: 1.3 },
+    plein: { src: `${C_fantasy}/icons/plein.webp`, ratio: 1.0, scale: 1.3 },
+    valider: { src: `${C_fantasy}/icons/valider.webp`, ratio: 0.847, scale: 1.3 },
+    annuler: { src: `${C_fantasy}/icons/annuler.webp`, ratio: 1.0, scale: 1.3 },
+    profil: { src: null, ratio: 6.33, boxStyle: { ...fantasyGlass, borderRadius: '1.6cqw' } },
+  },
+  frames: {
+    progress: { src: `${C_fantasy}/frame.webp`, ratio: 1400 / 614, width: 80 },
+    msg: { src: `${C_fantasy}/frame.webp`, ratio: 1400 / 614, width: 62 },
+  },
+};
+
+export const THEMES: Record<ThemeId, Theme> = { espace, jungle, marins, egypte, art, inventions, sciences, terre, fantasy };
+export const THEME_LIST: Theme[] = [espace, jungle, marins, egypte, art, inventions, sciences, terre, fantasy];
 export const DEFAULT_THEME_ID: ThemeId = 'espace';
 export const THEME_STORAGE_KEY = 'quiz-party-theme';
