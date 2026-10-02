@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { useTheme } from '@/lib/useTheme';
 
 const LEVELS = ['CP', 'CE1', 'CE2', 'CM1', 'CM2', 'ADO', 'ADULTE'];
 
@@ -10,6 +11,7 @@ type Category = { id: string; name: string; emoji: string };
 
 export default function NewGamePage() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<string[]>(['CM1']);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -43,7 +45,7 @@ export default function NewGamePage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        visualTheme: 'espace',
+        visualTheme: theme.id,
         levelIds: selectedLevels,
         categoryIds: selectedCategories, // vide = toutes les catégories
       }),

@@ -6,6 +6,7 @@ import GameArea from '@/components/GameArea';
 import { ckLed } from '@/lib/cockpitUi';
 import CockpitMsgBox from '@/components/CockpitMsgBox';
 import CockpitPlate from '@/components/CockpitPlate';
+import TeamAvatar from '@/components/TeamAvatar';
 import { PlateId, rectStyle } from '@/lib/themes';
 import { useTheme } from '@/lib/useTheme';
 import CockpitQR from '@/components/CockpitQR';
@@ -314,7 +315,7 @@ export default function ConsolePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mode: activeMode,
-        visualTheme: 'espace',
+        visualTheme: theme.id,
         levelIds: ['CM1'],
         categoryIds: [],
         profileId: selectedProfileId || null,
@@ -530,7 +531,7 @@ export default function ConsolePage() {
                 onMouseLeave={() => setTeamTip(null)}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.45cqw', borderLeft: `0.3cqw solid ${t.color}`, borderRadius: '0.5cqw', padding: '0.25cqw 0.5cqw', fontWeight: 700, fontSize: '1cqw', background: 'rgba(10,18,50,0.75)', cursor: 'pointer' }}
               >
-                <span>{t.avatar}</span>
+                <TeamAvatar avatar={t.avatar} size="1.7em" />
                 <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
               </div>
             ))}
@@ -684,7 +685,7 @@ export default function ConsolePage() {
         {/* Infobulle d'équipe (détails masqués dans la liste) */}
         {teamTip && (
           <div style={{ position: 'absolute', left: `${teamTip.left}%`, top: `${teamTip.top}%`, zIndex: 40, pointerEvents: 'none', padding: '0.5cqw 0.9cqw', borderRadius: '0.6cqw', background: 'rgba(4,9,36,0.97)', border: '1px solid rgba(120,175,255,0.75)', boxShadow: '0 0 1.2cqw rgba(60,120,255,0.55)', color: '#dfe9ff', fontSize: '0.95cqw', lineHeight: 1.45, whiteSpace: 'nowrap' }}>
-            <div style={{ fontWeight: 800 }}>{teamTip.t.avatar} {teamTip.t.name}</div>
+            <div style={{ fontWeight: 800 }}><TeamAvatar avatar={teamTip.t.avatar} /> {teamTip.t.name}</div>
             <div>{teamTip.t.score ?? 0} point{(teamTip.t.score ?? 0) > 1 ? 's' : ''}</div>
             {activeMode === 'camembert' && (
               <div>
@@ -710,7 +711,7 @@ export default function ConsolePage() {
             onCancel={() => setTeamAction(null)}
           >
             <span>
-              {teamAction.avatar} {teamAction.score ?? 0} point{(teamAction.score ?? 0) > 1 ? 's' : ''}
+              <TeamAvatar avatar={teamAction.avatar} /> {teamAction.score ?? 0} point{(teamAction.score ?? 0) > 1 ? 's' : ''}
             </span>
           </CockpitMsgBox>
         )}
@@ -791,7 +792,7 @@ export default function ConsolePage() {
                   ]) => (
                     <div key={teamId}>
                       <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
-                        {data.teamAvatar} {data.teamName}
+                        <TeamAvatar avatar={data.teamAvatar} /> {data.teamName}
                       </div>
                       {Object.keys(data.categories).length === 0 ? (
                         <p style={{ color: '#7a819c', fontSize: 12.5, marginLeft: 8 }}>Pas encore de réponse.</p>

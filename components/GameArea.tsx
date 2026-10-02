@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
 import { useTheme } from '@/lib/useTheme';
+import TeamAvatar from '@/components/TeamAvatar';
 import CockpitPlate from '@/components/CockpitPlate';
 import CockpitCrawl from '@/components/CockpitCrawl';
 import CockpitMsgBox from '@/components/CockpitMsgBox';
@@ -787,7 +788,7 @@ export default function GameArea({
         <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🏁 Partie terminée</h2>
         {winner ? (
           <p style={{ color: '#35c2a3', fontSize: 14, fontWeight: 700, marginBottom: 20 }}>
-            🥧 {winner.avatar} {winner.name} a complété tous ses camemberts !
+            🥧 <TeamAvatar avatar={winner.avatar} /> {winner.name} a complété tous ses camemberts !
           </p>
         ) : (
           <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 20 }}>Voici le classement final.</p>
@@ -796,7 +797,7 @@ export default function GameArea({
           {ranked.map((t, i) => (
             <div key={t.id} style={{ ...styles.teamTile, borderColor: i === 0 ? '#ffb648' : '#eaedf6' }}>
               {i === 0 ? '🏆 ' : `${i + 1}. `}
-              <span>{t.avatar}</span> {t.name} — <strong>{t.score} pts</strong>
+              <TeamAvatar avatar={t.avatar} /> {t.name} — <strong>{t.score} pts</strong>
               {mode === 'camembert' && (
                 <span style={{ marginLeft: 8, color: '#7a819c', fontSize: 12 }}>
                   ({(t.camembert_won ?? []).length}/{wedgeCategories.length} parts)
@@ -833,7 +834,7 @@ export default function GameArea({
                     <th style={{ textAlign: 'left', padding: 8 }}></th>
                     {teams.map((t) => (
                       <th key={t.id} style={{ padding: 8, fontWeight: 800, whiteSpace: 'nowrap' }}>
-                        {t.avatar} {t.name}
+                        <TeamAvatar avatar={t.avatar} /> {t.name}
                       </th>
                     ))}
                   </tr>
@@ -1140,7 +1141,7 @@ export default function GameArea({
                   {mode === 'defi' && t.id === challengerTeamId && <span title="Challenger">👑 </span>}
                   {mode === 'participatif' && t.id === participatifTurnTeamId && <span title="Son tour">🎙️ </span>}
                   {mode === 'camembert' && t.id === camembertChooserTeamId && <span title="Choisit la catégorie">🥧 </span>}
-                  <span>{t.avatar}</span> {t.name}
+                  <TeamAvatar avatar={t.avatar} /> {t.name}
                   {mode === 'survie' && (
                     <span style={{ marginLeft: 6, fontSize: 12 }}>
                       {(t.lives ?? 3) > 0 ? '❤️'.repeat(t.lives ?? 3) : '💀'}

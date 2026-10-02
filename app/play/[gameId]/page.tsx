@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { getRandomPresets, TeamPreset } from '@/lib/teamPresets';
 import { getTeamBackground, TeamBg } from '@/lib/teamBackgrounds';
+import TeamAvatar from '@/components/TeamAvatar';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const MODE_META: Record<string, { label: string; emoji: string }> = {
@@ -64,7 +65,7 @@ function TeamHeader({
     >
       <span>{meta ? `${meta.emoji} ${meta.label}` : ''}</span>
       <span>
-        {avatar} {name}
+        <TeamAvatar avatar={avatar} size="1.6em" /> {name}
         {mode === 'survie' && lives !== null && lives !== undefined && (
           <span style={{ marginLeft: 6 }}>{lives > 0 ? '❤️'.repeat(lives) : '💀'}</span>
         )}
@@ -173,9 +174,21 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [showProgressTable, setShowProgressTable] = useState(false);
   const [gameMode, setGameMode] = useState<string | null>(null);
 
+  // Les équipes proposées dépendent de l'habillage choisi par l'animateur à la création de la partie
   useEffect(() => {
-    setPresets(getRandomPresets('espace', 12));
-  }, []);
+    let cancelled = false;
+    supabase
+      .from('games')
+      .select('visual_theme')
+      .eq('id', gameId)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled) setPresets(getRandomPresets(data?.visual_theme ?? 'espace', 12));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId]);
 
   // Reprise directe via un lien de récupération (?team=<id>) — utile si
   // la page d'une équipe s'est fermée par erreur : cliquer sur sa tuile
@@ -437,6 +450,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
           Choisissez votre équipe
         </h1>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {presets.length === 0 && <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#7a819c' }}>Chargement des équipes…</p>}
           {presets.map((p) => {
             const taken = takenNames.has(p.name);
             return (
@@ -451,12 +465,17 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
                   padding: 16,
                   fontWeight: 700,
                   cursor: taken ? 'not-allowed' : 'pointer',
-                  textAlign: 'left',
+                  textAlign: 'center',
                   opacity: taken ? 0.5 : 1,
                   position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 14,
                 }}
               >
-                <div style={{ fontSize: 24 }}>{p.avatar}</div>
+                <TeamAvatar avatar={p.avatar} size={84} style={{ filter: taken ? 'grayscale(1)' : undefined }} />
                 {p.name}
                 {taken && (
                   <div style={{ fontSize: 11, color: '#7a819c', marginTop: 2 }}>Déjà prise</div>
@@ -566,7 +585,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     return (
       <Shell bg={teamBg} style={{ textAlign: 'center', marginTop: 40, fontFamily: 'Inter, sans-serif' }}>
         <ModeLabel mode={gameMode} />
-        <div style={{ fontSize: 36 }}>{team.preset.avatar}</div>
+        <div><TeamAvatar avatar={team.preset.avatar} size={88} /></div>
         <h2 style={{ fontWeight: 800 }}>{team.preset.name}</h2>
         <p style={{ color: '#7a819c' }}>En attente du démarrage…</p>
         {myTeamData && (myTeamData.camembert_won?.length > 0 || myTeamData.camembert_jokers > 0) && (

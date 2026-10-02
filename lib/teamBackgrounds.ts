@@ -14,18 +14,29 @@ const bg = (slug: string, contentTop = '9vh'): TeamBg => ({
 });
 
 export const TEAM_BACKGROUNDS: Record<string, TeamBg> = {
-  'Les Explorateurs': bg('explorateurs'),
+  // Espace (les équipes sans fond dédié — Orion, CosmoRiders, Nebula Squad — gardent l'écran standard)
+  'Les Explorateurs Cosmiques': bg('explorateurs'),
   'Team Nova': bg('nova'),
   Galaxie: bg('galaxie'),
   'Team Lune': bg('lune'),
   'Team Saturne': bg('saturne'),
-  'Les Comètes': bg('cometes'),
   'Les Martiens': bg('martiens'),
   'Les Astronautes': bg('astronautes'),
   'Les Météores': bg('meteores'),
   Zenith: bg('zenith'),
-  'Les Étoiles Filantes': bg('etoiles-filantes'),
-  Orbit: bg('astronautes'), // en attendant un fond dédié : même image que les Astronautes
+  // Fonds marins (l'emblème n'est pas en haut : peu de place à réserver)
+  'Coral Knights': bg('coral-knights', '5vh'),
+  'Abyss Serpents': bg('abyss-serpents', '5vh'),
+  'Pearl Keepers': bg('pearl-keepers', '5vh'),
+  'Tide Guardians': bg('tide-guardians', '5vh'),
+  'Kraken Squad': bg('kraken-squad', '5vh'),
+  'Sea Lantern Tribe': bg('sea-lantern-tribe', '5vh'),
+  SharkRiders: bg('sharkriders', '5vh'),
+  'Bubble Rangers': bg('bubble-rangers', '5vh'),
+  'Trident Force': bg('trident-force', '5vh'),
+  'Starfish Crew': bg('starfish-crew', '5vh'),
+  'DeepShell Clan': bg('deepshell-clan', '5vh'),
+  'Manta Spirits': bg('manta-spirits', '5vh'),
 };
 
 export function getTeamBackground(teamName: string): TeamBg | null {
