@@ -438,11 +438,11 @@ const sciences: Theme = {
   bar: { ...sciencesGlass, background: 'linear-gradient(180deg, rgba(34,20,8,0.6), rgba(24,13,5,0.78))' },
   
   planets: {
-    classique: { src: `${C_sciences}/icons/classique.webp`, width: 1.9 },
-    defi: { src: `${C_sciences}/icons/defi.webp`, width: 3 },
-    survie: { src: `${C_sciences}/icons/survie.webp`, width: 3 },
-    participatif: { src: `${C_sciences}/icons/participatif.webp`, width: 3 },
-    camembert: { src: `${C_sciences}/icons/camembert.webp`, width: 3 },
+    classique: { src: `${C_sciences}/icons/classique.webp`, ratio: 0.992, scale: 1.3},
+    defi: { src: `${C_sciences}/icons/defi.webp`,ratio: 0.992, scale: 1.3 },
+    survie: { src: `${C_sciences}/icons/survie.webp`, ratio: 0.992, scale: 1.3 },
+    participatif: { src: `${C_sciences}/icons/participatif.webp`, ratio: 0.992, scale: 1.3 },
+    camembert: { src: `${C_sciences}/icons/camembert.webp`, ratio: 0.992, scale: 1.3},
   },
   plates: {
     fusee: { src: `${C_sciences}/icons/fusee.webp`, ratio: 0.992, scale: 1.3 },
