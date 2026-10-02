@@ -311,7 +311,7 @@ const art: Theme = {
     teamCount: { left: 9.4, top: 63, width: 12.3, height: 4.8 },
     join: { left: 83.2, top: 25.5, width: 10.7, height: 31 },
     code: { left: 83.2, top: 52, width: 10.7, height: 5.6 },
-    hub: { left: 24, top: 17, width: 52, height: 50 },
+    hub: { left: 30, top: 20, width: 40, height: 40 },
     bar: { left: 19, top: 82, width: 62, height: 15 },
     profile: { left: 50, top: 3.2 },
   },
@@ -438,11 +438,11 @@ const sciences: Theme = {
   bar: { ...sciencesGlass, background: 'linear-gradient(180deg, rgba(34,20,8,0.6), rgba(24,13,5,0.78))' },
   
   planets: {
-    classique: { src: `${C_sciences}/icons/classique.webp`, width: 5.6 },
-    defi: { src: `${C_sciences}/icons/defi.webp`, width: 9.1 },
-    survie: { src: `${C_sciences}/icons/survie.webp`, width: 9.3 },
-    participatif: { src: `${C_sciences}/icons/participatif.webp`, width: 9.3 },
-    camembert: { src: `${C_sciences}/icons/camembert.webp`, width: 8.9 },
+    classique: { src: `${C_sciences}/icons/classique.webp`, width: 1.9 },
+    defi: { src: `${C_sciences}/icons/defi.webp`, width: 3 },
+    survie: { src: `${C_sciences}/icons/survie.webp`, width: 3 },
+    participatif: { src: `${C_sciences}/icons/participatif.webp`, width: 3 },
+    camembert: { src: `${C_sciences}/icons/camembert.webp`, width: 3 },
   },
   plates: {
     fusee: { src: `${C_sciences}/icons/fusee.webp`, ratio: 0.992, scale: 1.3 },
