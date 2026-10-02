@@ -401,7 +401,8 @@ const inventions: Theme = {
 // ───────────────────────── Sciences ─────────────────────────
 const C_sciences = '/themes/sciences';
 const sciencesGlass = {
-  background: 'linear-gradient(180deg, rgba(10,22,44,0.72), rgba(10,22,44,0.8))',
+  //background: 'linear-gradient(180deg, rgba(10,22,44,0.72), rgba(10,22,44,0.8))',
+  background: 'linear-gradient(180deg, rgba(34,20,8,0.72), rgba(24,13,5,0.8))',
   border: '2px solid rgba(90,255,170,0.65)',
   boxShadow: '0 0 2cqw rgba(90,255,170,0.28), inset 0 0 1.4cqw rgba(90,255,170,0.16)',
 };
