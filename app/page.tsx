@@ -301,6 +301,17 @@ export default function ConsolePage() {
     setGameStarted(false);
   };
 
+  // Garde l'habillage de la partie en phase avec celui de la console : une partie déjà créée (reprise via le
+  // stockage local) ou un changement d'habillage dans Paramétrage mettent à jour les équipes proposées aux joueurs.
+  useEffect(() => {
+    if (!gameId || !mounted) return;
+    fetch('/api/update-game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gameId, visualTheme: theme.id }),
+    }).catch(() => {});
+  }, [gameId, theme.id, mounted]);
+
   const inviteTeams = async (openInvite = true) => {
     setError(null);
 

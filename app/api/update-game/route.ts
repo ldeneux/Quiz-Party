@@ -22,6 +22,8 @@ export async function POST(request: Request) {
   const update: Record<string, unknown> = {};
   if ('mode' in body) update.mode = body.mode;
   if ('profileId' in body) update.profile_id = body.profileId || null;
+  // Habillage choisi par l'animateur : détermine les équipes proposées aux joueurs
+  if (typeof body.visualTheme === 'string' && body.visualTheme) update.visual_theme = body.visualTheme;
   if (body.resetCamembert) update.camembert_categories = [];
 
   if (Object.keys(update).length === 0) {
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
     .from('games')
     .update(update)
     .eq('id', gameId)
-    .select('id, mode, profile_id')
+    .select('id, mode, profile_id, visual_theme')
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
