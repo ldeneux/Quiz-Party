@@ -412,7 +412,7 @@ const sciences: Theme = {
   emoji: '🧪',
   description: 'Un laboratoire aux couleurs néon. (Fond blanc provisoire.)',
   preview: `${C_sciences}/preview.webp`,
-  stage: { src: '/themes/blanc/stage.webp', ratio: 1.7768, bg: '#ffffff' },
+  stage: { src: '${C_sciences}/stage.webp', ratio: 1.7768, bg: '#ffffff' },
   zones: {
     teams: { left: 3, top: 20, width: 15, height: 38 },
     teamCount: { left: 3, top: 60, width: 15, height: 4 },
