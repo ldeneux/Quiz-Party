@@ -293,7 +293,6 @@ const C_art = '/themes/art';
 const artGlass = {
   //background: 'linear-gradient(180deg, rgba(40,28,68,0.72), rgba(40,28,68,0.8))',
   background: 'transparent',
-  color: '#ff007f',
   //border: '2px solid rgba(214,164,244,0.65)',
   border: 'none',
   //boxShadow: '0 0 2cqw rgba(214,164,244,0.28), inset 0 0 1.4cqw rgba(214,164,244,0.16)',
@@ -309,9 +308,9 @@ const art: Theme = {
   stage: { src: `${C_art}/stage.webp`, ratio: 1.7917, bg: '#efe3cf' },
   zones: {
     teams: { left: 9.4, top: 17.5, width: 12.3, height: 50 },
-    teamCount: { left: 9.4, top: 63, width: 12.3, height: 4.8 ,background: 'transparent'},
+    teamCount: { left: 9.4, top: 63, width: 12.3, height: 4.8 },
     join: { left: 83.2, top: 25.5, width: 10.7, height: 31 },
-    code: { left: 83.2, top: 52, width: 10.7, height: 5.6 ,background: 'transparent'},
+    code: { left: 83.2, top: 52, width: 10.7, height: 5.6 },
     hub: { left: 24, top: 17, width: 52, height: 50 },
     bar: { left: 19, top: 82, width: 62, height: 15 },
     profile: { left: 50, top: 3.2 },
