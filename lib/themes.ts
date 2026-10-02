@@ -291,9 +291,12 @@ const egypte: Theme = {
 // ───────────────────────── Arts ─────────────────────────
 const C_art = '/themes/art';
 const artGlass = {
-  background: 'linear-gradient(180deg, rgba(40,28,68,0.72), rgba(40,28,68,0.8))',
-  border: '2px solid rgba(214,164,244,0.65)',
-  boxShadow: '0 0 2cqw rgba(214,164,244,0.28), inset 0 0 1.4cqw rgba(214,164,244,0.16)',
+  //background: 'linear-gradient(180deg, rgba(40,28,68,0.72), rgba(40,28,68,0.8))',
+  background: 'transparent',
+  //border: '2px solid rgba(214,164,244,0.65)',
+  border: 'none',
+  //boxShadow: '0 0 2cqw rgba(214,164,244,0.28), inset 0 0 1.4cqw rgba(214,164,244,0.16)',
+  boxShadow: 'none',
 };
 
 const art: Theme = {
@@ -312,8 +315,11 @@ const art: Theme = {
     bar: { left: 19, top: 82, width: 62, height: 15 },
     profile: { left: 50, top: 3.2 },
   },
-  hubStyle: { background: 'linear-gradient(180deg, rgba(40,28,68,0.9), rgba(40,28,68,0.93))', border: '2px solid rgba(214,164,244,0.75)', borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(190,130,230,0.35)' },
-  sidePanelStyle: { background: 'rgba(40,28,68,0.9)', border: '1px solid rgba(214,164,244,0.6)', borderRadius: '0.8cqw' },
+//  hubStyle: { background: 'linear-gradient(180deg, rgba(40,28,68,0.9), rgba(40,28,68,0.93))', border: '2px solid rgba(214,164,244,0.75)',
+  hubStyle: { background: 'transparent', border: 'none',
+  borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(190,130,230,0.35)' },
+  //sidePanelStyle: { background: 'rgba(40,28,68,0.9)', border: '1px solid rgba(214,164,244,0.6)', borderRadius: '0.8cqw' },
+  sidePanelStyle: { background: 'transparent', border: 'none', boxShadow: 'none' },
   joinPadTop: 1.6,
   qrWidth: 7,
   bar: { ...artGlass, background: 'linear-gradient(180deg, rgba(40,28,68,0.62), rgba(40,28,68,0.78))' },
