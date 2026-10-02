@@ -311,7 +311,7 @@ const art: Theme = {
     teamCount: { left: 9.4, top: 63, width: 12.3, height: 4.8 },
     join: { left: 83.2, top: 25.5, width: 10.7, height: 31 },
     code: { left: 83.2, top: 52, width: 10.7, height: 5.6 },
-    hub: { left: 34, top: 22, width: 33, height: 40 },
+    hub: { left: 33.5, top: 22.5, width: 34, height: 40 },
     bar: { left: 19, top: 82, width: 62, height: 15 },
     profile: { left: 50, top: 3.2 },
   },
