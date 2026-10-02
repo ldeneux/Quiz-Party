@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react';
 // + les images des modes (« planètes ») et des boutons (« plates »).
 // Le thème « espace » reprend exactement l'habillage historique : rien ne change tant qu'on ne choisit pas autre chose.
 
-export type ThemeId = 'espace' | 'jungle' | 'marins';
+export type ThemeId = 'espace' | 'jungle' | 'marins' | 'egypte';
 export type ModeId = 'classique' | 'defi' | 'survie' | 'participatif' | 'camembert';
 
 export type PlateId =
@@ -50,6 +50,7 @@ export type Theme = {
     profile: { left: number; top: number }; // bandeau du profil : centre horizontal et haut, en %
   };
   hubStyle?: CSSProperties; // fond du hublot central quand le décor n'en fournit pas
+  sidePanelStyle?: CSSProperties; // fond des panneaux gauche/droite quand le décor est trop clair pour le texte
   joinPadTop: number; // cqw : espace au-dessus du QR
   qrWidth: number; // cqw
   bar: { background: string; border: string; boxShadow: string };
@@ -192,8 +193,11 @@ const marins: Theme = {
     bar: { left: 19, top: 82.5, width: 62, height: 14.5 },
     profile: { left: 50, top: 3.5 },
   },
-  // Le décor n'a pas de grand écran central : on pose un panneau vitré par-dessus la scène
-  hubStyle: { ...marinGlass, borderRadius: '2.2cqw', backdropFilter: 'blur(3px)' },
+  // Pas de grand écran central dans le décor : simple halo sombre, sans bord, pour garder le texte lisible
+  hubStyle: {
+    background: 'radial-gradient(ellipse at center, rgba(2,22,48,0.5) 0%, rgba(2,22,48,0.3) 55%, rgba(2,22,48,0) 100%)',
+    textShadow: '0 1px 4px rgba(0,20,50,0.95), 0 0 10px rgba(0,20,50,0.8)',
+  },
   joinPadTop: 2.2,
   qrWidth: 8.6,
   bar: { ...marinGlass, background: 'linear-gradient(180deg, rgba(4,26,54,0.62), rgba(3,16,38,0.78))' },
@@ -224,7 +228,68 @@ const marins: Theme = {
   },
 };
 
-export const THEMES: Record<ThemeId, Theme> = { espace, jungle, marins };
-export const THEME_LIST: Theme[] = [espace, jungle, marins];
+// ───────────────────────── Égypte ─────────────────────────
+const G = '/themes/egypte';
+const gIcon = (name: string, ratio: number, scale = 1.3): PlateDef => ({ src: `${G}/icons/${name}.webp`, ratio, scale });
+const egypteGlass = {
+  background: 'linear-gradient(180deg, rgba(34,20,8,0.72), rgba(24,13,5,0.8))',
+  border: '2px solid rgba(235,180,70,0.7)',
+  boxShadow: '0 0 2cqw rgba(255,180,60,0.3), inset 0 0 1.4cqw rgba(255,210,120,0.18)',
+};
+
+const egypte: Theme = {
+  id: 'egypte',
+  label: 'Égypte',
+  emoji: '🏺',
+  description: 'Un temple au bord du Nil : colonnes, hiéroglyphes et lumière dorée.',
+  preview: `${G}/preview.webp`,
+  stage: { src: `${G}/stage.webp`, ratio: 1672 / 941, bg: '#2a1706' },
+  zones: {
+    teams: { left: 5.9, top: 31, width: 13.6, height: 32 },
+    teamCount: { left: 5.9, top: 65.5, width: 13.6, height: 3.6 },
+    join: { left: 80.7, top: 31, width: 14, height: 32.5 },
+    code: { left: 81, top: 65.5, width: 13.6, height: 3.6 },
+    hub: { left: 22, top: 17, width: 56, height: 36 },
+    bar: { left: 19, top: 82.5, width: 62, height: 14.5 },
+    profile: { left: 50, top: 3.5 },
+  },
+  // Décor très lumineux : halo brun un peu plus marqué, toujours sans bord
+  hubStyle: {
+    background: 'radial-gradient(ellipse at center, rgba(34,18,4,0.64) 0%, rgba(34,18,4,0.44) 55%, rgba(34,18,4,0) 100%)',
+    textShadow: '0 1px 4px rgba(20,8,0,0.95), 0 0 10px rgba(20,8,0,0.8)',
+  },
+  // Les stèles sont en pierre claire : on fonce le fond pour le texte clair
+  sidePanelStyle: { background: 'rgba(30,16,6,0.74)', border: '1px solid rgba(235,180,70,0.55)', borderRadius: '0.8cqw' },
+  joinPadTop: 2.2,
+  qrWidth: 8.6,
+  bar: { ...egypteGlass, background: 'linear-gradient(180deg, rgba(34,20,8,0.6), rgba(24,13,5,0.78))' },
+  planets: {
+    classique: { src: `${G}/icons/ankh.webp`, width: 8.6 },
+    defi: { src: `${G}/icons/lionne.webp`, width: 8.7 },
+    survie: { src: `${G}/icons/oeil.webp`, width: 9.8 },
+    participatif: { src: `${G}/icons/papyrus_mains.webp`, width: 9.8 },
+    camembert: { src: `${G}/icons/roue.webp`, width: 9.7 },
+  },
+  plates: {
+    fusee: gIcon('faucon', 1.031),
+    suivante: gIcon('porte_ouverte', 0.95),
+    stats: gIcon('papyrus_faucon', 1.027),
+    parametrage: gIcon('scarabee', 0.939),
+    progression: gIcon('pyramide', 0.962),
+    nouvelle: gIcon('coffre', 1.007),
+    quitter: gIcon('porte', 0.886),
+    valider: gIcon('valider', 1),
+    annuler: gIcon('annuler', 1),
+    plein: gIcon('plein', 1),
+    profil: { src: null, ratio: 6.2, boxStyle: { ...egypteGlass, borderRadius: '1.6cqw' } },
+  },
+  frames: {
+    progress: { src: `${G}/frame.webp`, ratio: 1400 / 614, width: 80 },
+    msg: { src: `${G}/frame.webp`, ratio: 1400 / 614, width: 62 },
+  },
+};
+
+export const THEMES: Record<ThemeId, Theme> = { espace, jungle, marins, egypte };
+export const THEME_LIST: Theme[] = [espace, jungle, marins, egypte];
 export const DEFAULT_THEME_ID: ThemeId = 'espace';
 export const THEME_STORAGE_KEY = 'quiz-party-theme';

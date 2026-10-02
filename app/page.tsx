@@ -515,7 +515,7 @@ export default function ConsolePage() {
         `}</style>
 
         {/* Écran gauche : une ligne par équipe (emoji + nom), triées par points puis par ordre alphabétique ; détails en infobulle, clic = actions */}
-        <div className="ck-scroll" style={{ position: 'absolute', ...rectStyle(theme.zones.teams), overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw' }}>
+        <div className="ck-scroll" style={{ position: 'absolute', ...rectStyle(theme.zones.teams), overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw', ...theme.sidePanelStyle }}>
           <div style={{ fontSize: '0.9cqw', fontWeight: 800, color: '#7fd1ff', letterSpacing: '0.1cqw', marginBottom: '0.4cqw' }}>ÉQUIPES</div>
           {teams.length === 0 && <div style={{ fontSize: '0.9cqw', color: '#8a97c4' }}>Aucune équipe connectée</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3cqw' }}>
@@ -544,7 +544,7 @@ export default function ConsolePage() {
         </div>
 
         {/* Écran droit : adresse pour rejoindre (avant la partie) puis explication de la réponse (injectée par GameArea) */}
-        <div style={{ position: 'absolute', ...rectStyle(theme.zones.join), overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw' }}>
+        <div style={{ position: 'absolute', ...rectStyle(theme.zones.join), overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw', ...theme.sidePanelStyle }}>
           {!explainActive &&
             (joinCode ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4cqw', paddingTop: `${theme.joinPadTop}cqw` }}>
