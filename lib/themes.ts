@@ -293,6 +293,7 @@ const C_art = '/themes/art';
 const artGlass = {
   //background: 'linear-gradient(180deg, rgba(40,28,68,0.72), rgba(40,28,68,0.8))',
   background: 'transparent',
+  color: '#ff007f
   //border: '2px solid rgba(214,164,244,0.65)',
   border: 'none',
   //boxShadow: '0 0 2cqw rgba(214,164,244,0.28), inset 0 0 1.4cqw rgba(214,164,244,0.16)',
