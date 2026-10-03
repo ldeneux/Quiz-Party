@@ -8,6 +8,8 @@ import CockpitMsgBox from '@/components/CockpitMsgBox';
 import CockpitPlate from '@/components/CockpitPlate';
 import TeamAvatar from '@/components/TeamAvatar';
 import { PlateId, rectStyle } from '@/lib/themes';
+import { useLayout } from '@/lib/useLayout';
+import { LayoutOverlays, LayoutPanels } from '@/components/LayoutEditor';
 import { useTheme } from '@/lib/useTheme';
 import CockpitQR from '@/components/CockpitQR';
 
@@ -438,6 +440,8 @@ export default function ConsolePage() {
   const [explainActive, setExplainActive] = useState(false);
   // Équipes : tri (points décroissants puis ordre alphabétique), infobulle au survol, action au clic
   const stageRef = useRef<HTMLDivElement>(null);
+  const L = useLayout(theme, stageRef); // disposition personnalisable (zones, icônes, couleurs)
+  const zones = L.zones;
   const [teamTip, setTeamTip] = useState<{ t: Team; left: number; top: number } | null>(null);
   const [teamAction, setTeamAction] = useState<Team | null>(null);
   const sortedTeams = [...teams].sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || a.name.localeCompare(b.name, 'fr'));
@@ -512,6 +516,8 @@ export default function ConsolePage() {
         }
       >
         <style>{`
+          .ck-recolor, .ck-recolor *{color:var(--ck-color) !important}
+          .ck-edit-planet button{pointer-events:none !important}
           .ck-scroll{scrollbar-width:thin;scrollbar-color:rgba(90,140,255,.75) transparent}
           .ck-scroll::-webkit-scrollbar{width:5px}
           .ck-scroll::-webkit-scrollbar-thumb{background:rgba(90,140,255,.75);border-radius:4px}
@@ -527,7 +533,7 @@ export default function ConsolePage() {
         `}</style>
 
         {/* Écran gauche : une ligne par équipe (emoji + nom), triées par points puis par ordre alphabétique ; détails en infobulle, clic = actions */}
-        <div className="ck-scroll" style={{ position: 'absolute', ...rectStyle(theme.zones.teams), overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw', ...theme.sidePanelStyle }}>
+        <div className={`ck-scroll ${L.fx('teams').className}`} style={{ position: 'absolute', ...rectStyle(zones.teams), overflowY: 'auto', boxSizing: 'border-box', padding: '0.4cqw', ...theme.sidePanelStyle, ...L.fx('teams').style }}>
           <div style={{ fontSize: '0.9cqw', fontWeight: 800, color: '#7fd1ff', letterSpacing: '0.1cqw', marginBottom: '0.4cqw' }}>ÉQUIPES</div>
           {teams.length === 0 && <div style={{ fontSize: '0.9cqw', color: '#8a97c4' }}>Aucune équipe connectée</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3cqw' }}>
@@ -550,13 +556,13 @@ export default function ConsolePage() {
         </div>
 
         {/* Petit afficheur sous l'écran gauche : nombre d'équipes */}
-        <div style={{ position: 'absolute', ...rectStyle(theme.zones.teamCount), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5cqw', background: 'rgba(3,8,30,0.9)', border: '1px solid rgba(90,170,255,0.55)', borderRadius: '0.4cqw', boxShadow: '0 0 0.8cqw rgba(60,130,255,0.4)', fontSize: '0.85cqw', fontWeight: 800, letterSpacing: '0.12cqw', color: '#9fc4ff' }}>
+        <div className={L.fx('teamCount').className} style={{ position: 'absolute', ...rectStyle(zones.teamCount), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5cqw', background: 'rgba(3,8,30,0.9)', border: '1px solid rgba(90,170,255,0.55)', borderRadius: '0.4cqw', boxShadow: '0 0 0.8cqw rgba(60,130,255,0.4)', fontSize: '0.85cqw', fontWeight: 800, letterSpacing: '0.12cqw', color: '#9fc4ff', ...L.fx('teamCount').style }}>
           <span style={ckLed(teams.length > 0 ? '#4dffb0' : '#ff9a5a')} />
           {teams.length} ÉQUIPE{teams.length > 1 ? 'S' : ''}
         </div>
 
         {/* Écran droit : adresse pour rejoindre (avant la partie) puis explication de la réponse (injectée par GameArea) */}
-        <div style={{ position: 'absolute', ...rectStyle(theme.zones.join), overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw', ...theme.sidePanelStyle }}>
+        <div className={L.fx('join').className} style={{ position: 'absolute', ...rectStyle(zones.join), overflow: 'hidden', boxSizing: 'border-box', padding: '0.4cqw', ...theme.sidePanelStyle, ...L.fx('join').style }}>
           {!explainActive &&
             (joinCode ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4cqw', paddingTop: `${theme.joinPadTop}cqw` }}>
@@ -578,22 +584,22 @@ export default function ConsolePage() {
 
         {/* Petit afficheur sous l'écran droit : code de la partie */}
         {joinCode && (
-          <div style={{ position: 'absolute', ...rectStyle(theme.zones.code), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6cqw', background: 'rgba(3,8,30,0.9)', border: '1px solid rgba(90,170,255,0.55)', borderRadius: '0.4cqw', boxShadow: '0 0 0.8cqw rgba(60,130,255,0.4)' }}>
+          <div className={L.fx('code').className} style={{ position: 'absolute', ...rectStyle(zones.code), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6cqw', background: 'rgba(3,8,30,0.9)', border: '1px solid rgba(90,170,255,0.55)', borderRadius: '0.4cqw', boxShadow: '0 0 0.8cqw rgba(60,130,255,0.4)', ...L.fx('code').style }}>
             <span style={{ fontSize: '0.7cqw', fontWeight: 800, letterSpacing: '0.1cqw', color: '#8a97c4' }}>CODE</span>
             <span style={{ fontSize: '1.7cqw', fontWeight: 800, letterSpacing: '0.3cqw', color: '#7fd1ff', textShadow: '0 0 0.9cqw #2aa8ff', fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}>{joinCode}</span>
           </div>
         )}
 
         {/* Hublot : menu des modes (planètes) ou écran de jeu */}
-        <div style={{ position: 'absolute', ...rectStyle(theme.zones.hub), boxSizing: 'border-box', ...theme.hubStyle }}>
+        <div className={L.fx('hub').className} style={{ position: 'absolute', ...rectStyle(zones.hub), boxSizing: 'border-box', ...theme.hubStyle, ...L.fx('hub').style }}>
           {!gameStarted ? (
             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end' }}>
                 {MODES.map((m) => {
                   const sel = activeMode === m.id;
                   return (
+                    <div key={m.id} {...L.planetProps(m.id as keyof typeof theme.planets)}>
                     <button
-                      key={m.id}
                       onClick={() => selectMode(m.id)}
                       title={m.label}
                       style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5cqw', opacity: sel ? 1 : 0.72, transform: sel ? 'scale(1.15)' : 'scale(1)', transition: 'transform .25s, opacity .25s, filter .25s', filter: sel ? `drop-shadow(0 0 1.1cqw ${m.color})` : 'none' }}
@@ -603,6 +609,7 @@ export default function ConsolePage() {
                         {m.emoji} {m.label}
                       </span>
                     </button>
+                    </div>
                   );
                 })}
               </div>
@@ -618,9 +625,10 @@ export default function ConsolePage() {
         </div>
 
         {/* Choix du profil : bandeau en haut au centre, près du halo bleu du plafond */}
-        <div style={{ position: 'absolute', left: `${theme.zones.profile.left}%`, top: `${theme.zones.profile.top}%`, transform: 'translateX(-50%)', zIndex: 15 }}>
+        <div className={L.fx('profile').className} style={{ position: 'absolute', left: `${zones.profile.left}%`, top: `${zones.profile.top}%`, transform: 'translateX(-50%)', zIndex: 15, ...L.fx('profile').style }}>
           <CockpitPlate
             id="profil"
+            boxOverride={L.fx('profile').style}
             height={5.5}
             tipSide="below"
             noTip={profileOpen}
@@ -663,7 +671,7 @@ export default function ConsolePage() {
         </div>
 
         {/* Pupitre du bas : emplacements fixes (les boutons ne bougent pas, ils se grisent quand ils sont inutilisables) */}
-        <div style={{ position: 'absolute', ...rectStyle(theme.zones.bar), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: theme.bar.background, border: theme.bar.border, borderRadius: '1.2cqw', boxShadow: theme.bar.boxShadow }}>
+        <div className={L.fx('bar').className} style={{ position: 'absolute', ...rectStyle(zones.bar), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: theme.bar.background, border: theme.bar.border, borderRadius: '1.2cqw', boxShadow: theme.bar.boxShadow, ...L.fx('bar').style }}>
           <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />
           <CockpitPlate id="stats" label="Statistiques" hint="S · par équipe et par catégorie" disabled={!gameId} onClick={openStats} />
           {slot('cockpit-progress', 'progression', !gameStarted && <CockpitPlate id="progression" label="Voir la progression" hint="Mode Trivial Poursuit, pendant la partie" disabled />)}
@@ -740,7 +748,9 @@ export default function ConsolePage() {
             Garder les mêmes équipes : même code, scores remis à zéro.
           </CockpitMsgBox>
         )}
+        <LayoutOverlays L={L} theme={theme} />
       </div>
+      <LayoutPanels L={L} theme={theme} />
 
       {/* Fenêtre statistiques */}
       {showStats && (

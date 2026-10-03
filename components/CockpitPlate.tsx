@@ -19,10 +19,11 @@ type Props = {
   height?: number; // en cqw
   tipSide?: 'above' | 'below';
   noTip?: boolean;
+  boxOverride?: React.CSSProperties; // couleurs personnalisées (disposition) appliquées au bouton lui-même
   children?: React.ReactNode; // contenu superposé au centre de l'image (ex. nom du profil)
 };
 
-export default function CockpitPlate({ id, label, hint, onClick, href, disabled = false, pulse = false, height = 5.2, tipSide = 'above', noTip = false, children }: Props) {
+export default function CockpitPlate({ id, label, hint, onClick, href, disabled = false, pulse = false, height = 5.2, tipSide = 'above', noTip = false, boxOverride, children }: Props) {
   const [show, setShow] = useState(false);
   const { theme } = useTheme();
   const def = theme.plates[id];
@@ -30,7 +31,7 @@ export default function CockpitPlate({ id, label, hint, onClick, href, disabled 
     // « suivante » reprend l'identifiant de « fusee » : même emplacement, même raccourci (Espace)
     id: id === 'suivante' ? 'ck-fusee' : `ck-${id}`,
     className: `ck-plate${pulse && !disabled ? ' ck-pulse' : ''}`,
-    style: { width: `${(height * (def.scale ?? 1) * def.ratio).toFixed(2)}cqw`, cursor: disabled ? 'not-allowed' : 'pointer', ...def.boxStyle } as React.CSSProperties,
+    style: { width: `${(height * (def.scale ?? 1) * def.ratio).toFixed(2)}cqw`, cursor: disabled ? 'not-allowed' : 'pointer', ...def.boxStyle, ...boxOverride } as React.CSSProperties,
     'aria-label': label,
     'aria-disabled': disabled,
     onMouseEnter: () => setShow(true),

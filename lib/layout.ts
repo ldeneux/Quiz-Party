@@ -1,0 +1,106 @@
+import type { CSSProperties } from 'react';
+import type { ModeId, Rect, Theme, ThemeId } from './themes';
+
+// Disposition personnalisée de l'écran d'accueil, enregistrée par thème sur cet appareil (localStorage).
+// Elle se superpose aux réglages du thème : ce qui n'est pas modifié reste tel que défini dans lib/themes.ts.
+
+export type ZoneKey = 'teams' | 'teamCount' | 'join' | 'code' | 'hub' | 'bar';
+export type StyleKey = ZoneKey | 'profile';
+export type ElStyle = { color?: string; bg?: string; bgOpacity?: number };
+export type PlanetTweak = { dx: number; dy: number; scale: number }; // dx/dy en cqw, scale = multiplicateur
+
+export type Layout = {
+  zones: Partial<Record<ZoneKey, Rect>>;
+  profile?: { left: number; top: number };
+  planets: Partial<Record<ModeId, PlanetTweak>>;
+  styles: Partial<Record<StyleKey, ElStyle>>;
+};
+
+export const EMPTY_LAYOUT: Layout = { zones: {}, planets: {}, styles: {} };
+export const ZONE_KEYS: ZoneKey[] = ['teams', 'teamCount', 'join', 'code', 'hub', 'bar'];
+
+export const ELEMENT_LABELS: Record<StyleKey, string> = {
+  teams: 'Écran gauche (équipes)',
+  teamCount: 'Afficheur « nombre d’équipes »',
+  join: 'Écran droit (QR / explication)',
+  code: 'Afficheur « code »',
+  hub: 'Hublot central',
+  bar: 'Barre de menu',
+  profile: 'Bandeau du profil',
+};
+export const CHIP_LABELS: Record<StyleKey, string> = {
+  teams: 'Équipes',
+  teamCount: 'Nb équipes',
+  join: 'QR',
+  code: 'Code',
+  hub: 'Hublot',
+  bar: 'Menu',
+  profile: 'Profil',
+};
+export const MODE_LABELS: Record<ModeId, string> = {
+  classique: 'Classique',
+  defi: 'Défi',
+  survie: 'Survie',
+  participatif: 'Participatif',
+  camembert: 'Trivial Poursuit',
+};
+
+export const EDIT_FLAG = 'quiz-party-edit-layout'; // posé par Paramétrage pour ouvrir la console en mode disposition
+const storageKey = (id: ThemeId) => `quiz-party-layout-${id}`;
+
+export function loadLayout(id: ThemeId): Layout {
+  try {
+    const raw = window.localStorage.getItem(storageKey(id));
+    if (!raw) return EMPTY_LAYOUT;
+    const p = JSON.parse(raw);
+    return { zones: p.zones ?? {}, profile: p.profile, planets: p.planets ?? {}, styles: p.styles ?? {} };
+  } catch {
+    return EMPTY_LAYOUT;
+  }
+}
+export function saveLayout(id: ThemeId, layout: Layout) {
+  try {
+    window.localStorage.setItem(storageKey(id), JSON.stringify(layout));
+  } catch {
+    // stockage indisponible : la disposition vaudra pour cette session seulement
+  }
+}
+export function clearLayout(id: ThemeId) {
+  try {
+    window.localStorage.removeItem(storageKey(id));
+  } catch {
+    // ignoré
+  }
+}
+
+export function hexToRgba(hex: string, alpha: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+// Couleurs choisies -> classe + variables CSS (la règle .ck-recolor est définie dans app/page.tsx)
+export function styleFx(st?: ElStyle): { className: string; style: CSSProperties } {
+  const style: Record<string, string> = {};
+  if (st?.bg) style.background = hexToRgba(st.bg, st.bgOpacity ?? 0.85);
+  if (st?.color) style['--ck-color'] = st.color;
+  return { className: st?.color ? 'ck-recolor' : '', style: style as CSSProperties };
+}
+
+const n1 = (v: number) => Number(v.toFixed(1));
+
+// Texte à coller dans lib/themes.ts pour rendre cette disposition définitive (valeur par défaut du thème)
+export function exportSnippet(theme: Theme, zones: Theme['zones'], layout: Layout): string {
+  const rect = (r: Rect) => `{ left: ${n1(r.left)}, top: ${n1(r.top)}, width: ${n1(r.width)}, height: ${n1(r.height)} }`;
+  const lines = [
+    `// Thème : ${theme.label}`,
+    '  zones: {',
+    ...ZONE_KEYS.map((k) => `    ${k}: ${rect(zones[k])},`),
+    `    profile: { left: ${n1(zones.profile.left)}, top: ${n1(zones.profile.top)} },`,
+    '  },',
+  ];
+  if (Object.keys(layout.planets).length) lines.push('', `// Icônes des modes (décalage en cqw, taille en multiplicateur)`, `planets: ${JSON.stringify(layout.planets)}`);
+  if (Object.keys(layout.styles).length) lines.push('', `// Couleurs`, `styles: ${JSON.stringify(layout.styles)}`);
+  return lines.join('\n');
+}

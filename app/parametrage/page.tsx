@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { THEME_LIST } from '@/lib/themes';
 import { useTheme } from '@/lib/useTheme';
+import { EDIT_FLAG, clearLayout } from '@/lib/layout';
 
 const LEVELS = [
   { id: 'CP', label: 'CP' },
@@ -327,6 +328,33 @@ export default function ParametragePage() {
               </button>
             );
           })}
+        </div>
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid #eaedf6' }}>
+          <div style={{ fontWeight: 800, fontSize: 14, color: '#1f2440' }}>Disposition de l'écran d'accueil</div>
+          <p style={{ color: '#7a819c', fontSize: 13, margin: '4px 0 12px' }}>
+            Déplace et redimensionne les écrans, la barre de menu, les icônes des modes et les afficheurs, et change leurs couleurs. La disposition est propre à chaque habillage.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => {
+                try { window.sessionStorage.setItem(EDIT_FLAG, '1'); } catch { /* ignoré */ }
+                window.location.href = '/';
+              }}
+              style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: '#6c7bf7', color: '#fff', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              🎛 Modifier la disposition
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Remettre la disposition de l'habillage « ${themeId} » à zéro ?`)) clearLayout(themeId);
+              }}
+              style={{ padding: '10px 16px', borderRadius: 10, border: '2px solid #eaedf6', background: '#fff', color: '#1f2440', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Réinitialiser cet habillage
+            </button>
+          </div>
         </div>
       </section>
 
