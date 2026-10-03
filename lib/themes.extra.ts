@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { ModeId, PlateDef, PlateId, Theme } from './themes';
+import type { ModeId, PlateDef, PlateId, Rect, Theme } from './themes';
 
 // Habillages complémentaires et remplacements, branchés dans lib/themes.ts (voir tools/apply-themes-patch.mjs).
 //  - THEME_OVERRIDES : remplace le décor (et les zones) de thèmes déjà définis (Espace, Fantasy)
@@ -22,8 +22,9 @@ function emptyTheme(id: string, label: string, emoji: string, description: strin
   const plates = {} as Record<PlateId | 'profil', PlateDef>;
   PLATES.forEach((p) => (plates[p] = { src: null, ratio: 1, scale: 1.3, boxStyle: plateBox }));
   plates.profil = { src: null, ratio: 6.2, boxStyle: { ...neutral, borderRadius: '1.6cqw' } };
-  const planets = {} as Theme['planets'];
+  const planets = {} as Record<ModeId, { src: string | null; width: number }>;
   MODES.forEach((m) => (planets[m] = { src: null, width: 8 })); // null => icône de mode neutre (public/modes)
+  // Le typage est volontairement souple : ce fichier compile que lib/themes.ts soit déjà adapté (planets / ThemeId) ou non
   return {
     id,
     label,
@@ -51,7 +52,7 @@ function emptyTheme(id: string, label: string, emoji: string, description: strin
       progress: { src: '/themes/blanc/frame.webp', ratio: 1400 / 614, width: 80 },
       msg: { src: '/themes/blanc/frame.webp', ratio: 1400 / 614, width: 62 },
     },
-  };
+  } as unknown as Theme;
 }
 
 // ── Thèmes ajoutés ──
@@ -90,7 +91,8 @@ export const EXTRA_THEMES: Record<string, Theme> = { sports, temps, voyage, pech
 // ── Remplacements de décor ──
 // Espace : nouveau poste de pilotage (l'astronaute). Les boutons et icônes existants sont conservés.
 // Fantasy : nouvelle illustration (portail). Elle n'a pas d'écrans : les panneaux sont posés par-dessus la scène.
-export const THEME_OVERRIDES: Record<string, Partial<Theme>> = {
+type OverrideZones = Partial<Theme['zones']> & { modes?: Rect };
+export const THEME_OVERRIDES: Record<string, Omit<Partial<Theme>, 'zones'> & { zones?: OverrideZones }> = {
   espace: {
     stage: { src: '/themes/espace/stage.webp', ratio: 1600 / 983, bg: '#03040c' },
     zones: {
