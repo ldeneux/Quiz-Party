@@ -52,6 +52,9 @@ export default function CockpitPlate({ id, label, hint, onClick, href, disabled 
   );
   const overlay = children ? (
     <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12%', pointerEvents: 'none' }}>{children}</span>
+  ) : !def.src && id !== 'profil' && label ? (
+    // Habillage sans image pour ce bouton : on affiche son libellé
+    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8%', pointerEvents: 'none', lineHeight: 1.15 }}>{label}</span>
   ) : null;
   const tip =
     show && !noTip ? (

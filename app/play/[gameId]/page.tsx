@@ -175,6 +175,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [allTeamsProgress, setAllTeamsProgress] = useState<AllTeamProgress[]>([]);
   const [showProgressTable, setShowProgressTable] = useState(false);
   const [gameMode, setGameMode] = useState<string | null>(null);
+  const [presetsReady, setPresetsReady] = useState(false);
 
   // Les équipes proposées dépendent de l'habillage choisi par l'animateur à la création de la partie
   useEffect(() => {
@@ -185,7 +186,9 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       .eq('id', gameId)
       .single()
       .then(({ data }) => {
-        if (!cancelled) setPresets(getRandomPresets(data?.visual_theme ?? 'espace', 12));
+        if (cancelled) return;
+        setPresets(getRandomPresets(data?.visual_theme ?? '', 12));
+        setPresetsReady(true);
       });
     return () => {
       cancelled = true;
@@ -452,7 +455,11 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
           Choisissez votre équipe
         </h1>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {presets.length === 0 && <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#7a819c' }}>Chargement des équipes…</p>}
+          {presets.length === 0 && (
+            <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#7a819c' }}>
+              {presetsReady ? 'Aucune équipe n’est disponible pour cet habillage.' : 'Chargement des équipes…'}
+            </p>
+          )}
           {presets.map((p) => {
             const taken = takenNames.has(p.name);
             return (

@@ -620,7 +620,11 @@ export default function ConsolePage() {
                       onClick={() => selectMode(m.id)}
                       style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5cqw', opacity: sel ? 1 : 0.72, transform: sel ? 'scale(1.15)' : 'scale(1)', transition: 'transform .25s, opacity .25s, filter .25s', filter: sel ? `drop-shadow(0 0 1.1cqw ${m.color})` : 'none' }}
                     >
-                      <img src={theme.planets[m.id as keyof typeof theme.planets].src} alt="" draggable={false} style={{ width: `${theme.planets[m.id as keyof typeof theme.planets].width * tw.scale}cqw`, display: 'block' }} />
+                      {theme.planets[m.id as keyof typeof theme.planets].src ? (
+                        <img src={theme.planets[m.id as keyof typeof theme.planets].src as string} alt="" draggable={false} style={{ width: `${theme.planets[m.id as keyof typeof theme.planets].width * tw.scale}cqw`, display: 'block' }} />
+                      ) : (
+                        <ModeIcon mode={m.id} size={`${theme.planets[m.id as keyof typeof theme.planets].width * tw.scale}cqw`} style={{ display: 'block' }} />
+                      )}
                       {tw.showLabel && (
                         <span
                           style={{

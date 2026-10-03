@@ -1,6 +1,6 @@
 // Équipes proposées aux joueurs, par habillage (12 par thème).
 // L'avatar est une image : /public/avatars/<thème>/NN.webp (même ordre que les noms ci-dessous).
-// Les thèmes sans jeu d'équipes (ex. « art ») utilisent celui d'« espace ».
+// Un thème sans jeu d'équipes n'en propose aucune : il ne reprend pas celles d'un autre thème.
 
 export type TeamPreset = {
   name: string;
@@ -55,6 +55,6 @@ export const TEAM_PRESETS: Record<string, TeamPreset[]> = {
 };
 
 export function getRandomPresets(theme: string, count: number): TeamPreset[] {
-  const pool = TEAM_PRESETS[theme] ?? TEAM_PRESETS.espace;
+  const pool = TEAM_PRESETS[theme] ?? [];
   return pool.slice(0, count);
 }
