@@ -11,6 +11,7 @@ import {
   ZONE_KEYS,
   ZoneKey,
   clearLayout,
+  defaultModesRect,
   exportSnippet,
   loadLayout,
   saveLayout,
@@ -60,7 +61,12 @@ export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) 
   );
 
   // Zones effectives = réglages du thème + modifications de l'utilisateur
-  const zones: Theme['zones'] = { ...theme.zones, ...layout.zones, profile: layout.profile ?? theme.zones.profile };
+  const zones: Theme['zones'] & { modes: Rect } = {
+    ...theme.zones,
+    ...layout.zones,
+    modes: layout.zones.modes ?? (theme.zones as { modes?: Rect }).modes ?? defaultModesRect(theme.zones.hub),
+    profile: layout.profile ?? theme.zones.profile,
+  };
 
   const setZone = (k: ZoneKey, rect: Rect) => commit((l) => ({ ...l, zones: { ...l.zones, [k]: rect } }));
   const setProfile = (pos: { left: number; top: number }) => commit((l) => ({ ...l, profile: pos }));
@@ -69,7 +75,7 @@ export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) 
   const setStyle = (k: StyleKey, patch: Partial<ElStyle>) =>
     commit((l) => {
       const merged: ElStyle = { ...l.styles[k], ...patch };
-      (Object.keys(merged) as (keyof ElStyle)[]).forEach((key) => merged[key] === undefined && delete merged[key]);
+      (Object.keys(merged) as (keyof ElStyle)[]).forEach((key) => (merged[key] === undefined || merged[key] === false) && delete merged[key]);
       const styles = { ...l.styles };
       if (Object.keys(merged).length) styles[k] = merged;
       else delete styles[k];
@@ -87,6 +93,7 @@ export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) 
       const zonesNext = { ...l.zones };
       const styles = { ...l.styles };
       delete styles[selected as StyleKey];
+      if (selected === 'teams') delete styles.teamRows;
       let profile = l.profile;
       if (selected === 'profile') profile = undefined;
       else delete zonesNext[selected as ZoneKey];

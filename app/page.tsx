@@ -540,13 +540,14 @@ export default function ConsolePage() {
             {sortedTeams.map((t) => (
               <div
                 key={t.id}
+                className={L.fx('teamRows').className}
                 onClick={() => {
                   setTeamTip(null);
                   setTeamAction(t);
                 }}
                 onMouseEnter={(e) => showTeamTip(e, t)}
                 onMouseLeave={() => setTeamTip(null)}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.45cqw', borderLeft: `0.3cqw solid ${t.color}`, borderRadius: '0.5cqw', padding: '0.25cqw 0.5cqw', fontWeight: 700, fontSize: '1cqw', background: 'rgba(10,18,50,0.75)', cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.45cqw', borderLeft: `0.3cqw solid ${t.color}`, borderRadius: '0.5cqw', padding: '0.25cqw 0.5cqw', fontWeight: 700, fontSize: '1cqw', background: 'rgba(10,18,50,0.75)', cursor: 'pointer', ...L.fx('teamRows').style }}
               >
                 <TeamAvatar avatar={t.avatar} size="1.7em" />
                 <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
@@ -593,8 +594,22 @@ export default function ConsolePage() {
         {/* Hublot : menu des modes (planètes) ou écran de jeu */}
         <div className={L.fx('hub').className} style={{ position: 'absolute', ...rectStyle(zones.hub), boxSizing: 'border-box', ...theme.hubStyle, ...L.fx('hub').style }}>
           {!gameStarted ? (
-            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end' }}>
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: '6%', boxSizing: 'border-box' }}>
+              <p style={{ textAlign: 'center', fontSize: '1.15cqw', lineHeight: 1.35, color: '#c8d3ff', margin: '1.2cqw 2cqw 0', textShadow: '0 0 0.6cqw #000' }}>
+                {activeModeInfo.desc}
+              </p>
+            </div>
+          ) : (
+            gameId && (
+              <GameArea gameId={gameId} initialMode={activeMode} cockpit onExplainChange={setExplainActive} onRestart={() => setShowNewGameChoice(true)} onClose={() => setGameStarted(false)} />
+            )
+          )}
+        </div>
+
+        {/* Icônes des modes de jeu : zone indépendante du hublot (déplaçable / redimensionnable à part) */}
+        {!gameStarted && (
+          <div className={L.fx('modes').className} style={{ position: 'absolute', ...rectStyle(zones.modes), boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', ...L.fx('modes').style }}>
+            <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end' }}>
                 {MODES.map((m) => {
                   const sel = activeMode === m.id;
                   return (
@@ -613,16 +628,8 @@ export default function ConsolePage() {
                   );
                 })}
               </div>
-              <p style={{ textAlign: 'center', fontSize: '1.15cqw', lineHeight: 1.35, color: '#c8d3ff', margin: '1.2cqw 2cqw 0', textShadow: '0 0 0.6cqw #000' }}>
-                {activeModeInfo.desc}
-              </p>
-            </div>
-          ) : (
-            gameId && (
-              <GameArea gameId={gameId} initialMode={activeMode} cockpit onExplainChange={setExplainActive} onRestart={() => setShowNewGameChoice(true)} onClose={() => setGameStarted(false)} />
-            )
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Choix du profil : bandeau en haut au centre, près du halo bleu du plafond */}
         <div className={L.fx('profile').className} style={{ position: 'absolute', left: `${zones.profile.left}%`, top: `${zones.profile.top}%`, transform: 'translateX(-50%)', zIndex: 15, ...L.fx('profile').style }}>

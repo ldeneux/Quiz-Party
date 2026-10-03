@@ -4,9 +4,17 @@ import type { ModeId, Rect, Theme, ThemeId } from './themes';
 // Disposition personnalisée de l'écran d'accueil, enregistrée par thème sur cet appareil (localStorage).
 // Elle se superpose aux réglages du thème : ce qui n'est pas modifié reste tel que défini dans lib/themes.ts.
 
-export type ZoneKey = 'teams' | 'teamCount' | 'join' | 'code' | 'hub' | 'bar';
-export type StyleKey = ZoneKey | 'profile';
-export type ElStyle = { color?: string; bg?: string; bgOpacity?: number };
+export type ZoneKey = 'teams' | 'teamCount' | 'join' | 'code' | 'hub' | 'modes' | 'bar';
+export type StyleKey = ZoneKey | 'profile' | 'teamRows';
+export type ElStyle = {
+  color?: string; // couleur de police
+  bg?: string; // couleur de fond
+  bgOpacity?: number; // opacité du fond (0 à 1)
+  bgNone?: boolean; // fond transparent
+  borderColor?: string;
+  borderWidth?: number; // en px
+  borderNone?: boolean; // aucune bordure (ni lueur)
+};
 export type PlanetTweak = { dx: number; dy: number; scale: number }; // dx/dy en cqw, scale = multiplicateur
 
 export type Layout = {
@@ -17,16 +25,26 @@ export type Layout = {
 };
 
 export const EMPTY_LAYOUT: Layout = { zones: {}, planets: {}, styles: {} };
-export const ZONE_KEYS: ZoneKey[] = ['teams', 'teamCount', 'join', 'code', 'hub', 'bar'];
+export const ZONE_KEYS: ZoneKey[] = ['teams', 'teamCount', 'join', 'code', 'hub', 'modes', 'bar'];
+
+// Position par défaut des icônes de modes : en haut du hublot du thème (comme avant qu'elles soient indépendantes)
+export const defaultModesRect = (hub: Rect): Rect => ({
+  left: hub.left,
+  top: Number((hub.top + hub.height * 0.08).toFixed(1)),
+  width: hub.width,
+  height: Number((hub.height * 0.55).toFixed(1)),
+});
 
 export const ELEMENT_LABELS: Record<StyleKey, string> = {
   teams: 'Écran gauche (équipes)',
   teamCount: 'Afficheur « nombre d’équipes »',
   join: 'Écran droit (QR / explication)',
   code: 'Afficheur « code »',
-  hub: 'Hublot central',
+  hub: 'Hublot central (texte / jeu)',
+  modes: 'Icônes des modes de jeu',
   bar: 'Barre de menu',
   profile: 'Bandeau du profil',
+  teamRows: 'Lignes d’équipes',
 };
 export const CHIP_LABELS: Record<StyleKey, string> = {
   teams: 'Équipes',
@@ -34,8 +52,10 @@ export const CHIP_LABELS: Record<StyleKey, string> = {
   join: 'QR',
   code: 'Code',
   hub: 'Hublot',
+  modes: 'Icônes',
   bar: 'Menu',
   profile: 'Profil',
+  teamRows: 'Lignes',
 };
 export const MODE_LABELS: Record<ModeId, string> = {
   classique: 'Classique',
@@ -80,10 +100,19 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-// Couleurs choisies -> classe + variables CSS (la règle .ck-recolor est définie dans app/page.tsx)
+// Réglages choisis -> classe + styles en ligne (la règle .ck-recolor est définie dans app/page.tsx)
 export function styleFx(st?: ElStyle): { className: string; style: CSSProperties } {
   const style: Record<string, string> = {};
-  if (st?.bg) style.background = hexToRgba(st.bg, st.bgOpacity ?? 0.85);
+  if (st?.bgNone) {
+    style.background = 'transparent';
+    style.backdropFilter = 'none';
+  } else if (st?.bg) style.background = hexToRgba(st.bg, st.bgOpacity ?? 0.85);
+  if (st?.borderNone) {
+    style.border = 'none';
+    style.boxShadow = 'none';
+  } else if (st?.borderColor || st?.borderWidth !== undefined) {
+    style.border = `${st?.borderWidth ?? 1}px solid ${st?.borderColor ?? '#ffffff'}`;
+  }
   if (st?.color) style['--ck-color'] = st.color;
   return { className: st?.color ? 'ck-recolor' : '', style: style as CSSProperties };
 }
@@ -91,7 +120,7 @@ export function styleFx(st?: ElStyle): { className: string; style: CSSProperties
 const n1 = (v: number) => Number(v.toFixed(1));
 
 // Texte à coller dans lib/themes.ts pour rendre cette disposition définitive (valeur par défaut du thème)
-export function exportSnippet(theme: Theme, zones: Theme['zones'], layout: Layout): string {
+export function exportSnippet(theme: Theme, zones: Theme['zones'] & { modes: Rect }, layout: Layout): string {
   const rect = (r: Rect) => `{ left: ${n1(r.left)}, top: ${n1(r.top)}, width: ${n1(r.width)}, height: ${n1(r.height)} }`;
   const lines = [
     `// Thème : ${theme.label}`,
