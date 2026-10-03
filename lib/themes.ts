@@ -1,11 +1,12 @@
 import type { CSSProperties } from 'react';
+import { EXTRA_THEMES, THEME_OVERRIDES, THEME_ORDER } from './themes.extra';
 
 // Habillages (thèmes) de l'écran d'accueil de l'animateur.
 // Un thème = une image de fond + les zones où se placent les écrans (en % de l'image)
 // + les images des modes (« planètes ») et des boutons (« plates »).
 // Le thème « espace » reprend exactement l'habillage historique : rien ne change tant qu'on ne choisit pas autre chose.
 
-export type ThemeId = 'espace' | 'jungle' | 'marins' | 'egypte' | 'art' | 'inventions' | 'sciences' | 'terre' | 'fantasy';
+export type ThemeId = string; // 'espace', 'jungle', 'marins'… : voir THEMES
 export type ModeId = 'classique' | 'defi' | 'survie' | 'participatif' | 'camembert';
 
 export type PlateId =
@@ -48,13 +49,14 @@ export type Theme = {
     hub: Rect; // hublot central : modes ou jeu
     bar: Rect; // pupitre des boutons
     profile: { left: number; top: number }; // bandeau du profil : centre horizontal et haut, en %
+    modes?: Rect; // icônes des modes (indépendantes du hublot) ; par défaut, calée sur le haut du hublot
   };
   hubStyle?: CSSProperties; // fond du hublot central quand le décor n'en fournit pas
   sidePanelStyle?: CSSProperties; // fond des panneaux gauche/droite quand le décor est trop clair pour le texte
   joinPadTop: number; // cqw : espace au-dessus du QR
   qrWidth: number; // cqw
   bar: { background: string; border: string; boxShadow: string };
-  planets: Record<ModeId, { src: string; width: number /* cqw */ }>;
+  planets: Record<ModeId, { src: string | null; width: number /* cqw */ }>;
   plates: Record<PlateId, PlateDef>;
   frames: { progress: FrameDef; msg: FrameDef };
 };
@@ -291,12 +293,9 @@ const egypte: Theme = {
 // ───────────────────────── Arts ─────────────────────────
 const C_art = '/themes/art';
 const artGlass = {
-  //background: 'linear-gradient(180deg, rgba(40,28,68,0.72), rgba(40,28,68,0.8))',
-  background: 'transparent',
-  //border: '2px solid rgba(214,164,244,0.65)',
-  border: 'none',
-  //boxShadow: '0 0 2cqw rgba(214,164,244,0.28), inset 0 0 1.4cqw rgba(214,164,244,0.16)',
-  boxShadow: 'none',
+  background: 'linear-gradient(180deg, rgba(40,28,68,0.72), rgba(40,28,68,0.8))',
+  border: '2px solid rgba(214,164,244,0.65)',
+  boxShadow: '0 0 2cqw rgba(214,164,244,0.28), inset 0 0 1.4cqw rgba(214,164,244,0.16)',
 };
 
 const art: Theme = {
@@ -308,27 +307,24 @@ const art: Theme = {
   stage: { src: `${C_art}/stage.webp`, ratio: 1.7917, bg: '#efe3cf' },
   zones: {
     teams: { left: 9.4, top: 17.5, width: 12.3, height: 50 },
-    teamCount: { left: 9.4, top: 63, width: 12.3, height: 4.8 },
-    join: { left: 83.2, top: 25.5, width: 10.7, height: 31 },
+    teamCount: { left: 9.4, top: 69.2, width: 12.3, height: 4.8 },
+    join: { left: 83.2, top: 20.5, width: 10.7, height: 31 },
     code: { left: 83.2, top: 52, width: 10.7, height: 5.6 },
-    hub: { left: 33.5, top: 22.8, width: 33, height: 42 },
+    hub: { left: 24, top: 17, width: 52, height: 50 },
     bar: { left: 19, top: 82, width: 62, height: 15 },
-    profile: { left: 48, top: 2.2 },
+    profile: { left: 50, top: 3.2 },
   },
-hubStyle: { background: 'linear-gradient(180deg, rgba(40,28,68,0.5), rgba(40,28,68,0.50))', border: '2px solid rgba(214,164,244,0.75)',
-  //hubStyle: { background: 'transparent', color: '#ff007f',textShadow: '0 1px 4px rgba(214,164,244,0.6)',border: 'none',
-  borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(190,130,230,0.35)' },
-  //sidePanelStyle: { background: 'rgba(40,28,68,0.9)', border: '1px solid rgba(214,164,244,0.6)', borderRadius: '0.8cqw' },
-  sidePanelStyle: { background: 'transparent', textShadow: '0 1px 4px rgba(214,164,244,0.6)',border: 'transparent', borderRadius: '0.8cqw' },
+  hubStyle: { background: 'linear-gradient(180deg, rgba(40,28,68,0.9), rgba(40,28,68,0.93))', border: '2px solid rgba(214,164,244,0.75)', borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(190,130,230,0.35)' },
+  sidePanelStyle: { background: 'rgba(40,28,68,0.9)', border: '1px solid rgba(214,164,244,0.6)', borderRadius: '0.8cqw' },
   joinPadTop: 1.6,
   qrWidth: 7,
   bar: { ...artGlass, background: 'linear-gradient(180deg, rgba(40,28,68,0.62), rgba(40,28,68,0.78))' },
   planets: {
-    classique: { src: `${C_art}/icons/classique.webp`, width: 4.5},
-    defi: { src: `${C_art}/icons/defi.webp`, width: 4.5 },
-    survie: { src: `${C_art}/icons/survie.webp`, width: 4.5 },
-    participatif: { src: `${C_art}/icons/participatif.webp`, width: 4.5 },
-    camembert: { src: `${C_art}/icons/camembert.webp`, width: 4.5 },
+    classique: { src: `${C_art}/icons/classique.webp`, width: 8.1 },
+    defi: { src: `${C_art}/icons/defi.webp`, width: 8.1 },
+    survie: { src: `${C_art}/icons/survie.webp`, width: 8.1 },
+    participatif: { src: `${C_art}/icons/participatif.webp`, width: 8.1 },
+    camembert: { src: `${C_art}/icons/camembert.webp`, width: 8.1 },
   },
   plates: {
     fusee: { src: `${C_art}/icons/fusee.webp`, ratio: 0.991, scale: 1.3 },
@@ -407,9 +403,9 @@ const inventions: Theme = {
 // ───────────────────────── Sciences ─────────────────────────
 const C_sciences = '/themes/sciences';
 const sciencesGlass = {
-background: 'linear-gradient(180deg, rgba(34,20,8,0.72), rgba(24,13,5,0.8))',
-  border: '2px solid rgba(235,180,70,0.7)',
-  boxShadow: '0 0 2cqw rgba(255,180,60,0.3), inset 0 0 1.4cqw rgba(255,210,120,0.18)',
+  background: 'linear-gradient(180deg, rgba(10,22,44,0.72), rgba(10,22,44,0.8))',
+  border: '2px solid rgba(90,255,170,0.65)',
+  boxShadow: '0 0 2cqw rgba(90,255,170,0.28), inset 0 0 1.4cqw rgba(90,255,170,0.16)',
 };
 
 const sciences: Theme = {
@@ -418,31 +414,27 @@ const sciences: Theme = {
   emoji: '🧪',
   description: 'Un laboratoire aux couleurs néon. (Fond blanc provisoire.)',
   preview: `${C_sciences}/preview.webp`,
-  stage: { src: `${C_sciences}/stage.webp`, ratio: 1672 / 941, bg: '#2a1706' },
+  stage: { src: '/themes/blanc/stage.webp', ratio: 1.7768, bg: '#ffffff' },
   zones: {
     teams: { left: 3, top: 20, width: 15, height: 38 },
     teamCount: { left: 3, top: 60, width: 15, height: 4 },
     join: { left: 82, top: 20, width: 15, height: 38 },
     code: { left: 82, top: 60, width: 15, height: 4 },
-    hub: { left: 24, top: 16, width: 48, height: 44 },
+    hub: { left: 22, top: 14, width: 56, height: 44 },
     bar: { left: 19, top: 80, width: 62, height: 15 },
     profile: { left: 50, top: 3.2 },
   },
-  hubStyle: {
-    background: 'radial-gradient(ellipse at center, rgba(34,18,4,0.64) 0%, rgba(34,18,4,0.44) 55%, rgba(34,18,4,0) 100%)',
-    textShadow: '0 1px 4px rgba(20,8,0,0.95), 0 0 10px rgba(20,8,0,0.8)',
-  },
-  sidePanelStyle: { background: 'rgba(30,16,6,0.74)', border: '1px solid rgba(235,180,70,0.55)', borderRadius: '0.8cqw' },
+  hubStyle: { background: 'linear-gradient(180deg, rgba(10,22,44,0.94), rgba(10,22,44,0.96))', border: '2px solid rgba(90,255,170,0.65)', borderRadius: '1.8cqw', boxShadow: '0 0 2cqw rgba(60,230,160,0.3)' },
+  sidePanelStyle: { background: 'rgba(10,22,44,0.94)', border: '1px solid rgba(90,255,170,0.55)', borderRadius: '0.8cqw' },
   joinPadTop: 2.2,
   qrWidth: 8.6,
-  bar: { ...sciencesGlass, background: 'linear-gradient(180deg, rgba(34,20,8,0.6), rgba(24,13,5,0.78))' },
-  
+  bar: { ...sciencesGlass, background: 'linear-gradient(180deg, rgba(10,22,44,0.62), rgba(10,22,44,0.78))' },
   planets: {
-    classique: { src: `${C_sciences}/icons/classique.webp`, width: 2 },
-    defi: { src: `${C_sciences}/icons/defi.webp`, width: 2 },
-    survie: { src: `${C_sciences}/icons/survie.webp`, width: 2 },
-    participatif: { src: `${C_sciences}/icons/participatif.webp`, width: 2 },
-    camembert: { src: `${C_sciences}/icons/camembert.webp`, width: 2 },
+    classique: { src: `${C_sciences}/icons/classique.webp`, width: 5.6 },
+    defi: { src: `${C_sciences}/icons/defi.webp`, width: 9.1 },
+    survie: { src: `${C_sciences}/icons/survie.webp`, width: 9.3 },
+    participatif: { src: `${C_sciences}/icons/participatif.webp`, width: 9.3 },
+    camembert: { src: `${C_sciences}/icons/camembert.webp`, width: 8.9 },
   },
   plates: {
     fusee: { src: `${C_sciences}/icons/fusee.webp`, ratio: 0.992, scale: 1.3 },
@@ -455,14 +447,13 @@ const sciences: Theme = {
     plein: { src: `${C_sciences}/icons/plein.webp`, ratio: 1.0, scale: 1.3 },
     valider: { src: `${C_sciences}/icons/valider.webp`, ratio: 0.98, scale: 1.3 },
     annuler: { src: `${C_sciences}/icons/annuler.webp`, ratio: 0.979, scale: 1.3 },
-      profil: { src: null, ratio: 6.2, boxStyle: { ...sciencesGlass, borderRadius: '1.6cqw' } },
+    profil: { src: null, ratio: 6.33, boxStyle: { ...sciencesGlass, borderRadius: '1.6cqw' } },
   },
   frames: {
     progress: { src: `${C_sciences}/frame.webp`, ratio: 1400 / 614, width: 80 },
     msg: { src: `${C_sciences}/frame.webp`, ratio: 1400 / 614, width: 62 },
   },
 };
-
 
 // ───────────────────────── Centre de la Terre ─────────────────────────
 const C_terre = '/themes/terre';
@@ -575,6 +566,16 @@ const fantasy: Theme = {
 };
 
 export const THEMES: Record<ThemeId, Theme> = { espace, jungle, marins, egypte, art, inventions, sciences, terre, fantasy };
-export const THEME_LIST: Theme[] = [espace, jungle, marins, egypte, art, inventions, sciences, terre, fantasy];
 export const DEFAULT_THEME_ID: ThemeId = 'espace';
 export const THEME_STORAGE_KEY = 'quiz-party-theme';
+
+// ── Habillages complémentaires et remplacements (lib/themes.extra.ts) ──
+const registry = THEMES as Record<string, Theme>;
+for (const [id, patch] of Object.entries(THEME_OVERRIDES)) {
+  const base = registry[id];
+  if (base) registry[id] = { ...base, ...patch, zones: { ...base.zones, ...(patch.zones ?? {}) } } as Theme;
+}
+Object.assign(registry, EXTRA_THEMES);
+export const THEME_LIST: Theme[] = [...THEME_ORDER, ...Object.keys(registry).filter((k) => !THEME_ORDER.includes(k))]
+  .map((k) => registry[k])
+  .filter(Boolean);

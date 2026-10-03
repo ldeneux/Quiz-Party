@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { CHIP_LABELS, ELEMENT_LABELS, MODE_LABELS, StyleKey, ZONE_KEYS } from '@/lib/layout';
+import { CHIP_LABELS, ELEMENT_LABELS, MODE_LABELS, PLATE_LABELS, StyleKey, ZONE_KEYS } from '@/lib/layout';
 import type { LayoutApi } from '@/lib/useLayout';
 import type { ModeId, Theme } from '@/lib/themes';
 
@@ -213,7 +213,10 @@ export function LayoutPanels({ L, theme }: { L: LayoutApi; theme: Theme }) {
   const sel = L.selected;
   const isPlanet = !!sel && sel.startsWith('planet:');
   const planetId = isPlanet ? (sel!.slice(7) as ModeId) : null;
-  const styleKey = sel && !isPlanet ? (sel as StyleKey) : null;
+  const isPlate = !!sel && sel.startsWith('plate:');
+  const plateId = isPlate ? sel!.slice(6) : null;
+  const plateScale = plateId ? L.layout.plates[plateId]?.scale ?? 1 : 1;
+  const styleKey = sel && !isPlanet && !isPlate ? (sel as StyleKey) : null;
   const rect = styleKey && styleKey !== 'profile' && styleKey !== 'teamRows' ? L.zones[styleKey] : null;
   const tweak = planetId ? L.planetTweak(planetId) : null;
 
@@ -232,7 +235,7 @@ export function LayoutPanels({ L, theme }: { L: LayoutApi; theme: Theme }) {
       </Floating>
 
       <Floating id="inspector" title="Réglages" width={290} initial={{ top: 10, right: 10 }}>
-        {!sel && <div style={{ opacity: 0.85, lineHeight: 1.4, marginTop: 8 }}>Clique un élément (écran, afficheur, barre, bandeau, icônes) pour régler police, fond et bordure.</div>}
+        {!sel && <div style={{ opacity: 0.85, lineHeight: 1.4, marginTop: 8 }}>Clique un élément (écran, afficheur, barre, bandeau, icônes, boutons du menu) pour le régler.</div>}
 
         {styleKey && (
           <>
@@ -243,6 +246,19 @@ export function LayoutPanels({ L, theme }: { L: LayoutApi; theme: Theme }) {
             {styleKey === 'hub' && <div style={{ opacity: 0.65, fontSize: 11, marginTop: 8 }}>La police du hublot s'applique aussi pendant une partie.</div>}
             {styleKey === 'modes' && <div style={{ opacity: 0.65, fontSize: 11, marginTop: 8 }}>Clique une icône pour la déplacer ou changer sa taille ; la zone règle l'espacement.</div>}
             <div style={row}><button style={btn} onClick={L.resetSelected}>Réinitialiser cet élément</button></div>
+          </>
+        )}
+
+        {plateId && (
+          <>
+            <div style={{ fontWeight: 800, color: CYAN, marginTop: 8 }}>Bouton « {PLATE_LABELS[plateId] ?? plateId} »</div>
+            <div style={{ opacity: 0.7, marginTop: 4, fontSize: 11 }}>Glisse-le pour le déplacer.</div>
+            <div style={row}>
+              <span style={lab}>Taille</span>
+              <input type="range" min={40} max={220} value={Math.round(plateScale * 100)} style={{ flex: 1 }} onChange={(e) => L.setPlate(plateId, { scale: Number(e.target.value) / 100 })} />
+              <span style={{ width: 38, textAlign: 'right' }}>{Math.round(plateScale * 100)}%</span>
+            </div>
+            <div style={row}><button style={btn} onClick={L.resetSelected}>Réinitialiser ce bouton</button></div>
           </>
         )}
 

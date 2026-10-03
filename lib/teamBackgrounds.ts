@@ -14,29 +14,29 @@ const bg = (slug: string, contentTop = '9vh'): TeamBg => ({
 });
 
 export const TEAM_BACKGROUNDS: Record<string, TeamBg> = {
-  // Espace (les équipes sans fond dédié — Orion, CosmoRiders, Nebula Squad — gardent l'écran standard)
+  // Espace (Orion, Les Chevaucheurs d’Étoiles et Les Nébuleuses n'ont pas de fond dédié : écran standard)
   'Les Explorateurs Cosmiques': bg('explorateurs'),
-  'Team Nova': bg('nova'),
-  Galaxie: bg('galaxie'),
-  'Team Lune': bg('lune'),
-  'Team Saturne': bg('saturne'),
+  'Les Novas': bg('nova'),
+  'Galaxie': bg('galaxie'),
+  'Les Lunaires': bg('lune'),
+  'Les Saturniens': bg('saturne'),
   'Les Martiens': bg('martiens'),
   'Les Astronautes': bg('astronautes'),
   'Les Météores': bg('meteores'),
-  Zenith: bg('zenith'),
+  'Zénith': bg('zenith'),
   // Fonds marins (l'emblème n'est pas en haut : peu de place à réserver)
-  'Coral Knights': bg('coral-knights', '5vh'),
-  'Abyss Serpents': bg('abyss-serpents', '5vh'),
-  'Pearl Keepers': bg('pearl-keepers', '5vh'),
-  'Tide Guardians': bg('tide-guardians', '5vh'),
-  'Kraken Squad': bg('kraken-squad', '5vh'),
-  'Sea Lantern Tribe': bg('sea-lantern-tribe', '5vh'),
-  SharkRiders: bg('sharkriders', '5vh'),
-  'Bubble Rangers': bg('bubble-rangers', '5vh'),
-  'Trident Force': bg('trident-force', '5vh'),
-  'Starfish Crew': bg('starfish-crew', '5vh'),
-  'DeepShell Clan': bg('deepshell-clan', '5vh'),
-  'Manta Spirits': bg('manta-spirits', '5vh'),
+  'Les Chevaliers du Corail': bg('coral-knights', '5vh'),
+  'Les Serpents des Abysses': bg('abyss-serpents', '5vh'),
+  'Les Gardiens des Perles': bg('pearl-keepers', '5vh'),
+  'Les Gardiens des Marées': bg('tide-guardians', '5vh'),
+  'Les Krakens': bg('kraken-squad', '5vh'),
+  'La Tribu des Lanternes': bg('sea-lantern-tribe', '5vh'),
+  'Les Chevaucheurs de Requins': bg('sharkriders', '5vh'),
+  'Les Rangers des Bulles': bg('bubble-rangers', '5vh'),
+  'La Force du Trident': bg('trident-force', '5vh'),
+  'L’Équipage des Étoiles de Mer': bg('starfish-crew', '5vh'),
+  'Le Clan des Coquillages': bg('deepshell-clan', '5vh'),
+  'Les Esprits Manta': bg('manta-spirits', '5vh'),
 };
 
 export function getTeamBackground(teamName: string): TeamBg | null {

@@ -469,11 +469,23 @@ export default function ConsolePage() {
   };
   // Emplacement fixe d'un bouton du pupitre : il ne bouge jamais, seul son état (actif / grisé) change
   const PH = 5.2;
-  const slot = (id: string, plate: PlateId, children?: React.ReactNode) => (
-    <div id={id} style={{ width: `${(PH * (theme.plates[plate].scale ?? 1) * theme.plates[plate].ratio).toFixed(2)}cqw`, height: `${(PH * (theme.plates[plate].scale ?? 1)).toFixed(2)}cqw`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      {children}
-    </div>
-  );
+  const slot = (id: string, plate: PlateId, children?: React.ReactNode) => {
+    const pp = L.plateProps(plate);
+    return (
+      <div id={id} className={pp.className} onPointerDown={pp.onPointerDown} style={{ width: `${(PH * (theme.plates[plate].scale ?? 1) * theme.plates[plate].ratio).toFixed(2)}cqw`, height: `${(PH * (theme.plates[plate].scale ?? 1)).toFixed(2)}cqw`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, ...pp.style }}>
+        {children}
+      </div>
+    );
+  };
+  // Bouton de la barre de menu (paramétrage, stats, nouvelle partie, plein écran) : même enveloppe que slot()
+  const barItem = (plate: PlateId, el: React.ReactNode) => {
+    const pp = L.plateProps(plate);
+    return (
+      <div className={pp.className} onPointerDown={pp.onPointerDown} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, ...pp.style }}>
+        {el}
+      </div>
+    );
+  };
   // Raccourcis clavier de l'hôte : Espace = fusée (démarrer / question suivante), S = statistiques, P = progression, F = plein écran
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -518,7 +530,7 @@ export default function ConsolePage() {
       >
         <style>{`
           .ck-recolor, .ck-recolor *{color:var(--ck-color) !important}
-          .ck-edit-planet button{pointer-events:none !important}
+          .ck-edit-planet *{pointer-events:none !important}
           .ck-scroll{scrollbar-width:thin;scrollbar-color:rgba(90,140,255,.75) transparent}
           .ck-scroll::-webkit-scrollbar{width:5px}
           .ck-scroll::-webkit-scrollbar-thumb{background:rgba(90,140,255,.75);border-radius:4px}
@@ -694,8 +706,8 @@ export default function ConsolePage() {
 
         {/* Pupitre du bas : emplacements fixes (les boutons ne bougent pas, ils se grisent quand ils sont inutilisables) */}
         <div className={L.fx('bar').className} style={{ position: 'absolute', ...rectStyle(zones.bar), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: theme.bar.background, border: theme.bar.border, borderRadius: '1.2cqw', boxShadow: theme.bar.boxShadow, ...L.fx('bar').style }}>
-          <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />
-          <CockpitPlate id="stats" label="Statistiques" hint="S · par équipe et par catégorie" disabled={!gameId} onClick={openStats} />
+          {barItem('parametrage', <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />)}
+          {barItem('stats', <CockpitPlate id="stats" label="Statistiques" hint="S · par équipe et par catégorie" disabled={!gameId} onClick={openStats} />)}
           {slot('cockpit-progress', 'progression', !gameStarted && <CockpitPlate id="progression" label="Voir la progression" hint="Mode Trivial Poursuit, pendant la partie" disabled />)}
 
           {/* Fusée : Démarrer avant la partie, puis « Question suivante » (injectée par GameArea) */}
@@ -714,9 +726,9 @@ export default function ConsolePage() {
             )
           )}
 
-          <CockpitPlate id="nouvelle" label="Nouvelle partie" hint="Oublier la partie actuelle" disabled={!gameId} onClick={() => setShowNewGameChoice(true)} />
+          {barItem('nouvelle', <CockpitPlate id="nouvelle" label="Nouvelle partie" hint="Oublier la partie actuelle" disabled={!gameId} onClick={() => setShowNewGameChoice(true)} />)}
           {slot('cockpit-quit', 'quitter', !gameStarted && <CockpitPlate id="quitter" label="Quitter la partie" hint="Aucune partie en cours" disabled />)}
-          <CockpitPlate id="plein" label="Plein écran" hint="F" onClick={toggleFullscreen} />
+          {barItem('plein', <CockpitPlate id="plein" label="Plein écran" hint="F" onClick={toggleFullscreen} />)}
 
           {/* Messages d'erreur : au-dessus du pupitre, sans décaler les boutons */}
           <div id="cockpit-actions" style={{ position: 'absolute', bottom: 'calc(100% + 0.3cqw)', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }} />

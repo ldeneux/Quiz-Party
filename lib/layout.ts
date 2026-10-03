@@ -23,14 +23,27 @@ export type PlanetTweak = {
   showLabel?: boolean; // afficher le texte sous l'icône (par défaut oui)
 };
 
+export type PlateTweak = { dx: number; dy: number; scale: number }; // boutons de la barre de menu : décalage en cqw + taille
+
 export type Layout = {
   zones: Partial<Record<ZoneKey, Rect>>;
   profile?: { left: number; top: number };
   planets: Partial<Record<ModeId, PlanetTweak>>;
+  plates: Partial<Record<string, PlateTweak>>;
   styles: Partial<Record<StyleKey, ElStyle>>;
 };
 
-export const EMPTY_LAYOUT: Layout = { zones: {}, planets: {}, styles: {} };
+export const EMPTY_LAYOUT: Layout = { zones: {}, planets: {}, plates: {}, styles: {} };
+
+export const PLATE_LABELS: Record<string, string> = {
+  parametrage: 'Paramétrage',
+  stats: 'Statistiques',
+  progression: 'Progression',
+  fusee: 'Démarrer / Question suivante',
+  nouvelle: 'Nouvelle partie',
+  quitter: 'Quitter',
+  plein: 'Plein écran',
+};
 export const ZONE_KEYS: ZoneKey[] = ['teams', 'teamCount', 'join', 'code', 'hub', 'modes', 'bar'];
 
 // Position par défaut des icônes de modes : en haut du hublot du thème (comme avant qu'elles soient indépendantes)
@@ -79,7 +92,7 @@ export function loadLayout(id: ThemeId): Layout {
     const raw = window.localStorage.getItem(storageKey(id));
     if (!raw) return EMPTY_LAYOUT;
     const p = JSON.parse(raw);
-    return { zones: p.zones ?? {}, profile: p.profile, planets: p.planets ?? {}, styles: p.styles ?? {} };
+    return { zones: p.zones ?? {}, profile: p.profile, planets: p.planets ?? {}, plates: p.plates ?? {}, styles: p.styles ?? {} };
   } catch {
     return EMPTY_LAYOUT;
   }
@@ -136,6 +149,7 @@ export function exportSnippet(theme: Theme, zones: Theme['zones'] & { modes: Rec
     '  },',
   ];
   if (Object.keys(layout.planets).length) lines.push('', `// Icônes des modes (décalage en cqw, taille en multiplicateur)`, `planets: ${JSON.stringify(layout.planets)}`);
+  if (Object.keys(layout.plates).length) lines.push('', `// Boutons de la barre (décalage en cqw, taille en multiplicateur)`, `plates: ${JSON.stringify(layout.plates)}`);
   if (Object.keys(layout.styles).length) lines.push('', `// Couleurs`, `styles: ${JSON.stringify(layout.styles)}`);
   return lines.join('\n');
 }

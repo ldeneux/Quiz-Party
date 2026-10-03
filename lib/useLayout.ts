@@ -7,6 +7,7 @@ import {
   ElStyle,
   Layout,
   PlanetTweak,
+  PlateTweak,
   StyleKey,
   ZONE_KEYS,
   ZoneKey,
@@ -22,9 +23,10 @@ import type { ModeId, Rect, Theme } from './themes';
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const DEFAULT_TWEAK: PlanetTweak = { dx: 0, dy: 0, scale: 1, labelScale: 1, showLabel: true };
+const DEFAULT_PLATE: PlateTweak = { dx: 0, dy: 0, scale: 1 };
 
 // Sélection : une zone, le bandeau du profil, ou une icône de mode ("planet:classique")
-export type Selection = StyleKey | `planet:${ModeId}` | null;
+export type Selection = StyleKey | `planet:${ModeId}` | `plate:${string}` | null;
 
 export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) {
   const [layout, setLayout] = useState<Layout>(EMPTY_LAYOUT);
@@ -72,6 +74,8 @@ export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) 
   const setProfile = (pos: { left: number; top: number }) => commit((l) => ({ ...l, profile: pos }));
   const setPlanet = (id: ModeId, patch: Partial<PlanetTweak>) =>
     commit((l) => ({ ...l, planets: { ...l.planets, [id]: { ...DEFAULT_TWEAK, ...l.planets[id], ...patch } } }));
+  const setPlate = (id: string, patch: Partial<PlateTweak>) =>
+    commit((l) => ({ ...l, plates: { ...l.plates, [id]: { ...DEFAULT_PLATE, ...l.plates[id], ...patch } } }));
   const setStyle = (k: StyleKey, patch: Partial<ElStyle>) =>
     commit((l) => {
       const merged: ElStyle = { ...l.styles[k], ...patch };
@@ -85,6 +89,11 @@ export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) 
   const resetSelected = () => {
     if (!selected) return;
     commit((l) => {
+      if (selected.startsWith('plate:')) {
+        const plates = { ...l.plates };
+        delete plates[selected.slice(6)];
+        return { ...l, plates };
+      }
       if (selected.startsWith('planet:')) {
         const planets = { ...l.planets };
         delete planets[selected.slice(7) as ModeId];
@@ -155,6 +164,28 @@ export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) 
     track(e, (_a, _b, dxc, dyc) => setPlanet(id, { dx: r1(start.dx + dxc), dy: r1(start.dy + dyc) }));
   };
 
+  const beginPlateMove = (e: React.PointerEvent, id: string) => {
+    setSelected(`plate:${id}`);
+    const start = { ...DEFAULT_PLATE, ...layout.plates[id] };
+    track(e, (_a, _b, dxc, dyc) => setPlate(id, { dx: r1(start.dx + dxc), dy: r1(start.dy + dyc) }));
+  };
+
+  // Enveloppe d'un bouton de la barre de menu : décalage + taille (+ poignée de glisser en mode disposition)
+  const plateProps = (id: string) => {
+    const t = { ...DEFAULT_PLATE, ...layout.plates[id] };
+    const sel = editing && selected === `plate:${id}`;
+    const style: React.CSSProperties = {
+      transform: `translate(${t.dx}cqw, ${t.dy}cqw) scale(${t.scale})`,
+      position: 'relative',
+      ...(editing ? { cursor: 'move', touchAction: 'none', zIndex: 210, outline: sel ? '2px solid #38d9ff' : '1.5px dashed rgba(56,217,255,.85)', outlineOffset: 3, borderRadius: 6 } : {}),
+    };
+    return {
+      className: editing ? 'ck-edit-planet' : undefined,
+      style,
+      onPointerDown: editing ? (e: React.PointerEvent) => beginPlateMove(e, id) : undefined,
+    };
+  };
+
   // Enveloppe d'une icône de mode : décalage + taille (+ poignée de glisser en mode disposition)
   const planetProps = (id: ModeId) => {
     const t = { ...DEFAULT_TWEAK, ...layout.planets[id] };
@@ -176,9 +207,9 @@ export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) 
   const snippet = () => exportSnippet(theme, zones, layout);
 
   return {
-    zones, layout, fx, planetProps, planetTweak, snippet,
+    zones, layout, fx, planetProps, planetTweak, plateProps, snippet,
     editing, setEditing, selected, setSelected, linked, setLinked,
-    setZone, setProfile, setPlanet, setStyle, resetSelected, resetAll,
+    setZone, setProfile, setPlanet, setPlate, setStyle, resetSelected, resetAll,
     beginMove, beginResize, beginProfileMove,
     ZONE_KEYS,
   };

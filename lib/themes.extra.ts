@@ -66,9 +66,14 @@ const astronomie = emptyTheme('astronomie', 'Astronomie', '🔭', 'Planètes, t�
 const civilisations = emptyTheme('civilisations', 'Civilisations', '🏛️', 'Monuments et empires du monde. (Page blanche : décor à venir.)');
 const iles = emptyTheme('iles', 'Îles', '🏝️', 'Plages, palmiers et perroquets. (Page blanche : décor à venir.)');
 
-// Voyages dans le temps : le décor existe (mammouths et tigres à dents de sabre), les icônes pas encore (neutres)
+// Voyages dans le temps : décor (mammouths et tigres à dents de sabre) + icônes de modes et de menu néon
+const tempsGlass = {
+  background: 'linear-gradient(180deg, rgba(6,14,34,0.72), rgba(4,10,26,0.82))',
+  border: '2px solid rgba(90,200,255,0.65)',
+  boxShadow: '0 0 2cqw rgba(60,160,255,0.3), inset 0 0 1.4cqw rgba(120,200,255,0.16)',
+};
 const temps: Theme = {
-  ...emptyTheme('temps', 'Voyages dans le temps', '⏳', 'Un poste de pilotage face à l’ère glaciaire. (Icônes à venir.)'),
+  ...emptyTheme('temps', 'Voyages dans le temps', '⏳', 'Un poste de pilotage face à l’ère glaciaire, entre mammouths et civilisations.'),
   stage: { src: '/themes/temps/stage.webp', ratio: 1536 / 1024, bg: '#07101c' },
   zones: {
     teams: { left: 3.4, top: 9, width: 15.6, height: 46 },
@@ -84,6 +89,22 @@ const temps: Theme = {
     textShadow: '0 1px 4px rgba(0,10,30,0.95), 0 0 10px rgba(0,10,30,0.8)',
   },
   sidePanelStyle: { background: 'rgba(6,16,32,0.88)', border: '1px solid rgba(110,190,255,0.55)', borderRadius: '0.8cqw' },
+  bar: { ...tempsGlass, background: 'linear-gradient(180deg, rgba(6,14,34,0.62), rgba(4,10,26,0.8))' },
+  planets: {
+    classique: { src: '/themes/temps/icons/classique.webp', width: 9 },
+    defi: { src: '/themes/temps/icons/defi.webp', width: 9 },
+    survie: { src: '/themes/temps/icons/survie.webp', width: 9 },
+    participatif: { src: '/themes/temps/icons/participatif.webp', width: 9 },
+    camembert: { src: '/themes/temps/icons/camembert.webp', width: 9 },
+  },
+  plates: {
+    ...Object.fromEntries(PLATES.map((p) => [p, { src: `/themes/temps/icons/${p}.webp`, ratio: 1, scale: 1.3 }])),
+    profil: { src: null, ratio: 6.2, boxStyle: { ...tempsGlass, borderRadius: '1.6cqw' } },
+  } as unknown as Theme['plates'],
+  frames: {
+    progress: { src: '/themes/temps/frame.webp', ratio: 1400 / 614, width: 80 },
+    msg: { src: '/themes/temps/frame.webp', ratio: 1400 / 614, width: 62 },
+  },
 };
 
 export const EXTRA_THEMES: Record<string, Theme> = { sports, temps, voyage, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
