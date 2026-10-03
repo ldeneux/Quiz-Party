@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { THEME_LIST } from '@/lib/themes';
 import { useTheme } from '@/lib/useTheme';
+import CategoryBadge from '@/components/CategoryBadge';
 import { EDIT_FLAG, clearLayout } from '@/lib/layout';
 
 const LEVELS = [
@@ -406,7 +407,7 @@ export default function ParametragePage() {
             {categories.map((c) => (
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                 <button onClick={() => toggleCategory(c.id)} style={chip(selectedCategories.includes(c.id))}>
-                  {c.emoji} {c.name}
+                  <CategoryBadge name={c.name} emoji={c.emoji} height="2.4em" withName />
                 </button>
                 <button onClick={() => editCategory(c)} title="Modifier" style={iconBtn}>✏️</button>
                 <button onClick={() => deleteCategory(c.id, c.name)} title="Supprimer" style={iconBtn}>✕</button>

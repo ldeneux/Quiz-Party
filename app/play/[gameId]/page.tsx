@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { getRandomPresets, TeamPreset } from '@/lib/teamPresets';
 import { getTeamBackground, TeamBg } from '@/lib/teamBackgrounds';
 import TeamAvatar from '@/components/TeamAvatar';
+import CategoryBadge from '@/components/CategoryBadge';
+import ModeIcon from '@/components/ModeIcon';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const MODE_META: Record<string, { label: string; emoji: string }> = {
@@ -30,7 +32,7 @@ function ModeLabel({ mode }: { mode: string | null }) {
         zIndex: 10,
       }}
     >
-      {MODE_META[mode].emoji} {MODE_META[mode].label}
+      <ModeIcon mode={mode} /> {MODE_META[mode].label}
     </div>
   );
 }
@@ -63,7 +65,7 @@ function TeamHeader({
         textShadow: themed ? '0 1px 6px rgba(0,0,0,0.7)' : undefined,
       }}
     >
-      <span>{meta ? `${meta.emoji} ${meta.label}` : ''}</span>
+      <span>{meta && mode ? <><ModeIcon mode={mode} /> {meta.label}</> : ''}</span>
       <span>
         <TeamAvatar avatar={avatar} size="1.6em" /> {name}
         {mode === 'survie' && lives !== null && lives !== undefined && (
@@ -527,7 +529,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
                       alignItems: 'center',
                     }}
                   >
-                    <span>{c.emoji} {c.name}</span>
+                    <CategoryBadge name={c.name} emoji={c.emoji} height={60} withName />
                     {progress > 0 && <span style={{ fontSize: 13, fontWeight: 800 }}>{progress}/3</span>}
                   </button>
                 );
@@ -627,11 +629,11 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       ) : (
         <>
           {(question.category_name || camembertCategory) && (
-            <p style={{ textAlign: 'center', color: '#6c7bf7', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
-              {question.category_emoji ?? camembertCategory?.emoji} {question.category_name ?? camembertCategory?.name}
-            </p>
+            <div style={{ textAlign: 'center', color: '#6c7bf7', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
+              <CategoryBadge name={question.category_name ?? camembertCategory?.name} emoji={question.category_emoji ?? camembertCategory?.emoji} height={88} />
+            </div>
           )}
-          <p style={{ fontWeight: 800, fontSize: 19, lineHeight: 1.4, marginBottom: 20, textAlign: 'center' }}>
+          <p style={{ fontWeight: 800, fontSize: 16, lineHeight: 1.4, marginBottom: 20, textAlign: 'center' }}>
             {question.prompt}
           </p>
           <div style={{ display: 'grid', gap: 12 }} key={question.id}>

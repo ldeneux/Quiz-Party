@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
 import { useTheme } from '@/lib/useTheme';
 import TeamAvatar from '@/components/TeamAvatar';
+import CategoryBadge from '@/components/CategoryBadge';
 import CockpitPlate from '@/components/CockpitPlate';
 import CockpitCrawl from '@/components/CockpitCrawl';
 import CockpitMsgBox from '@/components/CockpitMsgBox';
@@ -72,7 +73,7 @@ const cockpitStyles: Record<string, React.CSSProperties> = {
   qHead: { display: 'flex', alignItems: 'center', gap: '0.8cqw', marginBottom: '0.7cqw' },
   qTag: { background: 'rgba(80,170,255,.18)', color: '#8fd0ff', fontWeight: 800, padding: '0.25cqw 0.8cqw', borderRadius: 999, fontSize: '1cqw', border: '1px solid rgba(120,190,255,.4)' },
   timer: { marginLeft: 'auto', fontWeight: 800, fontSize: '2cqw', color: '#ffd166', textShadow: '0 0 1cqw #ff9f1c' },
-  questionText: { fontSize: '1.9cqw', fontWeight: 800, marginBottom: '0.8cqw', lineHeight: 1.2 },
+  questionText: { fontSize: '1.35cqw', fontWeight: 800, marginBottom: '0.8cqw', lineHeight: 1.2 },
   choices: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7cqw', marginBottom: '0.7cqw' },
   choice: { background: 'rgba(15,25,70,.7)', border: '1px solid rgba(120,160,255,.45)', borderRadius: '0.8cqw', padding: '0.6cqw 0.9cqw', fontWeight: 700, fontSize: '1.35cqw', lineHeight: 1.2 },
   choiceCorrect: { background: 'rgba(30,160,120,.35)', borderColor: '#35e0b0', boxShadow: '0 0 1cqw rgba(53,224,176,.6)' },
@@ -843,7 +844,7 @@ export default function GameArea({
                   {wedgeCategories.map((c) => (
                     <tr key={c.id}>
                       <td style={{ padding: 8, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        {c.emoji} {c.name}
+                        <CategoryBadge name={c.name} emoji={c.emoji} height="2.8em" withName />
                       </td>
                       {teams.map((t) => {
                         const won = (t.camembert_won ?? []).includes(c.id);
@@ -1051,7 +1052,7 @@ export default function GameArea({
                     cursor: 'pointer',
                   }}
                 >
-                  {c.emoji} {c.name}
+                  <CategoryBadge name={c.name} emoji={c.emoji} height="2.6em" withName />
                 </button>
               );
             })}
@@ -1081,9 +1082,12 @@ export default function GameArea({
           <div style={styles.qHead}>
             <span style={styles.qTag}>Question</span>
             {(question.category_name || camembertCategory) && (
-              <span style={{ ...styles.qTag, background: '#eef0f8', color: '#6c7bf7' }}>
-                {question.category_emoji ?? camembertCategory?.emoji} {question.category_name ?? camembertCategory?.name}
-              </span>
+              <CategoryBadge
+                name={question.category_name ?? camembertCategory?.name}
+                emoji={question.category_emoji ?? camembertCategory?.emoji}
+                height={cockpit ? '5cqw' : '84px'}
+                fallbackStyle={{ ...styles.qTag, background: '#eef0f8', color: '#6c7bf7' }}
+              />
             )}
             {mode === 'participatif' && (
               <span style={{ ...styles.qTag, background: '#fff3e0', color: '#b5761f' }}>
@@ -1404,7 +1408,7 @@ const baseStyles: Record<string, React.CSSProperties> = {
   qHead: { display: 'flex', justifyContent: 'space-between', marginBottom: 16 },
   qTag: { background: '#e6f5fd', color: '#4fb0e8', fontWeight: 800, padding: '6px 12px', borderRadius: 999, fontSize: 12 },
   timer: { fontWeight: 800, fontSize: 20, color: '#6c7bf7' },
-  questionText: { fontSize: 24, fontWeight: 800, marginBottom: 24 },
+  questionText: { fontSize: 16, fontWeight: 800, marginBottom: 24 },
   choices: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 },
   choice: { background: '#f4f6fb', borderRadius: 16, padding: 16, fontWeight: 700, border: '2px solid transparent' },
   choiceCorrect: { background: '#e3f8f2', borderColor: '#35c2a3' },

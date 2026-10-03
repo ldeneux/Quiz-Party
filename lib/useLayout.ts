@@ -21,7 +21,7 @@ import type { ModeId, Rect, Theme } from './themes';
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
-const DEFAULT_TWEAK: PlanetTweak = { dx: 0, dy: 0, scale: 1 };
+const DEFAULT_TWEAK: PlanetTweak = { dx: 0, dy: 0, scale: 1, labelScale: 1, showLabel: true };
 
 // Sélection : une zone, le bandeau du profil, ou une icône de mode ("planet:classique")
 export type Selection = StyleKey | `planet:${ModeId}` | null;
@@ -160,8 +160,7 @@ export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) 
     const t = { ...DEFAULT_TWEAK, ...layout.planets[id] };
     const sel = editing && selected === `planet:${id}`;
     const style: React.CSSProperties = {
-      transform: `translate(${t.dx}cqw, ${t.dy}cqw) scale(${t.scale})`,
-      transformOrigin: 'center',
+      transform: `translate(${t.dx}cqw, ${t.dy}cqw)`,
       position: 'relative',
       ...(editing ? { cursor: 'move', touchAction: 'none', zIndex: 210, outline: sel ? '2px solid #38d9ff' : '1.5px dashed rgba(56,217,255,.85)', outlineOffset: 3, borderRadius: 6 } : {}),
     };
@@ -172,11 +171,12 @@ export function useLayout(theme: Theme, stageRef: React.RefObject<HTMLElement>) 
     };
   };
 
+  const planetTweak = (id: ModeId) => ({ ...DEFAULT_TWEAK, ...layout.planets[id] }) as Required<PlanetTweak>;
   const fx = (k: StyleKey) => styleFx(layout.styles[k]);
   const snippet = () => exportSnippet(theme, zones, layout);
 
   return {
-    zones, layout, fx, planetProps, snippet,
+    zones, layout, fx, planetProps, planetTweak, snippet,
     editing, setEditing, selected, setSelected, linked, setLinked,
     setZone, setProfile, setPlanet, setStyle, resetSelected, resetAll,
     beginMove, beginResize, beginProfileMove,

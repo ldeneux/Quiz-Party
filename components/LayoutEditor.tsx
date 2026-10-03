@@ -215,7 +215,7 @@ export function LayoutPanels({ L, theme }: { L: LayoutApi; theme: Theme }) {
   const planetId = isPlanet ? (sel!.slice(7) as ModeId) : null;
   const styleKey = sel && !isPlanet ? (sel as StyleKey) : null;
   const rect = styleKey && styleKey !== 'profile' && styleKey !== 'teamRows' ? L.zones[styleKey] : null;
-  const tweak = planetId ? { dx: 0, dy: 0, scale: 1, ...L.layout.planets[planetId] } : null;
+  const tweak = planetId ? L.planetTweak(planetId) : null;
 
   return (
     <>
@@ -251,9 +251,20 @@ export function LayoutPanels({ L, theme }: { L: LayoutApi; theme: Theme }) {
             <div style={{ fontWeight: 800, color: CYAN, marginTop: 8 }}>Icône « {MODE_LABELS[planetId]} »</div>
             <div style={{ opacity: 0.7, marginTop: 4, fontSize: 11 }}>Glisse-la pour la déplacer.</div>
             <div style={row}>
-              <span style={lab}>Taille</span>
+              <span style={lab}>Taille icône</span>
               <input type="range" min={40} max={220} value={Math.round(tweak.scale * 100)} style={{ flex: 1 }} onChange={(e) => L.setPlanet(planetId, { scale: Number(e.target.value) / 100 })} />
               <span style={{ width: 38, textAlign: 'right' }}>{Math.round(tweak.scale * 100)}%</span>
+            </div>
+            <div style={row}>
+              <span style={lab}>Texte</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                <input type="checkbox" checked={tweak.showLabel} onChange={(e) => L.setPlanet(planetId, { showLabel: e.target.checked })} /> afficher
+              </label>
+            </div>
+            <div style={{ ...row, opacity: tweak.showLabel ? 1 : 0.4 }}>
+              <span style={lab}>Taille texte</span>
+              <input type="range" min={50} max={250} disabled={!tweak.showLabel} value={Math.round(tweak.labelScale * 100)} style={{ flex: 1 }} onChange={(e) => L.setPlanet(planetId, { labelScale: Number(e.target.value) / 100 })} />
+              <span style={{ width: 38, textAlign: 'right' }}>{Math.round(tweak.labelScale * 100)}%</span>
             </div>
             <div style={row}><button style={btn} onClick={L.resetSelected}>Réinitialiser cette icône</button></div>
           </>

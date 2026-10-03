@@ -15,7 +15,13 @@ export type ElStyle = {
   borderWidth?: number; // en px
   borderNone?: boolean; // aucune bordure (ni lueur)
 };
-export type PlanetTweak = { dx: number; dy: number; scale: number }; // dx/dy en cqw, scale = multiplicateur
+export type PlanetTweak = {
+  dx: number; // décalage en cqw
+  dy: number;
+  scale: number; // taille de l'icône (multiplicateur)
+  labelScale?: number; // taille du texte (multiplicateur), indépendante de l'icône
+  showLabel?: boolean; // afficher le texte sous l'icône (par défaut oui)
+};
 
 export type Layout = {
   zones: Partial<Record<ZoneKey, Rect>>;

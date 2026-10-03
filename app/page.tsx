@@ -10,6 +10,7 @@ import TeamAvatar from '@/components/TeamAvatar';
 import { PlateId, rectStyle } from '@/lib/themes';
 import { useLayout } from '@/lib/useLayout';
 import { LayoutOverlays, LayoutPanels } from '@/components/LayoutEditor';
+import ModeIcon from '@/components/ModeIcon';
 import { useTheme } from '@/lib/useTheme';
 import CockpitQR from '@/components/CockpitQR';
 
@@ -612,17 +613,27 @@ export default function ConsolePage() {
             <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end' }}>
                 {MODES.map((m) => {
                   const sel = activeMode === m.id;
+                  const tw = L.planetTweak(m.id as keyof typeof theme.planets);
                   return (
                     <div key={m.id} {...L.planetProps(m.id as keyof typeof theme.planets)}>
                     <button
                       onClick={() => selectMode(m.id)}
-                      title={m.label}
                       style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5cqw', opacity: sel ? 1 : 0.72, transform: sel ? 'scale(1.15)' : 'scale(1)', transition: 'transform .25s, opacity .25s, filter .25s', filter: sel ? `drop-shadow(0 0 1.1cqw ${m.color})` : 'none' }}
                     >
-                      <img src={theme.planets[m.id as keyof typeof theme.planets].src} alt="" draggable={false} style={{ width: `${theme.planets[m.id as keyof typeof theme.planets].width}cqw`, display: 'block' }} />
-                      <span style={{ fontWeight: 800, fontSize: '1.3cqw', color: sel ? '#fff' : '#a9b6e6', textShadow: '0 0 0.8cqw #000' }}>
-                        {m.emoji} {m.label}
-                      </span>
+                      <img src={theme.planets[m.id as keyof typeof theme.planets].src} alt="" draggable={false} style={{ width: `${theme.planets[m.id as keyof typeof theme.planets].width * tw.scale}cqw`, display: 'block' }} />
+                      {tw.showLabel && (
+                        <span
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.45cqw', whiteSpace: 'nowrap',
+                            padding: '0.4cqw 0.9cqw', borderRadius: '0.6cqw', fontWeight: 800, fontSize: `${1.05 * tw.labelScale}cqw`,
+                            background: 'rgba(4,9,36,0.92)', color: sel ? '#fff' : '#dfe9ff',
+                            border: sel ? '1px solid #fff' : '1px solid rgba(120,175,255,0.75)',
+                            boxShadow: sel ? `0 0 1.2cqw ${m.color}` : '0 0 1.2cqw rgba(60,120,255,0.45)',
+                          }}
+                        >
+                          <ModeIcon mode={m.id} /> {m.label}
+                        </span>
+                      )}
                     </button>
                     </div>
                   );

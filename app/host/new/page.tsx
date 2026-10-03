@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useTheme } from '@/lib/useTheme';
+import CategoryBadge from '@/components/CategoryBadge';
 
 const LEVELS = ['CP', 'CE1', 'CE2', 'CM1', 'CM2', 'ADO', 'ADULTE'];
 
@@ -111,7 +112,7 @@ export default function NewGamePage() {
                   cursor: 'pointer',
                 }}
               >
-                {cat.emoji} {cat.name}
+                <CategoryBadge name={cat.name} emoji={cat.emoji} height="2.4em" withName />
               </button>
             ))}
           </div>
