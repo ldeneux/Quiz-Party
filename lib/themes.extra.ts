@@ -65,6 +65,8 @@ const mythologie = emptyTheme('mythologie', 'Mythologie', '⚡', 'Dieux, héros 
 const astronomie = emptyTheme('astronomie', 'Astronomie', '🔭', 'Planètes, télescopes et galaxies. (Page blanche : décor à venir.)');
 const civilisations = emptyTheme('civilisations', 'Civilisations', '🏛️', 'Monuments et empires du monde. (Page blanche : décor à venir.)');
 const iles = emptyTheme('iles', 'Îles', '🏝️', 'Plages, palmiers et perroquets. (Page blanche : décor à venir.)');
+const sucrerie = emptyTheme( 'sucrerie',  'Sucreries',  '🍬',  'Bonbons, gâteaux, glaces et gourmandises. (Page blanche : décor à venir.)');
+
 
 // Voyages dans le temps : décor (mammouths et tigres à dents de sabre) + icônes de modes et de menu néon
 const tempsGlass = {
@@ -107,7 +109,7 @@ const temps: Theme = {
   },
 };
 
-export const EXTRA_THEMES: Record<string, Theme> = { sports, temps, voyage, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
+export const EXTRA_THEMES: Record<string, Theme> = { sports, temps, voyage, peche, aventure, medieval, mythologie, astronomie, civilisations, iles,sucrerie };
 
 // ── Remplacements de décor ──
 // Espace : nouveau poste de pilotage (l'astronaute). Les boutons et icônes existants sont conservés.
@@ -144,5 +146,5 @@ export const THEME_OVERRIDES: Record<string, Omit<Partial<Theme>, 'zones'> & { z
 export const THEME_ORDER: string[] = [
   'espace', 'art', 'marins', 'jungle', 'egypte', 'sports',
   'terre', 'temps', 'voyage', 'peche', 'aventure', 'medieval',
-  'mythologie', 'fantasy', 'astronomie', 'sciences', 'inventions', 'civilisations', 'iles',
+  'mythologie', 'fantasy', 'astronomie', 'sciences', 'inventions', 'civilisations', 'iles','sucrerie'
 ];
