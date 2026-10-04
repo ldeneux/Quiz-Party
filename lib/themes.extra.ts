@@ -128,6 +128,23 @@ export const THEME_OVERRIDES: Record<string, Omit<Partial<Theme>, 'zones'> & { z
       profile: { left: 50, top: 2.2 },
     },
   },
+  sucrerie: {
+  stage: { 
+    src: '/themes/sucrerie/stage.webp', 
+    ratio: 2560 / 1440, 
+    bg: '#ffeef8' // couleur douce sucrée
+  },
+  zones: {
+    teams: { left: 3, top: 20, width: 15, height: 38 },
+    teamCount: { left: 3, top: 60, width: 15, height: 4 },
+    join: { left: 82, top: 20, width: 15, height: 38 },
+    code: { left: 82, top: 60, width: 15, height: 4 },
+    hub: { left: 22, top: 14, width: 56, height: 44 },
+    bar: { left: 19, top: 80, width: 62, height: 15 },
+    profile: { left: 50, top: 3.2 },
+  }
+},
+
   fantasy: {
     stage: { src: '/themes/fantasy/stage.webp', ratio: 1536 / 1024, bg: '#1a1038' },
     zones: {
