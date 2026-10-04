@@ -6,7 +6,9 @@ import { supabase } from '@/lib/supabaseClient';
 import { useTheme } from '@/lib/useTheme';
 import CategoryBadge from '@/components/CategoryBadge';
 
-const LEVELS = ['CP', 'CE1', 'CE2', 'CM1', 'CM2', 'ADO', 'ADULTE'];
+// Repli si la table des niveaux est illisible ; sinon les niveaux viennent de la base (Paramétrage > Gérer les niveaux)
+const FALLBACK_LEVELS = ['CP', 'CE1', 'CE2', 'CM1', 'CM2', 'ADO', 'ADULTE'].map((id, i) => ({ id, label: id, sort_order: i + 1 }));
+type LevelOpt = { id: string; label: string; sort_order: number; is_hidden?: boolean };
 
 type Category = { id: string; name: string; emoji: string };
 
@@ -14,6 +16,7 @@ export default function NewGamePage() {
   const router = useRouter();
   const { theme } = useTheme();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [levels, setLevels] = useState<LevelOpt[]>(FALLBACK_LEVELS);
   const [selectedLevels, setSelectedLevels] = useState<string[]>(['CM1']);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +27,13 @@ export default function NewGamePage() {
       .from('categories')
       .select('*')
       .then(({ data }) => setCategories((data as Category[]) ?? []));
+    supabase
+      .from('difficulty_levels')
+      .select('*')
+      .then(({ data }) => {
+        const rows = ((data as LevelOpt[]) ?? []).filter((l) => !l.is_hidden).sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label, 'fr'));
+        if (rows.length) setLevels(rows);
+      });
   }, []);
 
   const toggleLevel = (level: string) => {
@@ -72,20 +82,20 @@ export default function NewGamePage() {
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontWeight: 700, marginBottom: 10 }}>Niveaux</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {LEVELS.map((level) => (
+          {levels.map((lv) => (
             <button
-              key={level}
-              onClick={() => toggleLevel(level)}
+              key={lv.id}
+              onClick={() => toggleLevel(lv.id)}
               style={{
                 padding: '8px 16px',
                 borderRadius: 999,
-                border: selectedLevels.includes(level) ? '2px solid #6c7bf7' : '2px solid #eaedf6',
-                background: selectedLevels.includes(level) ? '#eceeff' : '#fff',
+                border: selectedLevels.includes(lv.id) ? '2px solid #6c7bf7' : '2px solid #eaedf6',
+                background: selectedLevels.includes(lv.id) ? '#eceeff' : '#fff',
                 fontWeight: 700,
                 cursor: 'pointer',
               }}
             >
-              {level}
+              {lv.label}
             </button>
           ))}
         </div>

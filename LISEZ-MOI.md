@@ -20,3 +20,13 @@
 ## Base de données (facultatif)
 `supabase/rename-teams-fr.sql` renomme en français les équipes déjà créées dans des parties existantes.
 Les nouvelles parties utilisent directement les noms de `lib/teamPresets.ts`. Les équipes ne sont pas stockées comme « modèles » en base : elles sont créées à chaque partie.
+
+## Nouvel écran Paramétrage (packs, profils, catégories, niveaux)
+1. **Exécute `supabase/migration-014-parametrage.sql`** dans l'éditeur SQL de Supabase (une seule fois) : niveaux configurables
+   (icône, « niveau scolaire », masqué) + vue de comptage qui rend l'écran léger. Sans elle l'écran fonctionne en mode dégradé (comptage plus lent, options de niveaux grisées).
+2. Menu à 4 options : Générer les packs (Gemini) · Gérer les profils · Gérer les catégories · Gérer les niveaux, avec un tableau catégories × niveaux commun.
+3. **Coût Gemini** : une fenêtre affiche le coût estimé AVANT toute génération ; le coût réel est affiché à la fin.
+   Tarifs réglables sans toucher au code (optionnel, `.env.local`) : `NEXT_PUBLIC_GEMINI_PRICE_IN`, `NEXT_PUBLIC_GEMINI_PRICE_OUT` ($ par million de tokens), `NEXT_PUBLIC_USD_EUR`.
+4. Optimisations de coût : lots de 15 questions par appel, sortie JSON structurée (plus d'appel perdu), anti-doublons avant insertion, aucun appel de « rattrapage ».
+5. Corrections : « Impossible de parser la réponse Gemini en JSON » (récupération des questions complètes + sortie structurée) et
+   « value too long for type character(1) » (la lettre de la bonne réponse est validée a/b/c/d avant l'insertion).

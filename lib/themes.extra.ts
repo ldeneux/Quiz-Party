@@ -65,8 +65,6 @@ const mythologie = emptyTheme('mythologie', 'Mythologie', '⚡', 'Dieux, héros 
 const astronomie = emptyTheme('astronomie', 'Astronomie', '🔭', 'Planètes, télescopes et galaxies. (Page blanche : décor à venir.)');
 const civilisations = emptyTheme('civilisations', 'Civilisations', '🏛️', 'Monuments et empires du monde. (Page blanche : décor à venir.)');
 const iles = emptyTheme('iles', 'Îles', '🏝️', 'Plages, palmiers et perroquets. (Page blanche : décor à venir.)');
-const sucrerie = emptyTheme( 'sucrerie',  'Sucreries',  '🍬',  'Bonbons, gâteaux, glaces et gourmandises. (Page blanche : décor à venir.)');
-
 
 // Voyages dans le temps : décor (mammouths et tigres à dents de sabre) + icônes de modes et de menu néon
 const tempsGlass = {
@@ -109,7 +107,7 @@ const temps: Theme = {
   },
 };
 
-export const EXTRA_THEMES: Record<string, Theme> = { sports, temps, voyage, peche, aventure, medieval, mythologie, astronomie, civilisations, iles,sucrerie };
+export const EXTRA_THEMES: Record<string, Theme> = { sports, temps, voyage, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
 
 // ── Remplacements de décor ──
 // Espace : nouveau poste de pilotage (l'astronaute). Les boutons et icônes existants sont conservés.
@@ -128,23 +126,6 @@ export const THEME_OVERRIDES: Record<string, Omit<Partial<Theme>, 'zones'> & { z
       profile: { left: 50, top: 2.2 },
     },
   },
-  sucrerie: {
-  stage: { 
-    src: '/themes/sucrerie/stage.webp', 
-    ratio: 2560 / 1440, 
-    bg: '#ffeef8' // couleur douce sucrée
-  },
-  zones: {
-    teams: { left: 3, top: 20, width: 15, height: 38 },
-    teamCount: { left: 3, top: 60, width: 15, height: 4 },
-    join: { left: 82, top: 20, width: 15, height: 38 },
-    code: { left: 82, top: 60, width: 15, height: 4 },
-    hub: { left: 22, top: 14, width: 56, height: 44 },
-    bar: { left: 19, top: 80, width: 62, height: 15 },
-    profile: { left: 50, top: 3.2 },
-  }
-},
-
   fantasy: {
     stage: { src: '/themes/fantasy/stage.webp', ratio: 1536 / 1024, bg: '#1a1038' },
     zones: {
@@ -163,5 +144,5 @@ export const THEME_OVERRIDES: Record<string, Omit<Partial<Theme>, 'zones'> & { z
 export const THEME_ORDER: string[] = [
   'espace', 'art', 'marins', 'jungle', 'egypte', 'sports',
   'terre', 'temps', 'voyage', 'peche', 'aventure', 'medieval',
-  'mythologie', 'fantasy', 'astronomie', 'sciences', 'inventions', 'civilisations', 'iles','sucrerie'
+  'mythologie', 'fantasy', 'astronomie', 'sciences', 'inventions', 'civilisations', 'iles',
 ];
