@@ -56,12 +56,10 @@ function emptyTheme(id: string, label: string, emoji: string, description: strin
 }
 
 // ── Thèmes ajoutés ──
-const sports = emptyTheme('sports', 'Sports', '🏅', 'Terrains, ballons et stades. (Page blanche : décor à venir.)');
 const voyage = emptyTheme('voyage', 'Voyage', '🧭', 'Mers, boussoles et caravelles. (Page blanche : décor à venir.)');
 const peche = emptyTheme('peche', 'Pêche', '🎣', 'Lacs, cannes à pêche et gros poissons. (Page blanche : décor à venir.)');
 const aventure = emptyTheme('aventure', 'Aventure', '🗺️', 'Cartes au trésor et expéditions. (Page blanche : décor à venir.)');
 const medieval = emptyTheme('medieval', 'Médiéval', '🏰', 'Chevaliers, châteaux et blasons. (Page blanche : décor à venir.)');
-const mythologie = emptyTheme('mythologie', 'Mythologie', '⚡', 'Dieux, héros et temples. (Page blanche : décor à venir.)');
 const astronomie = emptyTheme('astronomie', 'Astronomie', '🔭', 'Planètes, télescopes et galaxies. (Page blanche : décor à venir.)');
 const civilisations = emptyTheme('civilisations', 'Civilisations', '🏛️', 'Monuments et empires du monde. (Page blanche : décor à venir.)');
 const iles = emptyTheme('iles', 'Îles', '🏝️', 'Plages, palmiers et perroquets. (Page blanche : décor à venir.)');
@@ -107,7 +105,129 @@ const temps: Theme = {
   },
 };
 
-export const EXTRA_THEMES: Record<string, Theme> = { sports, temps, voyage, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
+
+// ── Sucrerie : royaume de bonbons (décor, icônes, vidéo de lancement) ──
+const sucreGlass = {
+  background: 'linear-gradient(180deg, rgba(74,32,52,0.8), rgba(54,22,40,0.88))',
+  border: '2px solid rgba(255,170,210,0.75)',
+  boxShadow: '0 0 2cqw rgba(255,120,180,0.35), inset 0 0 1.4cqw rgba(255,200,230,0.2)',
+};
+const sucrerie: Theme = {
+  ...emptyTheme('sucrerie', 'Sucrerie', '🍬', 'Un royaume de bonbons : sucettes, chocolat et caramel.'),
+  stage: { src: '/themes/sucrerie/stage.webp', ratio: 1672 / 941, bg: '#f4b6d2' },
+  zones: {
+    teams: { left: 4.2, top: 24.5, width: 16.4, height: 27.5 },
+    teamCount: { left: 4.2, top: 52.6, width: 16.4, height: 3.6 },
+    join: { left: 79.6, top: 26.2, width: 16.8, height: 27 },
+    code: { left: 79.6, top: 53.6, width: 16.8, height: 3.6 },
+    hub: { left: 24, top: 49, width: 52, height: 29 },
+    bar: { left: 6, top: 82.2, width: 88, height: 14.5 },
+    profile: { left: 50, top: 3 },
+  },
+  // Panneaux blancs et champ de sucre très clairs : fonds chocolat pour que le texte reste lisible
+  hubStyle: {
+    background: 'radial-gradient(ellipse at center, rgba(70,28,48,0.74) 0%, rgba(70,28,48,0.52) 55%, rgba(70,28,48,0) 100%)',
+    textShadow: '0 1px 4px rgba(40,10,24,0.95), 0 0 10px rgba(40,10,24,0.8)',
+  },
+  sidePanelStyle: { background: 'rgba(74,32,52,0.9)', border: '1px solid rgba(255,170,210,0.7)', borderRadius: '1cqw' },
+  bar: { background: 'transparent', border: 'none', boxShadow: 'none' }, // la barre de caramel du décor sert de pupitre
+  planets: {
+    classique: { src: '/themes/sucrerie/icons/classique.webp', width: 8.1 },
+    defi: { src: '/themes/sucrerie/icons/defi.webp', width: 8.4 },
+    survie: { src: '/themes/sucrerie/icons/survie.webp', width: 7.7 },
+    participatif: { src: '/themes/sucrerie/icons/participatif.webp', width: 9.5 },
+    camembert: { src: '/themes/sucrerie/icons/camembert.webp', width: 9.4 },
+  },
+  plates: {
+    fusee: { src: '/themes/sucrerie/icons/fusee.webp', ratio: 0.839, scale: 1.3 },
+    suivante: { src: '/themes/sucrerie/icons/suivante.webp', ratio: 0.983, scale: 1.3 },
+    stats: { src: '/themes/sucrerie/icons/stats.webp', ratio: 0.904, scale: 1.3 },
+    parametrage: { src: '/themes/sucrerie/icons/parametrage.webp', ratio: 0.972, scale: 1.3 },
+    progression: { src: '/themes/sucrerie/icons/progression.webp', ratio: 1.082, scale: 1.3 },
+    nouvelle: { src: '/themes/sucrerie/icons/nouvelle.webp', ratio: 0.836, scale: 1.3 },
+    quitter: { src: '/themes/sucrerie/icons/quitter.webp', ratio: 1.065, scale: 1.3 },
+    plein: { src: '/themes/sucrerie/icons/plein.webp', ratio: 1.0, scale: 1.3 },
+    valider: { src: '/themes/sucrerie/icons/valider.webp', ratio: 1.0, scale: 1.3 },
+    annuler: { src: '/themes/sucrerie/icons/annuler.webp', ratio: 1.0, scale: 1.3 },
+    profil: { src: null, ratio: 6.2, boxStyle: { ...sucreGlass, borderRadius: '1.6cqw' } },
+  } as unknown as Theme['plates'],
+  frames: {
+    progress: { src: '/themes/sucrerie/frame.webp', ratio: 1400 / 614, width: 80 },
+    msg: { src: '/themes/sucrerie/frame.webp', ratio: 1400 / 614, width: 62 },
+  },
+};
+
+// ── Mythologie : l'Olympe et ses dieux ──
+const mythGlass = {
+  background: 'linear-gradient(180deg, rgba(14,20,50,0.78), rgba(10,14,38,0.86))',
+  border: '2px solid rgba(240,200,100,0.75)',
+  boxShadow: '0 0 2cqw rgba(255,200,90,0.3), inset 0 0 1.4cqw rgba(255,220,140,0.16)',
+};
+const mythologie: Theme = {
+  ...emptyTheme('mythologie', 'Mythologie', '⚡', 'L’Olympe, ses dieux et ses légendes venues du monde entier.'),
+  stage: { src: '/themes/mythologie/stage.webp', ratio: 1672 / 941, bg: '#1a2450' },
+  zones: {
+    teams: { left: 5.2, top: 38.5, width: 12.2, height: 33 },
+    teamCount: { left: 5.2, top: 72.4, width: 12.2, height: 3.6 },
+    join: { left: 84.4, top: 30, width: 13.2, height: 36 },
+    code: { left: 84.4, top: 67.4, width: 13.2, height: 3.6 },
+    hub: { left: 27.2, top: 32.5, width: 46, height: 37 },
+    bar: { left: 22, top: 86.5, width: 56, height: 11.5 },
+    profile: { left: 50, top: 9.4 },
+  },
+  hubStyle: {
+    background: 'radial-gradient(ellipse at center, rgba(8,14,40,0.72) 0%, rgba(8,14,40,0.5) 55%, rgba(8,14,40,0) 100%)',
+    textShadow: '0 1px 4px rgba(0,6,24,0.95), 0 0 10px rgba(0,6,24,0.8)',
+  },
+  sidePanelStyle: { background: 'rgba(14,20,50,0.88)', border: '1px solid rgba(240,200,100,0.7)', borderRadius: '0.8cqw' },
+  bar: { ...mythGlass, background: 'linear-gradient(180deg, rgba(14,20,50,0.55), rgba(10,14,38,0.78))' },
+  planets: {
+    classique: { src: '/themes/mythologie/icons/classique.webp', width: 8.4 },
+    defi: { src: '/themes/mythologie/icons/defi.webp', width: 7.5 },
+    survie: { src: '/themes/mythologie/icons/survie.webp', width: 8.0 },
+    participatif: { src: '/themes/mythologie/icons/participatif.webp', width: 8.7 },
+    camembert: { src: '/themes/mythologie/icons/camembert.webp', width: 8.4 },
+  },
+  plates: {
+    fusee: { src: '/themes/mythologie/icons/fusee.webp', ratio: 0.92, scale: 1.3 },
+    suivante: { src: '/themes/mythologie/icons/suivante.webp', ratio: 1.041, scale: 1.3 },
+    stats: { src: '/themes/mythologie/icons/stats.webp', ratio: 0.957, scale: 1.3 },
+    parametrage: { src: '/themes/mythologie/icons/parametrage.webp', ratio: 1.02, scale: 1.3 },
+    progression: { src: '/themes/mythologie/icons/progression.webp', ratio: 0.91, scale: 1.3 },
+    nouvelle: { src: '/themes/mythologie/icons/nouvelle.webp', ratio: 1.053, scale: 1.3 },
+    quitter: { src: '/themes/mythologie/icons/quitter.webp', ratio: 0.944, scale: 1.3 },
+    plein: { src: '/themes/mythologie/icons/plein.webp', ratio: 0.987, scale: 1.3 },
+    valider: { src: '/themes/mythologie/icons/valider.webp', ratio: 1.0, scale: 1.3 },
+    annuler: { src: '/themes/mythologie/icons/annuler.webp', ratio: 1.0, scale: 1.3 },
+    profil: { src: null, ratio: 5, boxStyle: { ...mythGlass, borderRadius: '1.6cqw' }, scale: 0.8 },
+  } as unknown as Theme['plates'],
+  frames: {
+    progress: { src: '/themes/mythologie/frame.webp', ratio: 1400 / 614, width: 80 },
+    msg: { src: '/themes/mythologie/frame.webp', ratio: 1400 / 614, width: 62 },
+  },
+};
+
+// ── Sports : décor ajouté (îles flottantes), icônes à venir (neutres) ──
+const sports: Theme = {
+  ...emptyTheme('sports', 'Sports', '🏅', 'Des îles flottantes dédiées au sport. (Icônes à venir.)'),
+  stage: { src: '/themes/sports/stage.webp', ratio: 1672 / 940, bg: '#0a2a7a' },
+  zones: {
+    teams: { left: 1.5, top: 24, width: 15, height: 36 },
+    teamCount: { left: 1.5, top: 61.2, width: 15, height: 4 },
+    join: { left: 83.5, top: 14, width: 15, height: 36 },
+    code: { left: 83.5, top: 51.2, width: 15, height: 4 },
+    hub: { left: 31, top: 12, width: 50, height: 42 },
+    bar: { left: 19, top: 82, width: 62, height: 15 },
+    profile: { left: 50, top: 3 },
+  },
+  hubStyle: {
+    background: 'radial-gradient(ellipse at center, rgba(6,20,70,0.72) 0%, rgba(6,20,70,0.5) 55%, rgba(6,20,70,0) 100%)',
+    textShadow: '0 1px 4px rgba(0,8,40,0.95), 0 0 10px rgba(0,8,40,0.8)',
+  },
+  sidePanelStyle: { background: 'rgba(8,24,80,0.86)', border: '1px solid rgba(110,190,255,0.65)', borderRadius: '0.8cqw' },
+};
+
+export const EXTRA_THEMES: Record<string, Theme> = { sucrerie, sports, temps, voyage, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
 
 // ── Remplacements de décor ──
 // Espace : nouveau poste de pilotage (l'astronaute). Les boutons et icônes existants sont conservés.
@@ -127,14 +247,14 @@ export const THEME_OVERRIDES: Record<string, Omit<Partial<Theme>, 'zones'> & { z
     },
   },
   fantasy: {
-    stage: { src: '/themes/fantasy/stage.webp', ratio: 1536 / 1024, bg: '#1a1038' },
+    stage: { src: '/themes/fantasy/stage.webp', ratio: 1672 / 941, bg: '#1a1038' },
     zones: {
-      teams: { left: 2.5, top: 17, width: 16, height: 48 },
-      teamCount: { left: 2.5, top: 66.5, width: 16, height: 4.4 },
-      join: { left: 81.5, top: 17, width: 16, height: 48 },
-      code: { left: 81.5, top: 66.5, width: 16, height: 4.4 },
-      hub: { left: 26, top: 44, width: 48, height: 36 },
-      modes: { left: 26, top: 8, width: 48, height: 32 },
+      teams: { left: 1.8, top: 16, width: 15.5, height: 46 },
+      teamCount: { left: 1.8, top: 63.2, width: 15.5, height: 4.2 },
+      join: { left: 82.7, top: 16, width: 15.5, height: 46 },
+      code: { left: 82.7, top: 63.2, width: 15.5, height: 4.2 },
+      hub: { left: 30, top: 44, width: 40, height: 32 },
+      modes: { left: 27, top: 8, width: 46, height: 30 },
       bar: { left: 19, top: 85, width: 62, height: 13 },
       profile: { left: 50, top: 2.5 },
     },
@@ -142,7 +262,7 @@ export const THEME_OVERRIDES: Record<string, Omit<Partial<Theme>, 'zones'> & { z
 };
 
 export const THEME_ORDER: string[] = [
-  'espace', 'art', 'marins', 'jungle', 'egypte', 'sports',
+  'sucrerie', 'espace', 'art', 'marins', 'jungle', 'egypte', 'sports',
   'terre', 'temps', 'voyage', 'peche', 'aventure', 'medieval',
   'mythologie', 'fantasy', 'astronomie', 'sciences', 'inventions', 'civilisations', 'iles',
 ];

@@ -57,6 +57,16 @@ export const TEAM_PRESETS: Record<string, TeamPreset[]> = {
   ], [
     '#5cd1f2', '#5ca4f2', '#f29c5c', '#5cd5f2', '#f2b05c', '#5ca7f2', '#f2a65c', '#5ccaf2', '#5cbaf2', '#5cacf2', '#5c7ff2', '#5cc1f2',
   ]),
+  sucrerie: make('sucrerie', [
+    'La Capsule Bonbon', 'Le Sablier de Sucre', 'Les Chamallows Copains', 'Les Oursons Gélifiés', 'Les Gardiens Cupcake', 'Les Sucettes Tourbillon', 'Les Carrés de Chocolat', 'Le Tourbillon de Caramel', 'Les Amis Glacés', 'Les Sucres d’Orge Torsadés', 'L’Esprit Macaron', 'Les Donuts Pop',
+  ], [
+    '#f2d15c', '#f2c85c', '#f25cd2', '#f2945c', '#5c71f2', '#5cbbf2', '#f2895c', '#f2a35c', '#5cd7f2', '#f25cd5', '#bc5cf2', '#f25cb7',
+  ]),
+  mythologie: make('mythologie', [
+    'Les Foudres de Zeus', 'Les Corbeaux d’Odin', 'Les Gardiens d’Anubis', 'Les Phénix Éternels', 'Les Tridents de Poséidon', 'Les Valkyries Sacrées', 'Les Cyclopes Titans', 'Les Dragons de Tiamat', 'Les Lions de Sekhmet', 'Les Minotaures d’Or', 'Les Gardiens du Kraken', 'Les Griffons Célestes',
+  ], [
+    '#f2b75c', '#5ca4f2', '#f2ca5c', '#f2965c', '#5cc4f2', '#5ca1f2', '#f29f5c', '#5ce0f2', '#f2945c', '#f2a95c', '#5cb6f2', '#f2b35c',
+  ]),
 };
 
 export function getRandomPresets(theme: string, count: number): TeamPreset[] {

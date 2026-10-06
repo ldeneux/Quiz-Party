@@ -7,6 +7,7 @@ import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
 import { useTheme } from '@/lib/useTheme';
 import TeamAvatar from '@/components/TeamAvatar';
 import CategoryBadge from '@/components/CategoryBadge';
+import { THEME_INTROS, HOLD_AFTER_VIDEO_MS } from '@/lib/themeIntros';
 import CockpitPlate from '@/components/CockpitPlate';
 import CockpitCrawl from '@/components/CockpitCrawl';
 import CockpitMsgBox from '@/components/CockpitMsgBox';
@@ -499,8 +500,12 @@ export default function GameArea({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [explainVisible]);
 
-  // Décompte 3-2-1-décollage avant la toute première question (mode cockpit uniquement)
+  // Lancement de la partie (mode cockpit) : vidéo du thème figée sur sa première image, décompte 3-2-1, vidéo,
+  // 3 secondes sur la dernière image, puis la première question. Sans vidéo : décompte puis « C'EST PARTI ! ».
+  const intro = THEME_INTROS[theme.id] ?? null;
   const [countdown, setCountdown] = useState<number | null>(null);
+  const introVideoRef = useRef<HTMLVideoElement>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const goNextRef = useRef(goToNextQuestion);
   useEffect(() => {
     goNextRef.current = goToNextQuestion;
@@ -516,6 +521,7 @@ export default function GameArea({
 
   useEffect(() => {
     if (countdown === null) return;
+    if (countdown === 0 && intro) return; // la vidéo prend le relais : c'est elle qui lance la suite
     const timer = setTimeout(
       () => {
         if (countdown > 0) setCountdown(countdown - 1);
@@ -524,10 +530,34 @@ export default function GameArea({
           goNextRef.current();
         }
       },
-      countdown === 0 ? 1100 : 1000
+      countdown === 0 ? 900 : 1000
     );
     return () => clearTimeout(timer);
-  }, [countdown]);
+  }, [countdown, intro]);
+
+  const endIntro = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+    setCountdown(null);
+    goNextRef.current();
+  };
+
+  // Fin du décompte : la vidéo démarre (si elle ne peut pas se lire, on enchaîne directement sur le jeu)
+  useEffect(() => {
+    if (countdown !== 0 || !intro) return;
+    const v = introVideoRef.current;
+    if (!v) return endIntro();
+    v.currentTime = 0;
+    v.play().catch(() => {
+      v.muted = true;
+      v.play().catch(endIntro);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown, intro]);
+
+  useEffect(() => () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+  }, []);
 
   useEffect(() => {
     if (phase !== 'question') return;
@@ -925,7 +955,7 @@ export default function GameArea({
           (() => {
             const a =
               phase === 'lobby'
-                ? { label: 'Démarrer la partie', ok: teams.length > 0 && countdown === null, hint: countdown !== null ? 'Décollage en cours…' : teams.length > 0 ? 'Espace' : 'Aucune équipe connectée' }
+                ? { label: 'Démarrer la partie', ok: teams.length > 0 && countdown === null, hint: countdown !== null ? 'Lancement en cours…' : teams.length > 0 ? 'Espace' : 'Aucune équipe connectée' }
                 : phase === 'revealed'
                   ? { label: 'Question suivante', ok: pendingJokerTeamIds.length === 0, hint: pendingJokerTeamIds.length === 0 ? 'Espace' : 'Des jokers sont à régler' }
                   : { label: 'Question suivante', ok: false, hint: 'Disponible après la réponse' };
@@ -983,28 +1013,44 @@ export default function GameArea({
       )}
 
       {phase === 'lobby' && cockpit && countdown !== null && (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', position: 'relative', overflow: 'hidden', boxSizing: 'border-box', paddingTop: '2.8cqw' }}>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', position: 'relative', overflow: 'hidden', borderRadius: '1.2cqw', boxSizing: 'border-box' }}>
           <style>{`
             @keyframes ck-pop{0%{transform:scale(1.9);opacity:0}30%{opacity:1}100%{transform:scale(0.92);opacity:.9}}
-            @keyframes ck-launch{0%{transform:translateY(3cqw) scale(1);opacity:0}15%{opacity:1}100%{transform:translateY(-22cqw) scale(1.5);opacity:0}}
-            @media (prefers-reduced-motion: reduce){.ck-cd-num,.ck-cd-rocket{animation:none !important}}
+            @media (prefers-reduced-motion: reduce){.ck-cd-num{animation:none !important}}
           `}</style>
-          <div style={{ fontSize: '1.3cqw', fontWeight: 800, letterSpacing: '0.3cqw', color: '#9fc4ff' }}>
-            {countdown > 0 ? 'PRÉPAREZ-VOUS' : 'C’EST PARTI !'}
-          </div>
-          {countdown > 0 ? (
-            <div key={countdown} className="ck-cd-num" style={{ padding: '1cqw 6cqw', fontSize: '11cqw', lineHeight: 1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9), 0 0 6cqw rgba(255,120,40,0.5)', animation: 'ck-pop 1s ease-out' }}>
+          {intro && (
+            <video
+              ref={introVideoRef}
+              src={intro.src}
+              poster={intro.poster}
+              preload="auto"
+              playsInline
+              onEnded={() => {
+                // dernière image conservée quelques secondes avant le jeu
+                holdTimer.current = setTimeout(endIntro, HOLD_AFTER_VIDEO_MS);
+              }}
+              onError={endIntro}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          )}
+          {intro && countdown > 0 && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.22)' }} />}
+          {countdown > 0 && (
+            <div style={{ position: 'relative', fontSize: '1.3cqw', fontWeight: 800, letterSpacing: '0.3cqw', color: '#fff', textShadow: '0 0 1cqw rgba(0,0,0,0.8)' }}>PRÉPAREZ-VOUS</div>
+          )}
+          {countdown > 0 && (
+            <div key={countdown} className="ck-cd-num" style={{ position: 'relative', padding: '1cqw 6cqw', fontSize: '11cqw', lineHeight: 1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9), 0 0 6cqw rgba(255,120,40,0.5), 0 0.3cqw 1cqw rgba(0,0,0,0.6)', animation: 'ck-pop 1s ease-out' }}>
               {countdown}
             </div>
-          ) : (
-            <>
-              <div className="ck-cd-num" style={{ padding: '1cqw 6cqw', fontSize: '6cqw', lineHeight: 1.1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9)', animation: 'ck-pop 0.6s ease-out' }}>
-                DÉCOLLAGE
-              </div>
-              <div className="ck-cd-rocket" style={{ position: 'absolute', bottom: '0.5cqw', fontSize: '5cqw', animation: 'ck-launch 1.1s ease-in forwards' }}>
-                🚀
-              </div>
-            </>
+          )}
+          {countdown === 0 && !intro && (
+            <div className="ck-cd-num" style={{ position: 'relative', padding: '1cqw 6cqw', fontSize: '6cqw', lineHeight: 1.1, fontWeight: 900, color: '#ffe27a', textShadow: '0 0 2.5cqw rgba(255,190,60,0.9)', animation: 'ck-pop 0.6s ease-out' }}>
+              C’EST PARTI !
+            </div>
+          )}
+          {countdown === 0 && intro && (
+            <button type="button" onClick={endIntro} style={{ position: 'absolute', right: '1cqw', bottom: '1cqw', background: 'rgba(0,0,0,0.45)', color: '#fff', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '0.8cqw', padding: '0.4cqw 1cqw', fontSize: '0.95cqw', fontWeight: 700, cursor: 'pointer' }}>
+              Passer ›
+            </button>
           )}
         </div>
       )}
