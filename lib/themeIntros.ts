@@ -12,13 +12,13 @@ export type ThemeIntro = { src: string; poster?: string };
 export const THEME_INTROS: Record<string, ThemeIntro> = {
   sucrerie: { src: '/themes/sucrerie/intro.mp4' },
   art: { src: '/themes/art/intro.mp4' },
-  jungle: { src: '/themes/art/intro.mp4' },
-  marin: { src: '/themes/art/intro.mp4' },
-  espace: { src: '/themes/art/intro.mp4' },
-  temps: { src: '/themes/art/intro.mp4' },
-  egypte: { src: '/themes/art/intro.mp4' },
-  sport: { src: '/themes/art/intro.mp4' },
-  terre: { src: '/themes/art/intro.mp4' },
+  jungle: { src: '/themes/jungle/intro.mp4' },
+  marin: { src: '/themes/marin/intro.mp4' },
+  espace: { src: '/themes/espace/intro.mp4' },
+  temps: { src: '/themes/temps/intro.mp4' },
+  egypte: { src: '/themes/egypte/intro.mp4' },
+  sport: { src: '/themes/sport/intro.mp4' },
+  terre: { src: '/themes/terre/intro.mp4' }
 
 };
 
