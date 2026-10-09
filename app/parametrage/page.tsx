@@ -28,6 +28,41 @@ const slugId = (label: string) =>
 export default function ParametragePage() {
   const { themeId, setTheme } = useTheme();
 
+  // ───────── Carrousel d'habillages : aperçu seul, détail au survol ─────────
+  const [hover, setHover] = useState<{ id: string; rect: DOMRect } | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const stopTimer = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+  };
+  const openHover = (id: string, el: HTMLElement) => {
+    stopTimer();
+    setHover({ id, rect: el.getBoundingClientRect() });
+  };
+  const closeHover = () => {
+    stopTimer();
+    hoverTimer.current = setTimeout(() => setHover(null), 150);
+  };
+  const scrollCarousel = (dir: number) => carouselRef.current?.scrollBy({ left: dir * 360, behavior: 'smooth' });
+  useEffect(() => {
+    const close = () => setHover(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, []);
+  const hoverTheme = hover ? THEME_LIST.find((t) => t.id === hover.id) : undefined;
+  const editLayout = (id: string) => {
+    setTheme(id); // la disposition modifiée est celle de l'habillage choisi
+    try { window.sessionStorage.setItem(EDIT_FLAG, '1'); } catch { /* ignoré */ }
+    window.location.href = '/';
+  };
+  const resetLayout = (id: string, label: string) => {
+    if (window.confirm(`Remettre la disposition de l'habillage « ${label} » à zéro ?`)) clearLayout(id);
+  };
+
   // ───────── Données ─────────
   const [categories, setCategories] = useState<Category[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
@@ -509,75 +544,83 @@ export default function ParametragePage() {
     >
       {/* Panneau clair translucide : garde les cartes et textes lisibles sur le décor */}
       <div style={{ maxWidth: 1180, margin: '0 auto', background: 'rgba(244,246,251,0.94)', borderRadius: 24, padding: '24px 32px 40px', boxShadow: '0 0 60px rgba(40,90,220,0.45)' }}>
-        <a href="/" style={{ color: '#7a819c', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>← Retour</a>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <a href="/" style={{ color: '#7a819c', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>← Retour</a>
+          <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>⚙️ Paramétrage</h1>
+        </div>
 
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: '16px 0 24px' }}>⚙️ Paramétrage</h1>
-
-        {/* ---- Habillage de l'écran d'accueil ---- */}
-        <section style={card}>
-          <h2 style={sectionTitle}>Habillage de l'écran d'accueil</h2>
-          <p style={{ color: '#7a819c', fontSize: 13, marginBottom: 16 }}>
-            Choisis le décor et les boutons de l'écran de l'animateur. Le choix est mémorisé sur cet appareil.
+        {/* ---- Habillage de l'écran d'accueil : carrousel sur une seule ligne ---- */}
+        <section style={{ ...card, maxWidth: 'none', padding: '16px 20px' }}>
+          <h2 style={{ ...sectionTitle, marginBottom: 4 }}>Habillage de l'écran d'accueil</h2>
+          <p style={{ color: '#7a819c', fontSize: 13, margin: '0 0 12px' }}>
+            Survole un habillage pour l'utiliser, modifier sa disposition ou la réinitialiser. Le choix est mémorisé sur cet appareil.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
-            {THEME_LIST.map((t) => {
-              const selected = t.id === themeId;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTheme(t.id)}
-                  aria-pressed={selected}
-                  style={{
-                    textAlign: 'left',
-                    padding: 8,
-                    borderRadius: 16,
-                    border: selected ? '3px solid #6c7bf7' : '3px solid #eaedf6',
-                    background: selected ? '#f1f3ff' : '#fff',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  <div style={{ background: '#f1f3fa', borderRadius: 10, padding: 8 }}>
-                    <img src={t.preview} alt="" draggable={false} style={{ width: '100%', display: 'block', aspectRatio: '3 / 2', objectFit: 'contain' }} />
-                  </div>
-                  <div style={{ fontWeight: 800, fontSize: 14, marginTop: 8, color: '#1f2440' }}>
-                    {t.emoji} {t.label} {selected && <span style={{ color: '#6c7bf7' }}>✓</span>}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#7a819c', marginTop: 2 }}>{t.description}</div>
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid #eaedf6' }}>
-            <div style={{ fontWeight: 800, fontSize: 14, color: '#1f2440' }}>Disposition de l'écran d'accueil</div>
-            <p style={{ color: '#7a819c', fontSize: 13, margin: '4px 0 12px' }}>
-              Déplace et redimensionne les écrans, la barre de menu, les icônes des modes et les afficheurs, et change leurs couleurs. La disposition est propre à chaque habillage.
-            </p>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  try { window.sessionStorage.setItem(EDIT_FLAG, '1'); } catch { /* ignoré */ }
-                  window.location.href = '/';
-                }}
-                style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: '#6c7bf7', color: '#fff', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                🎛 Modifier la disposition
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm(`Remettre la disposition de l'habillage « ${themeId} » à zéro ?`)) clearLayout(themeId);
-                }}
-                style={{ padding: '10px 16px', borderRadius: 10, border: '2px solid #eaedf6', background: '#fff', color: '#1f2440', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                Réinitialiser cet habillage
-              </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button" aria-label="Précédent" onClick={() => scrollCarousel(-1)} style={arrowBtn}>‹</button>
+            <div ref={carouselRef} onScroll={() => setHover(null)} style={{ flex: 1, minWidth: 0, display: 'flex', gap: 12, overflowX: 'auto', scrollSnapType: 'x proximity', padding: '4px 2px', scrollbarWidth: 'none' }}>
+              {THEME_LIST.map((t) => {
+                const selected = t.id === themeId;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    title={t.label}
+                    onMouseEnter={(e) => openHover(t.id, e.currentTarget)}
+                    onMouseLeave={closeHover}
+                    onClick={(e) => openHover(t.id, e.currentTarget)} // tactile : un appui ouvre le détail
+                    aria-pressed={selected}
+                    style={{
+                      flex: '0 0 auto',
+                      width: 132,
+                      padding: 6,
+                      borderRadius: 14,
+                      border: selected ? '3px solid #6c7bf7' : '3px solid #eaedf6',
+                      background: selected ? '#f1f3ff' : '#fff',
+                      cursor: 'pointer',
+                      scrollSnapAlign: 'start',
+                      position: 'relative',
+                    }}
+                  >
+                    <div style={{ background: '#f1f3fa', borderRadius: 9, padding: 4 }}>
+                      <img src={t.preview} alt={t.label} draggable={false} style={{ width: '100%', display: 'block', aspectRatio: '1 / 1', objectFit: 'contain' }} />
+                    </div>
+                    {selected && <span style={{ position: 'absolute', top: 4, right: 8, color: '#6c7bf7', fontWeight: 800, fontSize: 15 }}>✓</span>}
+                  </button>
+                );
+              })}
             </div>
+            <button type="button" aria-label="Suivant" onClick={() => scrollCarousel(1)} style={arrowBtn}>›</button>
           </div>
-        </section>
 
+          {/* Détail au survol : fond d'écran réduit, texte dessous, boutons */}
+          {hover && hoverTheme && (() => {
+            const W = 340;
+            const left = Math.max(8, Math.min(hover.rect.left + hover.rect.width / 2 - W / 2, window.innerWidth - W - 8));
+            const top = Math.max(8, Math.min(hover.rect.top - 24, window.innerHeight - 390));
+            const t = hoverTheme;
+            const selected = t.id === themeId;
+            return (
+              <div onMouseEnter={stopTimer} onMouseLeave={closeHover} style={{ position: 'fixed', left, top, width: W, zIndex: 40, background: '#1b1d26', color: '#fff', borderRadius: 14, overflow: 'hidden', boxShadow: '0 18px 50px -10px rgba(0,0,0,0.6)', ...FONT }}>
+                <div style={{ background: t.stage.bg, aspectRatio: '16 / 10' }}>
+                  <img src={t.stage.src} alt="" draggable={false} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+                </div>
+                <div style={{ padding: '12px 14px 14px' }}>
+                  <div style={{ fontWeight: 800, fontSize: 16 }}>
+                    {t.emoji} {t.label} {selected && <span style={{ color: '#9aa6ff' }}>✓</span>}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: '#b8bdd3', margin: '4px 0 12px' }}>{t.description}</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" onClick={() => setTheme(t.id)} disabled={selected} style={{ ...hoverBtn, background: '#6c7bf7', color: '#fff', opacity: selected ? 0.6 : 1, cursor: selected ? 'default' : 'pointer' }}>
+                      {selected ? 'Utilisé' : 'Utiliser'}
+                    </button>
+                    <button type="button" onClick={() => editLayout(t.id)} style={{ ...hoverBtn, background: '#fff', color: '#1f2440' }}>Modifier</button>
+                    <button type="button" onClick={() => resetLayout(t.id, t.label)} style={{ ...hoverBtn, background: 'transparent', color: '#fff', border: '1.5px solid #5b6080' }}>Réinitialiser</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </section>
 
         {/* ---- Packs, profils, catégories et niveaux : un seul écran ---- */}
         <section style={{ ...card, maxWidth: 'none' }}>
@@ -849,6 +892,8 @@ export default function ParametragePage() {
 // ───────── Styles (police uniforme : celle du bouton « Générer les packs (Gemini) ») ─────────
 const FONT: React.CSSProperties = { fontFamily: 'Inter, sans-serif' };
 const card: React.CSSProperties = { background: '#fff', borderRadius: 20, padding: 24, marginBottom: 20, maxWidth: 720, boxShadow: '0 10px 30px -16px rgba(31,36,64,0.15)', ...FONT };
+const arrowBtn: React.CSSProperties = { flex: '0 0 auto', width: 34, height: 34, borderRadius: 999, border: '1.5px solid #dfe3f0', background: '#fff', color: '#4553c9', fontSize: 22, lineHeight: 1, fontWeight: 800, cursor: 'pointer', ...FONT };
+const hoverBtn: React.CSSProperties = { flex: 1, border: 'none', borderRadius: 999, padding: '9px 6px', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', ...FONT };
 const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 800, marginBottom: 10 };
 const selectAllLink: React.CSSProperties = { fontSize: 12, color: '#6c7bf7', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' };
 const labelStyle: React.CSSProperties = { fontSize: 13.5, fontWeight: 700, color: '#1f2440', ...FONT };
