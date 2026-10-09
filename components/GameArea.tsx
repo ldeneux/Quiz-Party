@@ -128,6 +128,9 @@ export default function GameArea({
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [autoAttempted, setAutoAttempted] = useState(false);
+  // Choix des thèmes (camembert) : nom de l'icône survolée, affiché en info-bulle
+  const [setupTip, setSetupTip] = useState<{ name: string; left: number; top: number; below: boolean } | null>(null);
+  const setupWrapRef = useRef<HTMLDivElement>(null);
   const [revealedInfo, setRevealedInfo] = useState<Record<string, RevealInfo>>({});
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const askedQuestionIdsRef = useRef<string[]>([]);
@@ -980,44 +983,111 @@ export default function GameArea({
         </div>
       )}
 
-      {phase === 'camembert-setup' && (
-        <div style={styles.mainCard}>
-          <h1 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🥧 Choix des thèmes de la partie</h1>
-          <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 16 }}>
-            Sélectionne {camembertSetupNeeded} thème{camembertSetupNeeded > 1 ? 's' : ''} parmi les {camembertSetupPool.length}{' '}
-            disponibles ({teams.length} équipe{teams.length > 1 ? 's' : ''} en jeu).
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-            {camembertSetupPool.map((c) => {
-              const selected = camembertSetupSelected.includes(c.id);
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => toggleCamembertSetupCategory(c.id)}
+      {phase === 'camembert-setup' && (() => {
+        // Icônes rondes en grille (cockpit : unités de la scène ; sinon px), nom au survol
+        const u = (c: number, px: number) => (cockpit ? `${c}cqw` : `${px}px`);
+        const size = u(5.4, 84);
+        const showTip = (e: React.SyntheticEvent<HTMLElement>, name: string) => {
+          const wrap = setupWrapRef.current;
+          if (!wrap) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          const w = wrap.getBoundingClientRect();
+          const half = Math.min(w.width / 2, name.length * 5 + 20);
+          const left = Math.min(Math.max(r.left - w.left + r.width / 2, half), w.width - half);
+          const below = r.top - w.top < 44;
+          setSetupTip({ name, left, top: below ? r.bottom - w.top + 6 : r.top - w.top - 6, below });
+        };
+        return (
+          <div style={{ ...styles.mainCard, display: 'flex', flexDirection: 'column' }}>
+            <h1 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4, flexShrink: 0 }}>🥧 Choix des thèmes de la partie</h1>
+            <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 10, flexShrink: 0 }}>
+              Sélectionne {camembertSetupNeeded} thème{camembertSetupNeeded > 1 ? 's' : ''} parmi les {camembertSetupPool.length}{' '}
+              disponibles ({teams.length} équipe{teams.length > 1 ? 's' : ''} en jeu). Survole une icône pour voir son nom.
+            </p>
+            <div ref={setupWrapRef} style={{ position: 'relative', flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div
+                onScroll={() => setSetupTip(null)}
+                style={{
+                  flex: '1 1 auto',
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(auto-fill, ${size})`,
+                  gap: u(0.9, 12),
+                  justifyContent: 'center',
+                  alignContent: 'start',
+                  padding: '6px 6px 10px',
+                  scrollbarWidth: 'thin',
+                }}
+              >
+                {camembertSetupPool.map((c) => {
+                  const selected = camembertSetupSelected.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      aria-label={c.name}
+                      aria-pressed={selected}
+                      onClick={() => toggleCamembertSetupCategory(c.id)}
+                      onMouseEnter={(e) => showTip(e, c.name)}
+                      onMouseLeave={() => setSetupTip(null)}
+                      onFocus={(e) => showTip(e, c.name)}
+                      onBlur={() => setSetupTip(null)}
+                      style={{
+                        width: size,
+                        height: size,
+                        padding: 0,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        border: selected ? '3px solid #ffb648' : '3px solid rgba(255,255,255,0.25)',
+                        background: selected ? 'radial-gradient(circle, #fff3d6 0%, #ffc766 100%)' : 'rgba(255,255,255,0.92)',
+                        boxShadow: selected ? '0 0 14px 3px rgba(255,182,72,0.8)' : 'none',
+                        transform: selected ? 'scale(1.06)' : 'none',
+                        transition: 'transform .15s, box-shadow .15s, background .15s, border-color .15s',
+                      }}
+                    >
+                      <CategoryBadge name={c.name} emoji={c.emoji} height={`calc(${size} * 0.8)`} />
+                    </button>
+                  );
+                })}
+              </div>
+              {setupTip && (
+                <div
                   style={{
-                    padding: '9px 16px',
-                    borderRadius: 999,
-                    border: selected ? '2px solid #ffb648' : '2px solid #eaedf6',
-                    background: selected ? '#fff3e0' : '#fff',
+                    position: 'absolute',
+                    left: setupTip.left,
+                    top: setupTip.top,
+                    transform: setupTip.below ? 'translateX(-50%)' : 'translate(-50%, -100%)',
+                    background: '#0d1130',
+                    color: '#fff',
+                    border: '1px solid rgba(160,200,255,0.7)',
+                    borderRadius: 8,
+                    padding: '5px 12px',
                     fontWeight: 700,
-                    fontSize: 13.5,
-                    cursor: 'pointer',
+                    fontSize: 14,
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 5,
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
                   }}
                 >
-                  <CategoryBadge name={c.name} emoji={c.emoji} height="2.6em" withName />
-                </button>
-              );
-            })}
+                  {setupTip.name}
+                </div>
+              )}
+            </div>
+            <button
+              style={{ ...styles.startBtn, flexShrink: 0, marginTop: 10, opacity: camembertSetupSelected.length === camembertSetupNeeded ? 1 : 0.5 }}
+              onClick={confirmCamembertSetup}
+              disabled={camembertSetupSelected.length !== camembertSetupNeeded}
+            >
+              Valider ({camembertSetupSelected.length}/{camembertSetupNeeded})
+            </button>
           </div>
-          <button
-            style={{ ...styles.startBtn, opacity: camembertSetupSelected.length === camembertSetupNeeded ? 1 : 0.5 }}
-            onClick={confirmCamembertSetup}
-            disabled={camembertSetupSelected.length !== camembertSetupNeeded}
-          >
-            Valider ({camembertSetupSelected.length}/{camembertSetupNeeded})
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {phase === 'choosing-category' && (
         <div style={styles.lobbyCard}>
