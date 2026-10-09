@@ -41,6 +41,7 @@ export type Theme = {
   description: string;
   preview: string;
   stage: { src: string; ratio: number; bg: string };
+  stageByMode?: Partial<Record<ModeId, { src: string }>>; // fond différent selon le mode de jeu actif (même ratio que `stage`) ; `stage` sert de repli
   zones: {
     teams: Rect; // écran gauche : liste des équipes
     teamCount: Rect; // petit afficheur : nombre d'équipes

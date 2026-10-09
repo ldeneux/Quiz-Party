@@ -56,7 +56,6 @@ function emptyTheme(id: string, label: string, emoji: string, description: strin
 }
 
 // ── Thèmes ajoutés ──
-const voyage = emptyTheme('voyage', 'Voyage', '🧭', 'Mers, boussoles et caravelles. (Page blanche : décor à venir.)');
 const peche = emptyTheme('peche', 'Pêche', '🎣', 'Lacs, cannes à pêche et gros poissons. (Page blanche : décor à venir.)');
 const aventure = emptyTheme('aventure', 'Aventure', '🗺️', 'Cartes au trésor et expéditions. (Page blanche : décor à venir.)');
 const medieval = emptyTheme('medieval', 'Médiéval', '🏰', 'Chevaliers, châteaux et blasons. (Page blanche : décor à venir.)');
@@ -105,6 +104,52 @@ const temps: Theme = {
   },
 };
 
+
+// ── Voyage : le fond change avec le mode de jeu (Maldives, volcan, glacier, marché, bibliothèque) ; icônes et boutons identiques ──
+const voyageGlass = {
+  background: 'linear-gradient(180deg, rgba(8,24,42,0.8), rgba(6,16,32,0.88))',
+  border: '2px solid rgba(232,194,122,0.78)',
+  boxShadow: '0 0 2cqw rgba(232,194,122,0.28), inset 0 0 1.4cqw rgba(232,194,122,0.14)',
+};
+const VOY_RATIOS: Record<string, number> = {
+  fusee: 1.007, suivante: 1.014, stats: 1.011, parametrage: 1, progression: 1.018, nouvelle: 1.011, quitter: 1.011, plein: 1.014, valider: 1, annuler: 1,
+};
+const voyage: Theme = {
+  ...emptyTheme('voyage', 'Voyage', '🧭', 'Un voyage autour du monde : le décor change selon le mode (Maldives, volcan, glacier, marché, bibliothèque).'),
+  stage: { src: '/themes/voyage/stage.webp', ratio: 1672 / 941, bg: '#0b1a26' },
+  stageByMode: {
+    classique: { src: '/themes/voyage/stage-classique.webp' }, // Maldives
+    defi: { src: '/themes/voyage/stage-defi.webp' }, // volcan
+    survie: { src: '/themes/voyage/stage-survie.webp' }, // glacier
+    participatif: { src: '/themes/voyage/stage-participatif.webp' }, // marché
+    camembert: { src: '/themes/voyage/stage-camembert.webp' }, // bibliothèque (Trivial)
+  },
+  zones: {
+    teams: { left: 2.2, top: 22, width: 15, height: 38 },
+    teamCount: { left: 2.2, top: 62, width: 15, height: 4.4 },
+    join: { left: 82.8, top: 22, width: 15, height: 38 },
+    code: { left: 82.8, top: 62, width: 15, height: 4.4 },
+    hub: { left: 22, top: 13, width: 56, height: 52 },
+    bar: { left: 19, top: 81, width: 62, height: 15 },
+    profile: { left: 50, top: 3 },
+  },
+  hubStyle: { ...voyageGlass, borderRadius: '1.8cqw', background: 'linear-gradient(180deg, rgba(8,24,42,0.72), rgba(6,16,32,0.82))' },
+  sidePanelStyle: { background: 'rgba(8,24,42,0.86)', border: '1px solid rgba(232,194,122,0.6)', borderRadius: '0.8cqw' },
+  joinPadTop: 2,
+  qrWidth: 7.6,
+  bar: { ...voyageGlass, background: 'linear-gradient(180deg, rgba(8,24,42,0.62), rgba(6,16,32,0.8))' },
+  planets: {
+    classique: { src: '/themes/voyage/icons/classique.webp', width: 8.6 },
+    defi: { src: '/themes/voyage/icons/defi.webp', width: 8.6 },
+    survie: { src: '/themes/voyage/icons/survie.webp', width: 8.6 },
+    participatif: { src: '/themes/voyage/icons/participatif.webp', width: 8.6 },
+    camembert: { src: '/themes/voyage/icons/camembert.webp', width: 8.6 },
+  },
+  plates: {
+    ...Object.fromEntries(PLATES.map((p) => [p, { src: `/themes/voyage/icons/${p}.webp`, ratio: VOY_RATIOS[p], scale: 1.3 }])),
+    profil: { src: null, ratio: 6.2, boxStyle: { ...voyageGlass, borderRadius: '1.6cqw' } },
+  } as unknown as Theme['plates'],
+};
 
 // ── Sucrerie : royaume de bonbons (décor, icônes, vidéo de lancement) ──
 const sucreGlass = {

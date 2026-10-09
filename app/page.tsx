@@ -89,6 +89,18 @@ export default function ConsolePage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const [activeMode, setActiveMode] = useState('classique');
+
+  // Fond de scène : certains habillages (Voyage) changent de décor selon le mode de jeu, avec un fondu enchaîné
+  const modeStageSrc = (theme.stageByMode as Record<string, { src: string }> | undefined)?.[activeMode]?.src ?? theme.stage.src;
+  const [bgPair, setBgPair] = useState<{ prev: string | null; cur: string }>({ prev: null, cur: modeStageSrc });
+  useEffect(() => {
+    setBgPair((p) => (p.cur === modeStageSrc ? p : { prev: p.cur, cur: modeStageSrc }));
+  }, [modeStageSrc]);
+  useEffect(() => {
+    Object.values(theme.stageByMode ?? {}).forEach((st) => {
+      if (st) new Image().src = st.src; // préchargement : pas de flash au changement de mode
+    });
+  }, [theme]);
   const [infoMode, setInfoMode] = useState<string | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
@@ -525,12 +537,20 @@ export default function ConsolePage() {
             containerType: 'size',
             backgroundImage: `url(${theme.stage.src})`,
             backgroundSize: '100% 100%',
+            isolation: 'isolate',
             color: '#e8eeff',
             overflow: 'hidden',
             userSelect: 'none',
           } as React.CSSProperties
         }
       >
+        {theme.stageByMode && (
+          <>
+            <style>{`@keyframes ck-bgfade{from{opacity:0}to{opacity:1}}`}</style>
+            {bgPair.prev && <div aria-hidden style={{ position: 'absolute', inset: 0, zIndex: -2, backgroundImage: `url(${bgPair.prev})`, backgroundSize: '100% 100%', pointerEvents: 'none' }} />}
+            <div key={bgPair.cur} aria-hidden style={{ position: 'absolute', inset: 0, zIndex: -1, backgroundImage: `url(${bgPair.cur})`, backgroundSize: '100% 100%', pointerEvents: 'none', animation: 'ck-bgfade .8s ease both' }} />
+          </>
+        )}
         <style>{`
           .ck-recolor, .ck-recolor *{color:var(--ck-color) !important}
           .ck-edit-planet *{pointer-events:none !important}
