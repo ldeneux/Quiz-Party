@@ -10,9 +10,25 @@
 export type ThemeIntro = { src: string; poster?: string };
 
 export const THEME_INTROS: Record<string, ThemeIntro> = {
-  sucrerie: { src: '/themes/sucrerie/intro.mp4', poster: '/themes/sucrerie/intro-poster.webp' },
+  sucrerie: { src: '/themes/sucrerie/intro.mp4' },
   art: { src: '/themes/art/intro.mp4' },
+  jungle: { src: '/themes/art/intro.mp4' },
+  marin: { src: '/themes/art/intro.mp4' },
+  espace: { src: '/themes/art/intro.mp4' },
+  temps: { src: '/themes/art/intro.mp4' },
+  egypte: { src: '/themes/art/intro.mp4' },
+  sport: { src: '/themes/art/intro.mp4' },
+  terre: { src: '/themes/art/intro.mp4' },
+
 };
 
 export const HOLD_AFTER_VIDEO_MS = 2000; // pause sur la dernière image, avant que le portail se referme
 export const NO_VIDEO_MS = 5000; // durée du « ? » lumineux quand le thème n'a pas de vidéo
+
+
+
+
+
+
+
+
