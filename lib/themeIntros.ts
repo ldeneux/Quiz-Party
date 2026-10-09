@@ -18,7 +18,8 @@ export const THEME_INTROS: Record<string, ThemeIntro> = {
   temps: { src: '/themes/temps/intro.mp4' },
   egypte: { src: '/themes/egypte/intro.mp4' },
   sport: { src: '/themes/sport/intro.mp4' },
-  terre: { src: '/themes/terre/intro.mp4' }
+  terre: { src: '/themes/terre/intro.mp4' },
+  fantasy: { src: '/themes/fantasy/intro.mp4' }
 
 };
 
