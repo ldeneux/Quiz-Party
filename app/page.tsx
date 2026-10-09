@@ -12,6 +12,7 @@ import { useLayout } from '@/lib/useLayout';
 import { LayoutOverlays, LayoutPanels } from '@/components/LayoutEditor';
 import ModeIcon from '@/components/ModeIcon';
 import { useTheme } from '@/lib/useTheme';
+import MascotPortal from '@/components/MascotPortal';
 import CockpitQR from '@/components/CockpitQR';
 
 const MODES = [
@@ -375,14 +376,16 @@ export default function ConsolePage() {
     }
   };
 
+  const [portalOn, setPortalOn] = useState(false);
   const startGame = async () => {
-    if (!gameId) return;
+    if (!gameId || portalOn) return;
     // Filet de sécurité final : garantit qu'au moment précis où l'écran de
     // jeu se lance, la base reflète bien le mode et le profil actuellement
     // affichés dans la console, quoi qu'il ait pu se passer avant.
     const ok = await updateGame({ mode: activeMode, profileId: selectedProfileId || null });
     if (!ok) return; // on ne lance pas la partie avec un mauvais profil
-    setGameStarted(true);
+    // La mascotte ouvre son portail (vidéo du thème) ; la partie démarre quand il commence à se refermer
+    setPortalOn(true);
   };
 
   const openStats = async () => {
@@ -704,6 +707,9 @@ export default function ConsolePage() {
           )}
         </div>
 
+        {/* Mascotte (toujours visible) + portail holographique de lancement de partie */}
+        <MascotPortal active={portalOn} themeId={theme.id} stageRatio={theme.stage.ratio} onLaunch={() => setGameStarted(true)} onDone={() => setPortalOn(false)} />
+
         {/* Pupitre du bas : emplacements fixes (les boutons ne bougent pas, ils se grisent quand ils sont inutilisables) */}
         <div className={L.fx('bar').className} style={{ position: 'absolute', ...rectStyle(zones.bar), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1cqw', boxSizing: 'border-box', padding: '0.4cqw 1.2cqw', background: theme.bar.background, border: theme.bar.border, borderRadius: '1.2cqw', boxShadow: theme.bar.boxShadow, ...L.fx('bar').style }}>
           {barItem('parametrage', <CockpitPlate id="parametrage" label="Paramétrage" href="/parametrage" />)}
@@ -719,8 +725,8 @@ export default function ConsolePage() {
                 id="fusee"
                 label="Démarrer la partie"
                 hint={teams.length > 0 ? 'Espace' : 'Aucune équipe connectée'}
-                disabled={teams.length === 0}
-                pulse={teams.length > 0}
+                disabled={teams.length === 0 || portalOn}
+                pulse={teams.length > 0 && !portalOn}
                 onClick={startGame}
               />
             )
