@@ -19,7 +19,8 @@ export const THEME_INTROS: Record<string, ThemeIntro> = {
   peche: { src: '/themes/peche/intro.mp4' },
   sports: { src: '/themes/sports/intro.mp4' },
   temps: { src: '/themes/temps/intro.mp4' },
-  terre: { src: '/themes/terre/intro.mp4' }
+  terre: { src: '/themes/terre/intro.mp4' },
+  mythologie: { src: '/themes/mythologie/intro.mp4' },
 };
 
 export const HOLD_AFTER_VIDEO_MS = 2000; // pause sur la dernière image, avant que le portail se referme
