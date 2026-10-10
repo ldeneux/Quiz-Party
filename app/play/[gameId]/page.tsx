@@ -79,13 +79,15 @@ function TeamHeader({
 
 // Fond d'écran de l'équipe : image portrait/paysage selon l'orientation de l'appareil
 function TeamBackdrop({ bg }: { bg: TeamBg }) {
+  const shade = 'linear-gradient(rgba(3,6,20,.15),rgba(3,6,20,.35))';
   const css =
     `.tb-bg{position:fixed;inset:0;z-index:0;background-color:#050818;` +
-    `background-image:linear-gradient(rgba(3,6,20,.15),rgba(3,6,20,.35)),url(${bg.portrait});` +
-    `background-size:cover;background-position:center top;background-repeat:no-repeat}` +
+    `background-image:${shade},url(${bg.portrait ?? bg.landscape});` +
+    // sans version portrait : on recadre le fond paysage au centre, en bas de l'image
+    `background-size:cover;background-position:${bg.portrait ? 'center top' : 'center bottom'};background-repeat:no-repeat}` +
     // sans version paysage : on recadre le fond portrait sur le haut de l'image
     `@media (orientation:landscape){.tb-bg{background-position:center 8%` +
-    (bg.landscape ? `;background-image:linear-gradient(rgba(3,6,20,.15),rgba(3,6,20,.35)),url(${bg.landscape});background-position:center` : '') +
+    (bg.landscape ? `;background-image:${shade},url(${bg.landscape});background-position:center` : '') +
     `}}` +
     // en portrait, le contenu commence sous l'emblème de l'équipe
     `@media (orientation:portrait){.tb-content{padding-top:${bg.contentTop ?? '31vh'} !important}}`;
@@ -176,6 +178,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [showProgressTable, setShowProgressTable] = useState(false);
   const [gameMode, setGameMode] = useState<string | null>(null);
   const [presetsReady, setPresetsReady] = useState(false);
+  const [visualTheme, setVisualTheme] = useState<string | null>(null); // habillage de la partie : sert à retrouver le fond de l'équipe
 
   // Les équipes proposées dépendent de l'habillage choisi par l'animateur à la création de la partie
   useEffect(() => {
@@ -187,6 +190,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       .single()
       .then(({ data }) => {
         if (cancelled) return;
+        setVisualTheme(data?.visual_theme ?? null);
         setPresets(getRandomPresets(data?.visual_theme ?? '', 12));
         setPresetsReady(true);
       });
@@ -418,7 +422,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
     });
   };
 
-  const teamBg = team ? getTeamBackground(team.preset.name) : null;
+  const teamBg = team ? getTeamBackground(visualTheme, team.preset.name) : null;
 
   // --- Écran : équipe expulsée par l'hôte ---
   if (kicked) {

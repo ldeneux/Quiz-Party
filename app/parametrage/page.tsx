@@ -939,7 +939,7 @@ export default function ParametragePage() {
 }
 
 // ───────── Fenêtre « Équipes » : les 12 équipes d'un habillage et leurs fonds d'écran équipés ─────────
-function BgThumb({ src, w, h, caption, emptyText }: { src?: string; w: number; h: number; caption: string; emptyText: string }) {
+function BgThumb({ src, w, h, caption, emptyText, cropped }: { src?: string; w: number; h: number; caption: string; emptyText: string; cropped?: boolean }) {
   const [failed, setFailed] = useState(false);
   const box: React.CSSProperties = { width: w, height: h, borderRadius: 8, overflow: 'hidden', background: '#eef0f8', flex: '0 0 auto' };
   return (
@@ -951,7 +951,7 @@ function BgThumb({ src, w, h, caption, emptyText }: { src?: string; w: number; h
           {src ? 'Image introuvable' : emptyText}
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: '#7a819c', fontWeight: 700, marginTop: 3 }}>{caption}</div>
+      <div style={{ fontSize: 10.5, color: '#7a819c', fontWeight: 700, marginTop: 3 }}>{caption}{cropped && src && !failed ? '*' : ''}</div>
     </div>
   );
 }
@@ -966,13 +966,13 @@ function TeamsModal({ themeId, onClose }: { themeId: string; onClose: () => void
         <div style={{ padding: '22px 28px 10px' }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: '#1f2440' }}>{theme.emoji} Équipes — {theme.label}</h2>
           <p style={{ color: '#7a819c', fontSize: 13, margin: '4px 0 0' }}>
-            {teams.length > 0 ? `${teams.length} équipes, avec le fond d'écran équipé en paysage et en portrait.` : 'Aucune équipe n\'est définie pour cet habillage.'}
+            {teams.length > 0 ? `${teams.length} équipes, avec le fond d'écran équipé en paysage et en portrait.${teams.some((t) => { const b = getTeamBackground(themeId, t.name); return !!b && (!b.portrait || !b.landscape); }) ? ' * : image recadrée à partir de l\'autre format.' : ''}` : 'Aucune équipe n\'est définie pour cet habillage.'}
           </p>
         </div>
 
         <div style={{ overflowY: 'auto', padding: '8px 28px 16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(224px, 1fr))', gap: 14 }}>
           {teams.map((team) => {
-            const bg = getTeamBackground(team.name);
+            const bg = getTeamBackground(themeId, team.name);
             return (
               <div key={team.name} style={{ border: '1.5px solid #eaedf6', borderLeft: `5px solid ${team.color}`, borderRadius: 14, padding: '10px 12px 10px', background: '#fff' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -980,8 +980,8 @@ function TeamsModal({ themeId, onClose }: { themeId: string; onClose: () => void
                   <div style={{ fontWeight: 800, fontSize: 13.5, color: '#1f2440', lineHeight: 1.25 }}>{team.name}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <BgThumb src={bg ? bg.landscape ?? bg.portrait : undefined} w={144} h={81} caption={bg && !bg.landscape ? 'Paysage (portrait recadré)' : 'Paysage'} emptyText="Écran standard" />
-                  <BgThumb src={bg?.portrait} w={46} h={81} caption="Portrait" emptyText="Standard" />
+                  <BgThumb src={bg ? bg.landscape ?? bg.portrait : undefined} w={144} h={81} caption="Paysage" cropped={!!bg && !bg.landscape} emptyText="Écran standard" />
+                  <BgThumb src={bg ? bg.portrait ?? bg.landscape : undefined} w={46} h={81} caption="Portrait" cropped={!!bg && !bg.portrait} emptyText="Standard" />
                 </div>
               </div>
             );
