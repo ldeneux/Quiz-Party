@@ -22,7 +22,7 @@ const jungle = (slug: string, shade: number): TeamBg => ({ ...bg('jungle', slug,
 const art = (slug: string, shade = 0.5): TeamBg => ({ ...bg('art', slug, '5vh'), shade });
 
 export const TEAM_BACKGROUNDS: Record<string, Record<string, TeamBg>> = {
-  // Espace (Orion, Les Chevaucheurs d’Étoiles et Les Nébuleuses n'ont pas de fond dédié : écran standard)
+  // Espace : fonds sombres, le voile par défaut suffit
   espace: {
     'Les Explorateurs Cosmiques': bg('espace', 'explorateurs'),
     'Les Novas': bg('espace', 'nova'),
@@ -33,6 +33,10 @@ export const TEAM_BACKGROUNDS: Record<string, Record<string, TeamBg>> = {
     'Les Astronautes': bg('espace', 'astronautes'),
     'Les Météores': bg('espace', 'meteores'),
     'Zénith': bg('espace', 'zenith'),
+    'Orion': bg('espace', 'orion'),
+    'Les Chevaucheurs d’Étoiles': bg('espace', 'chevaucheurs'),
+    // Nébuleuses : version paysage seule, la version portrait en est recadrée
+    'Les Nébuleuses': { landscape: '/bg/espace/nebuleuses-paysage.webp', contentTop: '9vh' },
   },
   // Fonds marins (l'emblème n'est pas en haut : peu de place à réserver)
   marins: {
