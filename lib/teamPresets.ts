@@ -42,6 +42,11 @@ export const TEAM_PRESETS: Record<string, TeamPreset[]> = {
   ], [
     '#5cdcf2', '#5c98f2', '#5ca0f2', '#5ce6f2', '#8e5cf2', '#f2ed5c', '#5cb2f2', '#5cb2f2', '#5cf2dc', '#f2bf5c', '#5cbbf2', '#5c8ff2',
   ]),
+  art: make('art', [
+    'Les Jocondiers', 'Les Samothraciens', 'Les Vénusiens', 'Les Scribes', 'Les Pharaons', 'Les Chevaliers du Louvre', 'Les Delacroix', 'Les Nymphéas', 'Les Pyramidiens', 'Les Apollons', 'Les Gardiens du Sphinx', 'Les Arcadiens',
+  ], [
+    '#f2b35c', '#5cccf2', '#f25c9a', '#f29a5c', '#f2cc5c', '#f25c68', '#5c9bf2', '#5ce6f2', '#5cb4f2', '#f2b35c', '#5cc4f2', '#9a5cf2',
+  ]),
   fantasy: make('fantasy', [
     'Les Flammes du Dragon', 'Les Feuilles Elfiques', 'Les Mages de Cristal', 'Les Loups de l’Ombre', 'Le Réveil du Phénix', 'Les Gardiens des Runes', 'La Lumière des Licornes', 'La Bande des Gobelins', 'Les Sorciers de la Lune', 'Les Esprits de la Forêt', 'Les Griffons du Tonnerre', 'La Forge Mystique',
   ], [
