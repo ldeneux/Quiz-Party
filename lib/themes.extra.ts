@@ -56,7 +56,6 @@ function emptyTheme(id: string, label: string, emoji: string, description: strin
 }
 
 // ── Thèmes ajoutés ──
-const peche = emptyTheme('peche', 'Pêche', '🎣', 'Lacs, cannes à pêche et gros poissons. (Page blanche : décor à venir.)');
 const aventure = emptyTheme('aventure', 'Aventure', '🗺️', 'Cartes au trésor et expéditions. (Page blanche : décor à venir.)');
 const medieval = emptyTheme('medieval', 'Médiéval', '🏰', 'Chevaliers, châteaux et blasons. (Page blanche : décor à venir.)');
 const astronomie = emptyTheme('astronomie', 'Astronomie', '🔭', 'Planètes, télescopes et galaxies. (Page blanche : décor à venir.)');
@@ -189,6 +188,54 @@ const noel = sceneTheme(
 );
 const multivers = emptyTheme('multivers', 'Multivers', '🌌', 'Tous les mondes en un : bonbons, jungle, Égypte, espace… (Page blanche : décor à venir.)');
 
+// ── Pêche : petit port grec (barques, filets, phare) ──
+const pecheGlass = {
+  background: 'linear-gradient(180deg, rgba(8,32,70,0.8), rgba(5,22,52,0.88))',
+  border: '2px solid rgba(150,215,255,0.8)',
+  boxShadow: '0 0 2cqw rgba(110,190,255,0.3), inset 0 0 1.4cqw rgba(150,215,255,0.14)',
+};
+const PECHE_RATIOS: Record<string, number> = {
+  fusee: 0.654,
+  suivante: 1.022,
+  stats: 0.913,
+  parametrage: 0.696,
+  progression: 0.542,
+  nouvelle: 1.301,
+  quitter: 0.837,
+  plein: 1.0,
+  valider: 1.25,
+  annuler: 1.0,
+};
+const peche: Theme = {
+  ...emptyTheme('peche', 'Pêche', '🎣', 'Un petit port grec : barques bleues, filets, phare blanc et mer turquoise.'),
+  stage: { src: '/themes/peche/stage.webp', ratio: 1672 / 941, bg: '#1a6fb0' },
+  zones: {
+    teams: { left: 2.2, top: 22, width: 15, height: 38 },
+    teamCount: { left: 2.2, top: 62, width: 15, height: 4.6 },
+    join: { left: 82.8, top: 22, width: 15, height: 38 },
+    code: { left: 82.8, top: 62, width: 15, height: 4.6 },
+    hub: { left: 22, top: 11, width: 56, height: 52 },
+    bar: { left: 19, top: 81, width: 62, height: 15 },
+    profile: { left: 50, top: 3 },
+  },
+  hubStyle: { ...pecheGlass, borderRadius: '1.8cqw', background: 'linear-gradient(180deg, rgba(8,32,70,0.74), rgba(5,22,52,0.84))' },
+  sidePanelStyle: { background: 'rgba(8,32,70,0.86)', border: '1px solid rgba(150,215,255,0.65)', borderRadius: '0.8cqw' },
+  joinPadTop: 2,
+  qrWidth: 7.6,
+  bar: { ...pecheGlass, background: 'linear-gradient(180deg, rgba(8,32,70,0.62), rgba(5,22,52,0.8))' },
+  planets: {
+    classique: { src: '/themes/peche/icons/classique.webp', width: 9.6 },
+    defi: { src: '/themes/peche/icons/defi.webp', width: 9.6 },
+    survie: { src: '/themes/peche/icons/survie.webp', width: 6.4 },
+    participatif: { src: '/themes/peche/icons/participatif.webp', width: 8.2 },
+    camembert: { src: '/themes/peche/icons/camembert.webp', width: 8.4 },
+  },
+  plates: {
+    ...Object.fromEntries(PLATES.map((p) => [p, { src: `/themes/peche/icons/${p}.webp`, ratio: PECHE_RATIOS[p], scale: 1.3 }])),
+    profil: { src: null, ratio: 6.2, boxStyle: { ...pecheGlass, borderRadius: '1.6cqw' } },
+  } as unknown as Theme['plates'],
+};
+
 // ── Sucrerie : royaume de bonbons (décor, icônes, vidéo de lancement) ──
 const sucreGlass = {
   background: 'linear-gradient(180deg, rgba(74,32,52,0.8), rgba(54,22,40,0.88))',
@@ -290,9 +337,26 @@ const mythologie: Theme = {
   },
 };
 
-// ── Sports : décor ajouté (îles flottantes), icônes à venir (neutres) ──
+// ── Sports : décor (îles flottantes) + icônes de modes et de boutons ──
+const sportsGlass = {
+  background: 'linear-gradient(180deg, rgba(8,24,80,0.78), rgba(5,16,56,0.88))',
+  border: '2px solid rgba(110,190,255,0.75)',
+  boxShadow: '0 0 2cqw rgba(80,160,255,0.3), inset 0 0 1.4cqw rgba(110,190,255,0.14)',
+};
+const SPORTS_RATIOS: Record<string, number> = {
+  fusee: 1.054,
+  suivante: 1.051,
+  stats: 1.051,
+  parametrage: 1.048,
+  progression: 1.045,
+  nouvelle: 1.051,
+  quitter: 1.051,
+  plein: 1.051,
+  valider: 1.051,
+  annuler: 1.051,
+};
 const sports: Theme = {
-  ...emptyTheme('sports', 'Sports', '🏅', 'Des îles flottantes dédiées au sport. (Icônes à venir.)'),
+  ...emptyTheme('sports', 'Sports', '🏅', 'Des îles flottantes dédiées au sport : ballons, sifflet, podium, vélo et flamme olympique.'),
   stage: { src: '/themes/sports/stage.webp', ratio: 1672 / 940, bg: '#0a2a7a' },
   zones: {
     teams: { left: 1.5, top: 24, width: 15, height: 36 },
@@ -308,6 +372,18 @@ const sports: Theme = {
     textShadow: '0 1px 4px rgba(0,8,40,0.95), 0 0 10px rgba(0,8,40,0.8)',
   },
   sidePanelStyle: { background: 'rgba(8,24,80,0.86)', border: '1px solid rgba(110,190,255,0.65)', borderRadius: '0.8cqw' },
+  bar: { ...sportsGlass, background: 'linear-gradient(180deg, rgba(8,24,80,0.62), rgba(5,16,56,0.8))' },
+  planets: {
+    classique: { src: '/themes/sports/icons/classique.webp', width: 8.6 },
+    defi: { src: '/themes/sports/icons/defi.webp', width: 8.6 },
+    survie: { src: '/themes/sports/icons/survie.webp', width: 8.6 },
+    participatif: { src: '/themes/sports/icons/participatif.webp', width: 8.6 },
+    camembert: { src: '/themes/sports/icons/camembert.webp', width: 8.6 },
+  },
+  plates: {
+    ...Object.fromEntries(PLATES.map((p) => [p, { src: `/themes/sports/icons/${p}.webp`, ratio: SPORTS_RATIOS[p], scale: 1.3 }])),
+    profil: { src: null, ratio: 6.2, boxStyle: { ...sportsGlass, borderRadius: '1.6cqw' } },
+  } as unknown as Theme['plates'],
 };
 
 export const EXTRA_THEMES: Record<string, Theme> = { sucrerie, sports, temps, voyage, multivers, halloween, noel, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
