@@ -79,7 +79,8 @@ function TeamHeader({
 
 // Fond d'écran de l'équipe : image portrait/paysage selon l'orientation de l'appareil
 function TeamBackdrop({ bg }: { bg: TeamBg }) {
-  const shade = 'linear-gradient(rgba(3,6,20,.15),rgba(3,6,20,.35))';
+  // voile sombre : celui par défaut, ou plus marqué (bg.shade) pour un fond très lumineux
+  const shade = bg.shade != null ? `linear-gradient(rgba(3,6,20,${bg.shade}),rgba(3,6,20,${Math.min(0.9, bg.shade + 0.15)}))` : 'linear-gradient(rgba(3,6,20,.15),rgba(3,6,20,.35))';
   const css =
     `.tb-bg{position:fixed;inset:0;z-index:0;background-color:#050818;` +
     `background-image:${shade},url(${bg.portrait ?? bg.landscape});` +
