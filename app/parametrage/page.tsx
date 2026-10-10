@@ -5,7 +5,10 @@ import { supabase } from '@/lib/supabaseClient';
 import { THEME_LIST } from '@/lib/themes';
 import { useTheme } from '@/lib/useTheme';
 import CategoryBadge from '@/components/CategoryBadge';
-import { EDIT_FLAG, clearLayout } from '@/lib/layout';
+import { EDIT_FLAG } from '@/lib/layout';
+import { TEAM_PRESETS } from '@/lib/teamPresets';
+import { getTeamBackground } from '@/lib/teamBackgrounds';
+import TeamAvatar from '@/components/TeamAvatar';
 import { CostEstimate, GENERATION, GEMINI_PRICING, estimateGeminiCost, formatEur, formatUsd } from '@/lib/geminiCost';
 
 type Level = { id: string; label: string; sort_order: number; emoji?: string | null; is_school?: boolean; is_hidden?: boolean };
@@ -32,25 +35,51 @@ export default function ParametragePage() {
   const [hover, setHover] = useState<{ id: string; rect: DOMRect } | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const tileRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const viewedId = useRef<string | null>(null); // dernier habillage visualisé (point de départ des flèches)
+  const quietUntil = useRef(0); // ignore les événements de défilement provoqués par les flèches
+  const [teamsFor, setTeamsFor] = useState<string | null>(null); // habillage dont la fenêtre « Équipes » est ouverte
   const stopTimer = () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
   };
   const openHover = (id: string, el: HTMLElement) => {
     stopTimer();
+    viewedId.current = id;
     setHover({ id, rect: el.getBoundingClientRect() });
   };
   const closeHover = () => {
     stopTimer();
     hoverTimer.current = setTimeout(() => setHover(null), 150);
   };
-  const scrollCarousel = (dir: number) => carouselRef.current?.scrollBy({ left: dir * 360, behavior: 'smooth' });
+  // Flèches ‹ › et ← → : déplacent l'habillage visualisé (comme le survol de la souris) et le gardent visible
+  const stepTheme = (dir: number) => {
+    const ids = THEME_LIST.map((t) => t.id);
+    const base = hover?.id ?? viewedId.current;
+    const from = ids.indexOf(base ?? themeId);
+    const idx = base ? Math.min(ids.length - 1, Math.max(0, from + dir)) : Math.max(0, from);
+    const el = tileRefs.current[ids[idx]];
+    if (!el) return;
+    quietUntil.current = Date.now() + 400;
+    el.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' });
+    requestAnimationFrame(() => openHover(ids[idx], el));
+  };
   useEffect(() => {
-    const close = () => setHover(null);
+    const close = () => {
+      if (Date.now() < quietUntil.current) return;
+      setHover(null);
+    };
+    const outside = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[data-theme-tile], [data-theme-popup], [data-carousel-arrow]')) return;
+      setHover(null);
+    };
     window.addEventListener('scroll', close, true);
     window.addEventListener('resize', close);
+    window.addEventListener('pointerdown', outside);
     return () => {
       window.removeEventListener('scroll', close, true);
       window.removeEventListener('resize', close);
+      window.removeEventListener('pointerdown', outside);
     };
   }, []);
   const hoverTheme = hover ? THEME_LIST.find((t) => t.id === hover.id) : undefined;
@@ -58,9 +87,6 @@ export default function ParametragePage() {
     setTheme(id); // la disposition modifiée est celle de l'habillage choisi
     try { window.sessionStorage.setItem(EDIT_FLAG, '1'); } catch { /* ignoré */ }
     window.location.href = '/';
-  };
-  const resetLayout = (id: string, label: string) => {
-    if (window.confirm(`Remettre la disposition de l'habillage « ${label} » à zéro ?`)) clearLayout(id);
   };
 
   // ───────── Données ─────────
@@ -80,6 +106,25 @@ export default function ParametragePage() {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [selCols, setSelCols] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState(false);
+
+  // Clavier : ← → déplacent l'habillage visualisé ; Échap ferme l'aperçu ou la fenêtre « Équipes »
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (teamsFor) setTeamsFor(null);
+        else setHover(null);
+        return;
+      }
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (teamsFor || dialog || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return; // ne pas gêner la saisie
+      e.preventDefault();
+      stepTheme(e.key === 'ArrowRight' ? 1 : -1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   // Option 1 — génération
   const [perPack, setPerPack] = useState(30);
@@ -553,16 +598,18 @@ export default function ParametragePage() {
         <section style={{ ...card, maxWidth: 'none', padding: '16px 20px' }}>
           <h2 style={{ ...sectionTitle, marginBottom: 4 }}>Habillage de l'écran d'accueil</h2>
           <p style={{ color: '#7a819c', fontSize: 13, margin: '0 0 12px' }}>
-            Survole un habillage pour l'utiliser, modifier sa disposition ou la réinitialiser. Le choix est mémorisé sur cet appareil.
+            Survole un habillage (ou utilise les flèches ← →) pour l'utiliser, modifier sa disposition ou voir ses équipes. Le choix est mémorisé sur cet appareil.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type="button" aria-label="Précédent" onClick={() => scrollCarousel(-1)} style={arrowBtn}>‹</button>
-            <div ref={carouselRef} onScroll={() => setHover(null)} style={{ flex: 1, minWidth: 0, display: 'flex', gap: 12, overflowX: 'auto', scrollSnapType: 'x proximity', padding: '4px 2px', scrollbarWidth: 'none' }}>
+            <button type="button" aria-label="Précédent" data-carousel-arrow onClick={() => stepTheme(-1)} style={arrowBtn}>‹</button>
+            <div ref={carouselRef} onScroll={() => { if (Date.now() >= quietUntil.current) setHover(null); }} style={{ flex: 1, minWidth: 0, display: 'flex', gap: 12, overflowX: 'auto', scrollSnapType: 'x proximity', padding: '4px 2px', scrollbarWidth: 'none' }}>
               {THEME_LIST.map((t) => {
                 const selected = t.id === themeId;
                 return (
                   <button
                     key={t.id}
+                    ref={(el) => { tileRefs.current[t.id] = el; }}
+                    data-theme-tile
                     type="button"
                     title={t.label}
                     onMouseEnter={(e) => openHover(t.id, e.currentTarget)}
@@ -589,7 +636,7 @@ export default function ParametragePage() {
                 );
               })}
             </div>
-            <button type="button" aria-label="Suivant" onClick={() => scrollCarousel(1)} style={arrowBtn}>›</button>
+            <button type="button" aria-label="Suivant" data-carousel-arrow onClick={() => stepTheme(1)} style={arrowBtn}>›</button>
           </div>
 
           {/* Détail au survol : fond d'écran réduit, texte dessous, boutons */}
@@ -600,7 +647,7 @@ export default function ParametragePage() {
             const t = hoverTheme;
             const selected = t.id === themeId;
             return (
-              <div onMouseEnter={stopTimer} onMouseLeave={closeHover} style={{ position: 'fixed', left, top, width: W, zIndex: 40, background: '#1b1d26', color: '#fff', borderRadius: 14, overflow: 'hidden', boxShadow: '0 18px 50px -10px rgba(0,0,0,0.6)', ...FONT }}>
+              <div data-theme-popup onMouseEnter={stopTimer} onMouseLeave={closeHover} style={{ position: 'fixed', left, top, width: W, zIndex: 40, background: '#1b1d26', color: '#fff', borderRadius: 14, overflow: 'hidden', boxShadow: '0 18px 50px -10px rgba(0,0,0,0.6)', ...FONT }}>
                 <div style={{ background: t.stage.bg, aspectRatio: '16 / 10' }}>
                   <img src={t.stage.src} alt="" draggable={false} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
                 </div>
@@ -614,12 +661,14 @@ export default function ParametragePage() {
                       {selected ? 'Utilisé' : 'Utiliser'}
                     </button>
                     <button type="button" onClick={() => editLayout(t.id)} style={{ ...hoverBtn, background: '#fff', color: '#1f2440' }}>Modifier</button>
-                    <button type="button" onClick={() => resetLayout(t.id, t.label)} style={{ ...hoverBtn, background: 'transparent', color: '#fff', border: '1.5px solid #5b6080' }}>Réinitialiser</button>
+                    <button type="button" onClick={() => { setHover(null); setTeamsFor(t.id); }} style={{ ...hoverBtn, background: 'transparent', color: '#fff', border: '1.5px solid #5b6080' }}>Équipes</button>
                   </div>
                 </div>
               </div>
             );
           })()}
+
+          {teamsFor && <TeamsModal themeId={teamsFor} onClose={() => setTeamsFor(null)} />}
         </section>
 
         {/* ---- Packs, profils, catégories et niveaux : un seul écran ---- */}
@@ -886,6 +935,64 @@ export default function ParametragePage() {
         )}
       </div>
     </main>
+  );
+}
+
+// ───────── Fenêtre « Équipes » : les 12 équipes d'un habillage et leurs fonds d'écran équipés ─────────
+function BgThumb({ src, w, h, caption, emptyText }: { src?: string; w: number; h: number; caption: string; emptyText: string }) {
+  const [failed, setFailed] = useState(false);
+  const box: React.CSSProperties = { width: w, height: h, borderRadius: 8, overflow: 'hidden', background: '#eef0f8', flex: '0 0 auto' };
+  return (
+    <div style={{ textAlign: 'center' }}>
+      {src && !failed ? (
+        <img src={src} alt={caption} draggable={false} onError={() => setFailed(true)} style={{ ...box, display: 'block', objectFit: 'cover', boxShadow: '0 0 0 1px #dfe3f0' }} />
+      ) : (
+        <div style={{ ...box, border: '1.5px dashed #c9cfe4', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, boxSizing: 'border-box', fontSize: 10, lineHeight: 1.25, color: '#7a819c', fontWeight: 600 }}>
+          {src ? 'Image introuvable' : emptyText}
+        </div>
+      )}
+      <div style={{ fontSize: 10.5, color: '#7a819c', fontWeight: 700, marginTop: 3 }}>{caption}</div>
+    </div>
+  );
+}
+
+function TeamsModal({ themeId, onClose }: { themeId: string; onClose: () => void }) {
+  const theme = THEME_LIST.find((t) => t.id === themeId);
+  if (!theme) return null;
+  const teams = TEAM_PRESETS[themeId] ?? [];
+  return (
+    <div onClick={onClose} style={{ ...overlay, padding: 16 }} role="dialog" aria-modal="true" aria-label={`Équipes de l'habillage ${theme.label}`}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 1040, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 50px -12px rgba(31,36,64,0.35)', ...FONT }}>
+        <div style={{ padding: '22px 28px 10px' }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: '#1f2440' }}>{theme.emoji} Équipes — {theme.label}</h2>
+          <p style={{ color: '#7a819c', fontSize: 13, margin: '4px 0 0' }}>
+            {teams.length > 0 ? `${teams.length} équipes, avec le fond d'écran équipé en paysage et en portrait.` : 'Aucune équipe n\'est définie pour cet habillage.'}
+          </p>
+        </div>
+
+        <div style={{ overflowY: 'auto', padding: '8px 28px 16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(224px, 1fr))', gap: 14 }}>
+          {teams.map((team) => {
+            const bg = getTeamBackground(team.name);
+            return (
+              <div key={team.name} style={{ border: '1.5px solid #eaedf6', borderLeft: `5px solid ${team.color}`, borderRadius: 14, padding: '10px 12px 10px', background: '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <TeamAvatar avatar={team.avatar} size={44} style={{ verticalAlign: 'middle' }} />
+                  <div style={{ fontWeight: 800, fontSize: 13.5, color: '#1f2440', lineHeight: 1.25 }}>{team.name}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <BgThumb src={bg ? bg.landscape ?? bg.portrait : undefined} w={144} h={81} caption={bg && !bg.landscape ? 'Paysage (portrait recadré)' : 'Paysage'} emptyText="Écran standard" />
+                  <BgThumb src={bg?.portrait} w={46} h={81} caption="Portrait" emptyText="Standard" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: '12px 28px 22px', textAlign: 'center', borderTop: '1px solid #eaedf6' }}>
+          <button type="button" autoFocus onClick={onClose} style={actionBtn}>Fermer</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
