@@ -151,6 +151,44 @@ const voyage: Theme = {
   } as unknown as Theme['plates'],
 };
 
+// ── Multivers (décor à venir), Halloween et Noël : décors + panneaux colorés, boutons textuels (pas encore d'icônes dédiées) ──
+type SceneGlass = { background: string; border: string; boxShadow: string };
+function sceneTheme(id: string, label: string, emoji: string, description: string, glass: SceneGlass, panel: string): Theme {
+  const base = emptyTheme(id, label, emoji, description);
+  const box: CSSProperties = { ...glass, borderRadius: '1cqw', color: '#fff', fontSize: '0.75cqw', fontWeight: 800, textAlign: 'center' };
+  const plates = {} as Record<string, PlateDef>;
+  PLATES.forEach((p) => (plates[p] = { src: null, ratio: 1, scale: 1.3, boxStyle: box }));
+  plates.profil = { src: null, ratio: 6.2, boxStyle: { ...glass, borderRadius: '1.6cqw' } };
+  return {
+    ...base,
+    stage: { src: `/themes/${id}/stage.webp`, ratio: 1672 / 941, bg: '#0b0b1a' },
+    zones: {
+      teams: { left: 2.2, top: 22, width: 15, height: 38 },
+      teamCount: { left: 2.2, top: 62, width: 15, height: 4.6 },
+      join: { left: 82.8, top: 22, width: 15, height: 38 },
+      code: { left: 82.8, top: 62, width: 15, height: 4.6 },
+      hub: { left: 22, top: 11, width: 56, height: 52 },
+      bar: { left: 19, top: 81, width: 62, height: 15 },
+      profile: { left: 50, top: 3 },
+    },
+    hubStyle: { ...glass, borderRadius: '1.8cqw', background: panel },
+    sidePanelStyle: { background: panel, border: glass.border, borderRadius: '0.8cqw' },
+    bar: { ...glass, background: panel.replace(/0?\.\d+\)/g, '0.72)') },
+    plates: plates as unknown as Theme['plates'],
+  } as Theme;
+}
+const halloween = sceneTheme(
+  'halloween', 'Halloween', '🎃', 'Une académie magique et gothique : citrouilles, fantômes, potions et vitraux ensorcelés.',
+  { background: 'linear-gradient(180deg, rgba(30,10,52,0.82), rgba(18,6,34,0.9))', border: '2px solid rgba(255,155,61,0.8)', boxShadow: '0 0 2cqw rgba(255,140,40,0.32), inset 0 0 1.4cqw rgba(255,155,61,0.14)' },
+  'linear-gradient(180deg, rgba(30,10,52,0.86), rgba(18,6,34,0.92))',
+);
+const noel = sceneTheme(
+  'noel', 'Noël', '🎄', 'Un château enneigé et illuminé : sapins, lanternes, rubans rouges et ciel étoilé.',
+  { background: 'linear-gradient(180deg, rgba(10,22,60,0.8), rgba(6,14,42,0.88))', border: '2px solid rgba(243,210,122,0.85)', boxShadow: '0 0 2cqw rgba(243,210,122,0.3), inset 0 0 1.4cqw rgba(243,210,122,0.14)' },
+  'linear-gradient(180deg, rgba(10,22,60,0.84), rgba(6,14,42,0.9))',
+);
+const multivers = emptyTheme('multivers', 'Multivers', '🌌', 'Tous les mondes en un : bonbons, jungle, Égypte, espace… (Page blanche : décor à venir.)');
+
 // ── Sucrerie : royaume de bonbons (décor, icônes, vidéo de lancement) ──
 const sucreGlass = {
   background: 'linear-gradient(180deg, rgba(74,32,52,0.8), rgba(54,22,40,0.88))',
@@ -272,7 +310,7 @@ const sports: Theme = {
   sidePanelStyle: { background: 'rgba(8,24,80,0.86)', border: '1px solid rgba(110,190,255,0.65)', borderRadius: '0.8cqw' },
 };
 
-export const EXTRA_THEMES: Record<string, Theme> = { sucrerie, sports, temps, voyage, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
+export const EXTRA_THEMES: Record<string, Theme> = { sucrerie, sports, temps, voyage, multivers, halloween, noel, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
 
 // ── Remplacements de décor ──
 // Espace : nouveau poste de pilotage (l'astronaute). Les boutons et icônes existants sont conservés.
@@ -307,7 +345,7 @@ export const THEME_OVERRIDES: Record<string, Omit<Partial<Theme>, 'zones'> & { z
 };
 
 export const THEME_ORDER: string[] = [
-  'sucrerie', 'espace', 'art', 'marins', 'jungle', 'egypte', 'sports',
+  'sucrerie', 'multivers', 'halloween', 'noel', 'espace', 'art', 'marins', 'jungle', 'egypte', 'sports',
   'terre', 'temps', 'voyage', 'peche', 'aventure', 'medieval',
   'mythologie', 'fantasy', 'astronomie', 'sciences', 'inventions', 'civilisations', 'iles',
 ];
