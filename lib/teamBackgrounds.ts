@@ -18,6 +18,7 @@ const bg = (theme: string, slug: string, contentTop = '9vh'): TeamBg => ({
   contentTop,
 });
 
+const jungle = (slug: string, shade: number): TeamBg => ({ ...bg('jungle', slug, '5vh'), shade });
 const art = (slug: string, shade = 0.5): TeamBg => ({ ...bg('art', slug, '5vh'), shade });
 
 export const TEAM_BACKGROUNDS: Record<string, Record<string, TeamBg>> = {
@@ -47,6 +48,20 @@ export const TEAM_BACKGROUNDS: Record<string, Record<string, TeamBg>> = {
     'L’Équipage des Étoiles de Mer': bg('marins', 'starfish-crew', '5vh'),
     'Le Clan des Coquillages': bg('marins', 'deepshell-clan', '5vh'),
     'Les Esprits Manta': bg('marins', 'manta-spirits', '5vh'),
+  },
+  // Jungle : fonds assez sombres, voile (shade) plus ou moins marqué selon la luminosité de la trouée de lumière ;
+  // Les Esprits de la Jungle, Les Grenouilles du Tonnerre et Les Chasseurs de Fleurs : fonds à venir (écran standard)
+  jungle: {
+    'La Fureur des Jaguars': jungle('jaguars', 0.2),
+    'La Tribu des Lianes': jungle('lianes', 0.5),
+    'Les Serpents d’Émeraude': jungle('serpents', 0.15),
+    'Les Gardiens du Totem': jungle('totem', 0.2),
+    'Les Perroquets': jungle('perroquets', 0.4),
+    'Le Clan du Bambou': jungle('bambou', 0.45),
+    'Les Coureurs de Lianes': jungle('coureurs-lianes', 0.5),
+    'La Tribu du Singe Solaire': jungle('singe-solaire', 0.35),
+    // Crocodile : version paysage seule, la version portrait en est recadrée
+    'L’Ordre du Crocodile': { landscape: '/bg/jungle/crocodile-paysage.webp', contentTop: '5vh', shade: 0.2 },
   },
   // Arts : fonds clairs et lumineux, donc voile plus sombre (shade) pour que le texte reste lisible ; pas d'emblème en haut
   art: {
