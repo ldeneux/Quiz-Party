@@ -39,6 +39,7 @@ export default function ParametragePage() {
   const viewedId = useRef<string | null>(null); // dernier habillage visualisé (point de départ des flèches)
   const quietUntil = useRef(0); // ignore les événements de défilement provoqués par les flèches
   const [teamsFor, setTeamsFor] = useState<string | null>(null); // habillage dont la fenêtre « Équipes » est ouverte
+  const [bigTheme, setBigTheme] = useState<string | null>(null); // habillage dont le décor est affiché en grand (double-clic)
   const stopTimer = () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
   };
@@ -615,6 +616,7 @@ export default function ParametragePage() {
                     onMouseEnter={(e) => openHover(t.id, e.currentTarget)}
                     onMouseLeave={closeHover}
                     onClick={(e) => openHover(t.id, e.currentTarget)} // tactile : un appui ouvre le détail
+                    onDoubleClick={() => { setHover(null); setBigTheme(t.id); }} // double-clic : décor en grand
                     aria-pressed={selected}
                     style={{
                       flex: '0 0 auto',
@@ -648,7 +650,7 @@ export default function ParametragePage() {
             const selected = t.id === themeId;
             return (
               <div data-theme-popup onMouseEnter={stopTimer} onMouseLeave={closeHover} style={{ position: 'fixed', left, top, width: W, zIndex: 40, background: '#1b1d26', color: '#fff', borderRadius: 14, overflow: 'hidden', boxShadow: '0 18px 50px -10px rgba(0,0,0,0.6)', ...FONT }}>
-                <div style={{ background: t.stage.bg, aspectRatio: '16 / 10' }}>
+                <div onDoubleClick={() => { setHover(null); setBigTheme(t.id); }} title="Double-clic : agrandir" style={{ background: t.stage.bg, aspectRatio: '16 / 10', cursor: 'zoom-in' }}>
                   <img src={t.stage.src} alt="" draggable={false} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
                 </div>
                 <div style={{ padding: '12px 14px 14px' }}>
@@ -669,6 +671,11 @@ export default function ParametragePage() {
           })()}
 
           {teamsFor && <TeamsModal themeId={teamsFor} onClose={() => setTeamsFor(null)} />}
+
+          {bigTheme && (() => {
+            const bt = THEME_LIST.find((x) => x.id === bigTheme);
+            return bt ? <Lightbox src={bt.stage.src} bg={bt.stage.bg} caption={`${bt.emoji} ${bt.label}`} onClose={() => setBigTheme(null)} /> : null;
+          })()}
         </section>
 
         {/* ---- Packs, profils, catégories et niveaux : un seul écran ---- */}
@@ -939,13 +946,35 @@ export default function ParametragePage() {
 }
 
 // ───────── Fenêtre « Équipes » : les 12 équipes d'un habillage et leurs fonds d'écran équipés ─────────
-function BgThumb({ src, w, h, caption, emptyText, cropped }: { src?: string; w: number; h: number; caption: string; emptyText: string; cropped?: boolean }) {
+// Image affichée en grand (double-clic) : se ferme par clic, double-clic, Échap ou le bouton Fermer.
+// Écoute Échap et les flèches en phase de capture : fermer l'image n'agit ni sur la fenêtre « Équipes » ni sur le carrousel derrière.
+function Lightbox({ src, caption, bg, onClose }: { src: string; caption: string; bg?: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.stopPropagation();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+  const close = (e: React.MouseEvent) => { e.stopPropagation(); onClose(); };
+  return (
+    <div onClick={close} onDoubleClick={close} role="dialog" aria-modal="true" aria-label={caption}
+      style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(8,10,20,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16, cursor: 'zoom-out', ...FONT }}>
+      <img src={src} alt={caption} draggable={false} style={{ maxWidth: '96vw', maxHeight: '80vh', objectFit: 'contain', borderRadius: 12, background: bg, boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }} />
+      <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, textAlign: 'center' }}>{caption}</div>
+      <button type="button" autoFocus onClick={close} style={actionBtn}>Fermer</button>
+    </div>
+  );
+}
+
+function BgThumb({ src, w, h, caption, emptyText, cropped, onOpen }: { src?: string; w: number; h: number; caption: string; emptyText: string; cropped?: boolean; onOpen?: () => void }) {
   const [failed, setFailed] = useState(false);
   const box: React.CSSProperties = { width: w, height: h, borderRadius: 8, overflow: 'hidden', background: '#eef0f8', flex: '0 0 auto' };
   return (
     <div style={{ textAlign: 'center' }}>
       {src && !failed ? (
-        <img src={src} alt={caption} draggable={false} onError={() => setFailed(true)} style={{ ...box, display: 'block', objectFit: 'cover', boxShadow: '0 0 0 1px #dfe3f0' }} />
+        <img src={src} alt={caption} draggable={false} onError={() => setFailed(true)} onDoubleClick={onOpen} title="Double-clic : agrandir" style={{ ...box, display: 'block', objectFit: 'cover', boxShadow: '0 0 0 1px #dfe3f0', cursor: onOpen ? 'zoom-in' : undefined }} />
       ) : (
         <div style={{ ...box, border: '1.5px dashed #c9cfe4', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, boxSizing: 'border-box', fontSize: 10, lineHeight: 1.25, color: '#7a819c', fontWeight: 600 }}>
           {src ? 'Image introuvable' : emptyText}
@@ -957,6 +986,7 @@ function BgThumb({ src, w, h, caption, emptyText, cropped }: { src?: string; w: 
 }
 
 function TeamsModal({ themeId, onClose }: { themeId: string; onClose: () => void }) {
+  const [big, setBig] = useState<{ src: string; caption: string } | null>(null); // image affichée en grand (double-clic)
   const theme = THEME_LIST.find((t) => t.id === themeId);
   if (!theme) return null;
   const teams = TEAM_PRESETS[themeId] ?? [];
@@ -980,8 +1010,10 @@ function TeamsModal({ themeId, onClose }: { themeId: string; onClose: () => void
                   <div style={{ fontWeight: 800, fontSize: 13.5, color: '#1f2440', lineHeight: 1.25 }}>{team.name}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <BgThumb src={bg ? bg.landscape ?? bg.portrait : undefined} w={144} h={81} caption="Paysage" cropped={!!bg && !bg.landscape} emptyText="Écran standard" />
-                  <BgThumb src={bg ? bg.portrait ?? bg.landscape : undefined} w={46} h={81} caption="Portrait" cropped={!!bg && !bg.portrait} emptyText="Standard" />
+                  <BgThumb src={bg ? bg.landscape ?? bg.portrait : undefined} w={144} h={81} caption="Paysage" cropped={!!bg && !bg.landscape} emptyText="Écran standard"
+                    onOpen={() => { const src = bg ? bg.landscape ?? bg.portrait : undefined; if (src) setBig({ src, caption: `${team.name} — Paysage${bg && !bg.landscape ? ' (fond portrait complet, recadré à l\'usage)' : ''}` }); }} />
+                  <BgThumb src={bg ? bg.portrait ?? bg.landscape : undefined} w={46} h={81} caption="Portrait" cropped={!!bg && !bg.portrait} emptyText="Standard"
+                    onOpen={() => { const src = bg ? bg.portrait ?? bg.landscape : undefined; if (src) setBig({ src, caption: `${team.name} — Portrait${bg && !bg.portrait ? ' (fond paysage complet, recadré à l\'usage)' : ''}` }); }} />
                 </div>
               </div>
             );
@@ -992,6 +1024,7 @@ function TeamsModal({ themeId, onClose }: { themeId: string; onClose: () => void
           <button type="button" autoFocus onClick={onClose} style={actionBtn}>Fermer</button>
         </div>
       </div>
+      {big && <Lightbox src={big.src} caption={big.caption} onClose={() => setBig(null)} />}
     </div>
   );
 }
