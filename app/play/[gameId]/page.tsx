@@ -168,6 +168,14 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   const [camembertCategory, setCamembertCategory] = useState<CategoryChoice | null>(null);
   const [jokerOffer, setJokerOffer] = useState<{ categoryName: string; seconds: number } | null>(null);
   const [jokerUsed, setJokerUsed] = useState(false);
+  const [jokerDeclined, setJokerDeclined] = useState(false); // l'équipe a refusé le joker : progression remise à zéro
+  const [jokerLeft, setJokerLeft] = useState(0); // secondes restantes pour décider
+  useEffect(() => {
+    if (!jokerOffer) return;
+    setJokerLeft(jokerOffer.seconds);
+    const id = setInterval(() => setJokerLeft((n) => (n > 0 ? n - 1 : 0)), 1000);
+    return () => clearInterval(id);
+  }, [jokerOffer]);
   const [myTeamData, setMyTeamData] = useState<{
     camembert_won: string[];
     camembert_jokers: number;
@@ -309,6 +317,7 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       setCategoryChoicePrompt(null);
       setJokerOffer(null);
       setJokerUsed(false);
+      setJokerDeclined(false);
     });
 
     channel.on('broadcast', { event: 'choose-category:prompt' }, ({ payload }) => {
@@ -320,6 +329,8 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
       if (team && payload.teamIds?.includes(team.id)) {
         setJokerOffer({ categoryName: payload.categoryName, seconds: payload.seconds });
         setJokerUsed(false);
+        setJokerDeclined(false);
+        setJokerLeft(payload.seconds);
       }
     });
 
@@ -390,9 +401,16 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
   };
 
   const useJoker = () => {
-    if (!team || jokerUsed) return;
+    if (!team || jokerUsed || jokerDeclined) return;
     setJokerUsed(true);
     channelRef.current?.send({ type: 'broadcast', event: 'joker:use', payload: { teamId: team.id } });
+  };
+
+  // Refus explicite : la progression de la catégorie est remise à zéro immédiatement, sans attendre la fin du compte à rebours
+  const declineJoker = () => {
+    if (!team || jokerUsed || jokerDeclined) return;
+    setJokerDeclined(true);
+    channelRef.current?.send({ type: 'broadcast', event: 'joker:decline', payload: { teamId: team.id } });
   };
 
   const submitAnswer = async (choice: 'a' | 'b' | 'c' | 'd') => {
@@ -569,25 +587,53 @@ function PlayScreenInner({ params }: { params: { gameId: string } }) {
         </h2>
         {jokerUsed ? (
           <p style={{ color: '#35c2a3', fontWeight: 700 }}>Joker utilisé — votre progression est protégée ✓</p>
+        ) : jokerDeclined || jokerLeft <= 0 ? (
+          <p style={{ color: '#ff8a8a', fontWeight: 700 }}>
+            {jokerDeclined ? 'Joker refusé' : 'Temps écoulé'} — la progression sur "{jokerOffer.categoryName}" est remise à zéro.
+          </p>
         ) : (
           <>
-            <button
-              onClick={useJoker}
-              style={{
-                background: '#ffb648',
-                color: '#1f2440',
-                border: 'none',
-                borderRadius: 999,
-                padding: '14px 28px',
-                fontWeight: 800,
-                fontSize: 15,
-                cursor: 'pointer',
-                marginBottom: 10,
-              }}
-            >
-              🤡 Utiliser un Joker
-            </button>
-            <p style={{ color: '#7a819c', fontSize: 13 }}>Sinon la progression sera remise à zéro.</p>
+            <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
+              Voulez-vous utiliser un Joker ?
+              {(myTeamData?.camembert_jokers ?? 0) > 0 && (
+                <span style={{ color: '#7a819c', fontWeight: 600 }}> (vous en avez {myTeamData?.camembert_jokers})</span>
+              )}
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+              <button
+                onClick={useJoker}
+                style={{
+                  background: '#ffb648',
+                  color: '#1f2440',
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '14px 26px',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                }}
+              >
+                🤡 Oui, utiliser un Joker
+              </button>
+              <button
+                onClick={declineJoker}
+                style={{
+                  background: 'transparent',
+                  color: 'inherit',
+                  border: '2px solid #7a819c',
+                  borderRadius: 999,
+                  padding: '12px 26px',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                }}
+              >
+                Non, repartir de zéro
+              </button>
+            </div>
+            <p style={{ color: '#7a819c', fontSize: 13 }}>
+              Oui : un joker est débité et la progression est conservée. Non (ou sans réponse dans {jokerLeft} s) : progression remise à zéro.
+            </p>
           </>
         )}
       </Shell>

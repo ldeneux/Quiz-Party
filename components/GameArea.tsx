@@ -133,7 +133,8 @@ export default function GameArea({
   const setupWrapRef = useRef<HTMLDivElement>(null);
   const [revealedInfo, setRevealedInfo] = useState<Record<string, RevealInfo>>({});
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
-  const askedQuestionIdsRef = useRef<string[]>([]);
+  const askedQuestionIdsRef = useRef<string[]>([]); // questions posées pendant CETTE partie
+  const previousQuestionIdsRef = useRef<string[]>([]); // questions posées lors de parties précédentes avec le même code
   const currentQuestionIdRef = useRef<string | null>(null);
   const [challengerTeamId, setChallengerTeamId] = useState<string | null>(null);
   const challengerCountsRef = useRef<Record<string, number>>({});
@@ -158,6 +159,7 @@ export default function GameArea({
   const usedJokerTeamIdsRef = useRef<Set<string>>(new Set());
   const [jokerSecondsLeft, setJokerSecondsLeft] = useState(0);
   const [camembertWinnerId, setCamembertWinnerId] = useState<string | null>(null);
+  const [exhaustedInfo, setExhaustedInfo] = useState<{ total: number; asked: number } | null>(null); // pourquoi la partie s'est terminée (plus de question neuve)
   const [showProgressTable, setShowProgressTable] = useState(false);
   const proceedWithCategoryRef = useRef<((categoryId: string) => void) | null>(null);
 
@@ -189,7 +191,7 @@ export default function GameArea({
       .eq('game_id', gameId)
       .then(({ data }) => {
         if (data) {
-          askedQuestionIdsRef.current = Array.from(new Set(data.map((a: any) => a.question_id)));
+          previousQuestionIdsRef.current = Array.from(new Set(data.map((a: any) => a.question_id)));
         }
       });
 
@@ -237,17 +239,37 @@ export default function GameArea({
     // la fin du compte à rebours : sinon, si toutes les équipes concernées
     // répondent avant les 10s, le joker n'était jamais réellement débité.
     ch.on('broadcast', { event: 'joker:use' }, ({ payload }) => {
+      if (usedJokerTeamIdsRef.current.has(payload.teamId)) return; // un seul joker débité par équipe et par fenêtre
       usedJokerTeamIdsRef.current.add(payload.teamId);
-      supabase.rpc('decrement_team_joker', { p_team_id: payload.teamId }).then(() => {
-        supabase
-          .from('teams')
-          .select('*')
-          .eq('game_id', gameId)
-          .then(({ data }) => {
-            if (data) setTeams(data as Team[]);
-          });
-      });
       setPendingJokerTeamIds((prev) => prev.filter((id) => id !== payload.teamId));
+      (async () => {
+        const { error: rpcError } = await supabase.rpc('decrement_team_joker', { p_team_id: payload.teamId });
+        if (rpcError) {
+          // Repli si la fonction SQL est absente : décrément direct
+          const { data: row } = await supabase.from('teams').select('camembert_jokers').eq('id', payload.teamId).single();
+          await supabase
+            .from('teams')
+            .update({ camembert_jokers: Math.max((row?.camembert_jokers ?? 1) - 1, 0) })
+            .eq('id', payload.teamId);
+        }
+        const { data } = await supabase.from('teams').select('*').eq('game_id', gameId);
+        if (data) setTeams(data as Team[]);
+      })();
+    });
+
+    // Mode Camemberts : l'équipe refuse le Joker -> sa progression sur la catégorie est remise à zéro tout de suite
+    // (inutile d'attendre la fin du compte à rebours).
+    ch.on('broadcast', { event: 'joker:decline' }, ({ payload }) => {
+      setPendingJokerTeamIds((prev) => prev.filter((id) => id !== payload.teamId));
+      const categoryId = camembertCategoryRef.current?.id;
+      if (!categoryId) return;
+      (async () => {
+        const { data: row } = await supabase.from('teams').select('camembert_progress').eq('id', payload.teamId).single();
+        const progress = { ...(row?.camembert_progress ?? {}), [categoryId]: 0 };
+        await supabase.from('teams').update({ camembert_progress: progress }).eq('id', payload.teamId);
+        const { data } = await supabase.from('teams').select('*').eq('game_id', gameId);
+        if (data) setTeams(data as Team[]);
+      })();
     });
 
     ch.subscribe();
@@ -455,8 +477,12 @@ export default function GameArea({
         gameId,
         startQuestion,
         setLoadError,
-        () => setPhase('finished'),
+        (info) => {
+          setExhaustedInfo(info);
+          setPhase('finished');
+        },
         askedQuestionIdsRef.current,
+        previousQuestionIdsRef.current,
         categoryId
       );
     },
@@ -491,7 +517,17 @@ export default function GameArea({
       return;
     }
     setLoadError(null);
-    loadNextQuestion(gameId, startQuestion, setLoadError, () => setPhase('finished'), askedQuestionIdsRef.current);
+    loadNextQuestion(
+      gameId,
+      startQuestion,
+      setLoadError,
+      (info) => {
+        setExhaustedInfo(info);
+        setPhase('finished');
+      },
+      askedQuestionIdsRef.current,
+      previousQuestionIdsRef.current
+    );
   }, [mode, pickNextChallenger, pickNextParticipatifTurn, finishParticipatif, startCategoryChoice, beginCamembertSetup, gameId, startQuestion]);
 
   // Le parent masque le QR code tant que l'explication de la réponse occupe l'écran droit
@@ -774,7 +810,10 @@ export default function GameArea({
             🥧 <TeamAvatar avatar={winner.avatar} /> {winner.name} a complété tous ses camemberts !
           </p>
         ) : (
-          <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 20 }}>Voici le classement final.</p>
+          <p style={{ color: '#7a819c', fontSize: 13.5, marginBottom: 20 }}>
+            Voici le classement final.
+            {exhaustedInfo && ` Toutes les questions disponibles ont été posées (${exhaustedInfo.asked} sur ${exhaustedInfo.total}).`}
+          </p>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
           {ranked.map((t, i) => (
@@ -1309,12 +1348,30 @@ export default function GameArea({
   );
 }
 
+// L'API Supabase ne renvoie jamais plus de 1000 lignes par requête.
+const QUESTION_PAGE = 1000;
+
+// Liste TOUS les ids de questions d'une requête, page par page. Sans cette pagination le pool était tronqué aux 1000 premières
+// lignes de la table : une catégorie « tardive » (ex. Halloween, 99 questions) n'y avait plus que quelques questions et la
+// partie se terminait après 3 questions.
+async function fetchQuestionIds(build: () => any): Promise<{ ids: string[]; error: any }> {
+  const ids: string[] = [];
+  for (let from = 0; ; from += QUESTION_PAGE) {
+    const { data, error } = await build().order('id', { ascending: true }).range(from, from + QUESTION_PAGE - 1);
+    if (error) return { ids, error };
+    (data ?? []).forEach((r: { id: string }) => ids.push(r.id));
+    if (!data || data.length < QUESTION_PAGE) break;
+  }
+  return { ids, error: null };
+}
+
 async function loadNextQuestion(
   gameId: string,
   startQuestion: (q: Question) => void,
   onError: (msg: string) => void,
-  onExhausted: () => void,
+  onExhausted: (info: { total: number; asked: number }) => void,
   askedQuestionIds: string[] = [],
+  previousQuestionIds: string[] = [],
   forceCategoryId?: string
 ) {
   const { data: game } = await supabase
@@ -1323,7 +1380,19 @@ async function loadNextQuestion(
     .eq('id', gameId)
     .single();
 
-  let pool: any[] | null = null;
+  // Requête de base (ids seulement : léger) ; le filtre de catégorie se fait côté serveur
+  const base = (packChunk?: string[]) => {
+    let q: any = supabase.from('questions').select('id').eq('validated', true);
+    if (packChunk) q = q.in('pack_id', packChunk);
+    else {
+      if (game?.level_ids?.length) q = q.in('level_id', game.level_ids);
+      if (game?.category_ids?.length) q = q.in('category_id', game.category_ids);
+    }
+    if (forceCategoryId) q = q.eq('category_id', forceCategoryId);
+    return q;
+  };
+
+  const idSet = new Set<string>();
   let error: any = null;
 
   if (game?.profile_id) {
@@ -1339,46 +1408,63 @@ async function loadNextQuestion(
       return;
     }
 
-    const res = await supabase.from('questions').select('*').eq('validated', true).in('pack_id', packIds);
-    pool = res.data;
-    error = res.error;
+    // Par lots de 50 packs : l'adresse de la requête reste courte même pour un gros profil
+    for (let i = 0; i < packIds.length; i += 50) {
+      const res = await fetchQuestionIds(() => base(packIds.slice(i, i + 50)));
+      if (res.error) {
+        error = res.error;
+        break;
+      }
+      res.ids.forEach((id) => idSet.add(id));
+    }
   } else {
-    let query = supabase.from('questions').select('*').eq('validated', true);
-    if (game?.level_ids?.length) query = query.in('level_id', game.level_ids);
-    if (game?.category_ids?.length) query = query.in('category_id', game.category_ids);
-    const res = await query;
-    pool = res.data;
+    const res = await fetchQuestionIds(() => base());
     error = res.error;
+    res.ids.forEach((id) => idSet.add(id));
   }
 
   if (error) {
     onError(`Erreur lors du chargement des questions : ${error.message}`);
     return;
   }
-  if (!pool || pool.length === 0) {
+
+  const all = Array.from(idSet);
+  if (all.length === 0) {
     onError(
-      "Aucune question disponible. Va dans Paramétrage pour créer des packs (Gemini) et un profil, ou vérifie que la table `questions` contient des lignes validées."
+      forceCategoryId
+        ? "Aucune question disponible pour cette catégorie précise. Ajoute des questions à ce pack dans Paramétrage."
+        : "Aucune question disponible. Va dans Paramétrage pour créer des packs (Gemini) et un profil, ou vérifie que la table `questions` contient des lignes validées."
     );
     return;
   }
 
-  if (forceCategoryId) {
-    pool = pool.filter((q) => q.category_id === forceCategoryId);
-    if (pool.length === 0) {
-      onError("Aucune question disponible pour cette catégorie précise. Ajoute des questions à ce pack dans Paramétrage.");
+  // Trois niveaux : 1) questions jamais posées avec ce code, 2) déjà posées lors d'une partie PRÉCÉDENTE mais pas dans celle-ci,
+  // 3) (Trivial seulement) réutilisation. Avant, l'historique de toutes les parties précédentes était compté comme « déjà posé » :
+  // à force de rejouer avec le même code il ne restait que quelques questions neuves et la partie se terminait après 3 questions.
+  const asked = new Set(askedQuestionIds);
+  const before = new Set(previousQuestionIds);
+  let candidates = all.filter((id) => !asked.has(id) && !before.has(id));
+  if (candidates.length === 0) candidates = all.filter((id) => !asked.has(id));
+
+  if (candidates.length === 0) {
+    if (forceCategoryId) {
+      // Trivial Poursuit : la catégorie choisie n'a plus de question neuve. On réutilise ses questions (sauf la dernière posée)
+      // plutôt que de terminer toute la partie.
+      const last = askedQuestionIds[askedQuestionIds.length - 1];
+      candidates = all.length > 1 ? all.filter((id) => id !== last) : all;
+    } else {
+      // Toutes les questions ont été posées pendant cette partie : elle se termine proprement (pas de répétition).
+      onExhausted({ total: all.length, asked: all.filter((id) => asked.has(id)).length });
       return;
     }
   }
 
-  const freshPool = pool.filter((q) => !askedQuestionIds.includes(q.id));
-
-  if (freshPool.length === 0) {
-    // Plus de questions neuves : la partie se termine proprement (pas de répétition).
-    onExhausted();
+  const pickedId = candidates[Math.floor(Math.random() * candidates.length)];
+  const { data: randomQuestion, error: questionError } = await supabase.from('questions').select('*').eq('id', pickedId).single();
+  if (questionError || !randomQuestion) {
+    onError(`Erreur lors du chargement de la question : ${questionError?.message ?? 'question introuvable'}`);
     return;
   }
-
-  const randomQuestion = freshPool[Math.floor(Math.random() * freshPool.length)];
 
   // Attache le nom/emoji de la catégorie à la question, pour l'afficher
   // quel que soit le mode de jeu (les packs mélangent plusieurs thèmes).
