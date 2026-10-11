@@ -176,17 +176,47 @@ function sceneTheme(id: string, label: string, emoji: string, description: strin
     plates: plates as unknown as Theme['plates'],
   } as Theme;
 }
-const halloween = sceneTheme(
+// Icônes de modes (« planètes ») et de boutons d'un thème de scène : public/themes/<id>/icons/<mode ou bouton>.webp (images carrées, fond transparent).
+// Les boutons gardent leur libellé en infobulle ; le bouton « profil » reste un bandeau de verre.
+function withIcons(t: Theme, id: string, modeWidth = 9): Theme {
+  const planets = {} as Record<ModeId, { src: string; width: number }>;
+  MODES.forEach((m) => (planets[m] = { src: `/themes/${id}/icons/${m}.webp`, width: modeWidth }));
+  const plates = { ...t.plates } as Record<string, PlateDef>;
+  PLATES.forEach((p) => (plates[p] = { src: `/themes/${id}/icons/${p}.webp`, ratio: 1, scale: 1.3 }));
+  return { ...t, planets, plates } as unknown as Theme;
+}
+const halloween = withIcons(sceneTheme(
   'halloween', 'Halloween', '🎃', 'Une académie magique et gothique : citrouilles, fantômes, potions et vitraux ensorcelés.',
   { background: 'linear-gradient(180deg, rgba(30,10,52,0.82), rgba(18,6,34,0.9))', border: '2px solid rgba(255,155,61,0.8)', boxShadow: '0 0 2cqw rgba(255,140,40,0.32), inset 0 0 1.4cqw rgba(255,155,61,0.14)' },
   'linear-gradient(180deg, rgba(30,10,52,0.86), rgba(18,6,34,0.92))',
-);
-const noel = sceneTheme(
+), 'halloween');
+const noelBase = withIcons(sceneTheme(
   'noel', 'Noël', '🎄', 'Un château enneigé et illuminé : sapins, lanternes, rubans rouges et ciel étoilé.',
   { background: 'linear-gradient(180deg, rgba(10,22,60,0.8), rgba(6,14,42,0.88))', border: '2px solid rgba(243,210,122,0.85)', boxShadow: '0 0 2cqw rgba(243,210,122,0.3), inset 0 0 1.4cqw rgba(243,210,122,0.14)' },
   'linear-gradient(180deg, rgba(10,22,60,0.84), rgba(6,14,42,0.9))',
-);
-const multivers = emptyTheme('multivers', 'Multivers', '🌌', 'Tous les mondes en un : bonbons, jungle, Égypte, espace… (Page blanche : décor à venir.)');
+), 'noel');
+// Le château est au centre du nouveau décor : le panneau du hublot est plus transparent pour le laisser visible
+const noel: Theme = {
+  ...noelBase,
+  hubStyle: { ...noelBase.hubStyle, background: 'linear-gradient(180deg, rgba(10,22,60,0.5), rgba(6,14,42,0.62))', textShadow: '0 1px 4px rgba(0,10,40,0.95), 0 0 10px rgba(0,10,40,0.8)' },
+};
+// Multivers : tous les mondes autour d'une grande place de pierre (le hublot et les boutons se posent sur la place)
+const multivers: Theme = {
+  ...sceneTheme(
+    'multivers', 'Multivers', '🌌', 'Tous les mondes en un : jungle, Égypte, mers turquoise, statues, ciel de planètes… autour d’une grande place de pierre.',
+    { background: 'linear-gradient(180deg, rgba(22,18,56,0.84), rgba(14,12,40,0.9))', border: '2px solid rgba(196,176,255,0.85)', boxShadow: '0 0 2cqw rgba(170,140,255,0.32), inset 0 0 1.4cqw rgba(196,176,255,0.14)' },
+    'linear-gradient(180deg, rgba(22,18,56,0.86), rgba(14,12,40,0.92))',
+  ),
+  zones: {
+    teams: { left: 1.6, top: 12, width: 15, height: 38 },
+    teamCount: { left: 1.6, top: 52, width: 15, height: 4.6 },
+    join: { left: 83.4, top: 12, width: 15, height: 38 },
+    code: { left: 83.4, top: 52, width: 15, height: 4.6 },
+    hub: { left: 22, top: 44, width: 56, height: 37 },
+    bar: { left: 19, top: 83, width: 62, height: 14 },
+    profile: { left: 50, top: 3 },
+  },
+};
 
 // ── Pêche : petit port grec (barques, filets, phare) ──
 const pecheGlass = {
