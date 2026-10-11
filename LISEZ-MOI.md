@@ -39,3 +39,15 @@ Les nouvelles parties utilisent directement les noms de `lib/teamPresets.ts`. Le
   Un thème sans vidéo n'affiche que le décompte puis « C'EST PARTI ! ». La fusée du décompte a été retirée.
   Pour la vidéo d'un autre thème : `public/themes/<thème>/intro.mp4` + `intro-poster.webp` (sa première image), puis une ligne dans `lib/themeIntros.ts`.
 - La vidéo Sucrerie a été compressée (10 Mo → 4 Mo) et n'a pas de piste audio ; je n'y ai trouvé aucun filigrane visible (coins et zones fixes vérifiés).
+
+## Fonds d'équipe par thème, intros vidéo, compression
+- **Fonds d'équipe** : rangés par thème, comme les avatars : `public/bg/<thème>/<équipe>-portrait.webp` et `-paysage.webp`, déclarés dans `lib/teamBackgrounds.ts` (clé = thème, puis nom d'équipe).
+  Deux thèmes peuvent donc avoir une équipe du même nom sans confusion. Un seul format suffit : l'autre est recadré.
+  Fichiers existants à ranger une fois : `node tools/move-bg-to-theme-folders.mjs --dry-run`, puis sans `--dry-run`.
+- **Intros vidéo** : `lib/themeIntros.ts` a une ligne par thème (`public/themes/<thème>/intro.mp4`). Fichier absent : « ? » lumineux ; fichier présent : la vidéo est jouée.
+- **Compression des images** : `node tools/compress-images.mjs` (rapport), puis `--write` pour appliquer. Seules les images de plus de 400 Ko sont touchées, dimensions conservées.
+
+## Blind test (Deezer)
+- Une question peut porter un lien de morceau Deezer (colonne `questions.media_url`, migration `supabase/migration-015-media.sql`) : rien n'est stocké à part ce lien.
+- Page `/blindtest` (lien dans Paramétrage) : recherche d'un morceau, écoute de l'extrait de 30 s, création de la question (3 mauvaises réponses prises chez des artistes proches ou dans les autres titres de l'artiste). Les questions vont dans le pack « Blind test · <catégorie> » à ajouter à un profil.
+- L'extrait est joué sur l'écran de l'hôte (composant `DeezerClip` de `components/GameArea.tsx`) ; le lien d'aperçu est redemandé à Deezer à chaque lecture (`/api/deezer`).

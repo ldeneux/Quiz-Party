@@ -682,7 +682,8 @@ export default function ParametragePage() {
         <section style={{ ...card, maxWidth: 'none' }}>
           <h2 style={sectionTitle}>Créer des packs de questions</h2>
           <p style={{ color: '#7a819c', fontSize: 13, marginBottom: 16 }}>
-            Un pack est créé pour chaque case cochée (catégorie × niveau) et rempli via Gemini. Le coût estimé est toujours affiché avant de lancer.
+            Un pack est créé pour chaque case cochée (catégorie × niveau) et rempli via Gemini. Le coût estimé est toujours affiché avant de lancer.{' '}
+            <a href="/blindtest" style={{ color: '#6c7bf7', fontWeight: 700, textDecoration: 'none' }}>🎵 Ajouter des questions blind test (Deezer)</a>
           </p>
 
           {!hasLevelCols && (

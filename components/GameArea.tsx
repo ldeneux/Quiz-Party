@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
+import { deezerTrackId, type DeezerTrack } from '@/lib/deezer';
 import { useTheme } from '@/lib/useTheme';
 import TeamAvatar from '@/components/TeamAvatar';
 import CategoryBadge from '@/components/CategoryBadge';
@@ -50,6 +51,7 @@ type Question = {
   category_id?: string;
   category_name?: string;
   category_emoji?: string;
+  media_url?: string | null; // lien d'un morceau Deezer (blind test) : l'extrait de 30 s est joué sur l'écran de l'hôte
 };
 
 type RevealInfo = { choice: string | null; timeMs: number | null };
@@ -1160,6 +1162,7 @@ export default function GameArea({
             {phase === 'question' && <div style={styles.timer}>{secondsLeft}s</div>}
           </div>
           <div style={styles.questionText}>{question.prompt}</div>
+          {question.media_url && <DeezerClip key={question.id} mediaUrl={question.media_url} revealed={phase === 'revealed'} cockpit={cockpit} />}
 
           <div style={styles.choices} key={question.id}>
             {(['a', 'b', 'c', 'd'] as const).map((letter) => (
@@ -1477,6 +1480,88 @@ async function loadNextQuestion(
   }
 
   startQuestion(randomQuestion as Question);
+}
+
+// Extrait Deezer d'une question « blind test » : joué sur l'écran de l'hôte uniquement (les téléphones ne font que répondre).
+// Le lien d'aperçu est demandé à Deezer au moment de jouer (il expire : on ne le stocke jamais). Titre et pochette n'apparaissent
+// qu'à la révélation de la réponse.
+function DeezerClip({ mediaUrl, revealed, cockpit }: { mediaUrl: string; revealed: boolean; cockpit: boolean }) {
+  const trackId = deezerTrackId(mediaUrl);
+  const [track, setTrack] = useState<DeezerTrack | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const u = (px: number) => (cockpit ? `${(px / 10).toFixed(2)}cqw` : `${px}px`); // mêmes proportions en px (normal) ou cqw (cockpit)
+
+  useEffect(() => {
+    if (!trackId) return;
+    let cancelled = false;
+    setTrack(null);
+    setFailed(false);
+    fetch(`/api/deezer?track=${trackId}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelled) return;
+        if (j.track?.preview) setTrack(j.track as DeezerTrack);
+        else setFailed(true);
+      })
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [trackId]);
+
+  // Lecture automatique dès que l'extrait est prêt (si le navigateur la bloque, le bouton ▶ prend le relais)
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || !track) return;
+    a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  }, [track]);
+
+  if (!trackId) return null;
+
+  const toggle = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) {
+      if (a.ended) a.currentTime = 0;
+      a.play().catch(() => undefined);
+    } else a.pause();
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: u(14), margin: `${u(10)} 0 ${u(14)}`, color: 'inherit', fontSize: u(14), fontWeight: 700 }}>
+      {track && (
+        <audio ref={audioRef} src={track.preview} preload="auto" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
+      )}
+      {revealed && track?.album.cover ? (
+        <img src={track.album.cover} alt="" style={{ width: u(56), height: u(56), borderRadius: u(10), objectFit: 'cover', flex: '0 0 auto' }} />
+      ) : (
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={!track}
+          aria-label={playing ? "Mettre l'extrait en pause" : "Écouter l'extrait"}
+          style={{ width: u(56), height: u(56), borderRadius: '50%', border: 'none', background: '#6c7bf7', color: '#fff', fontSize: u(22), cursor: track ? 'pointer' : 'default', flex: '0 0 auto' }}
+        >
+          {playing ? '⏸' : '▶'}
+        </button>
+      )}
+      <div style={{ minWidth: 0 }}>
+        {failed ? (
+          <span style={{ color: '#ff9a9a' }}>Extrait indisponible : passe à la question suivante.</span>
+        ) : revealed && track ? (
+          <>
+            <div style={{ fontSize: u(16), fontWeight: 800 }}>« {track.titleShort} »</div>
+            <div style={{ opacity: 0.85 }}>{track.artist.name}{track.year ? ` · ${track.year}` : ''}</div>
+          </>
+        ) : (
+          <span>{track ? '🎧 Extrait de 30 s' : "Chargement de l'extrait…"}</span>
+        )}
+        <div style={{ fontSize: u(11), opacity: 0.6, fontWeight: 600 }}>Aperçu fourni par Deezer</div>
+      </div>
+    </div>
+  );
 }
 
 const baseStyles: Record<string, React.CSSProperties> = {
