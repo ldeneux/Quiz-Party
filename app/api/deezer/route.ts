@@ -26,40 +26,153 @@ function slim(t: any): DeezerTrack {
     artist: { id: t.artist?.id, name: t.artist?.name ?? '' },
     album: { title: t.album?.title ?? '', cover: t.album?.cover_medium ?? t.album?.cover ?? '' },
     year: typeof t.release_date === 'string' && t.release_date.length >= 4 ? t.release_date.slice(0, 4) : undefined,
+    rank: typeof t.rank === 'number' ? t.rank : undefined,
   };
 }
 
-// GET /api/deezer?search=...  -> liste de morceaux ; GET /api/deezer?track=ID -> un morceau (aperçu frais)
+const withPreview = (list: any[]) => (list ?? []).map(slim).filter((t: DeezerTrack) => t.preview);
+
+// Tous les titres d'une playlist (par pages de 100, 300 au plus)
+async function playlistTracks(id: string, max = 300): Promise<any[]> {
+  const out: any[] = [];
+  for (let index = 0; index < max; index += 100) {
+    const data = (await deezer(`/playlist/${id}/tracks?limit=100&index=${index}`)).data ?? [];
+    out.push(...data);
+    if (data.length < 100) break;
+  }
+  return out;
+}
+
+// GET /api/deezer?...
+//   search=...          recherche de morceaux           track=ID            un morceau (aperçu frais)
+//   genres=1            genres Deezer                   chart=GENREID       classement du moment (0 = tous genres)
+//   playlistSearch=...  playlists                       playlist=ID         titres d'une playlist
+//   artistSearch=...    artistes                        artistTop=ID        titres les plus écoutés d'un artiste
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
+  const numeric = (v: string | null) => (v !== null && /^\d+$/.test(v) ? v : null);
   try {
     const q = params.get('search');
     if (q) {
       const json = await deezer(`/search?q=${encodeURIComponent(q)}&limit=15`);
-      const tracks = (json.data ?? []).map(slim).filter((t: DeezerTrack) => t.preview);
-      return NextResponse.json({ tracks });
+      return NextResponse.json({ tracks: withPreview(json.data) });
     }
-    const id = params.get('track');
-    if (id && /^\d+$/.test(id)) {
-      const track = slim(await deezer(`/track/${id}`));
-      return NextResponse.json({ track });
+    if (numeric(params.get('track'))) {
+      return NextResponse.json({ track: slim(await deezer(`/track/${params.get('track')}`)) });
     }
-    return NextResponse.json({ error: 'Paramètre manquant (search ou track).' }, { status: 400 });
+    if (params.get('genres')) {
+      const json = await deezer('/genre');
+      return NextResponse.json({ genres: (json.data ?? []).map((g: any) => ({ id: g.id, name: g.name })) });
+    }
+    if (numeric(params.get('chart'))) {
+      const json = await deezer(`/chart/${params.get('chart')}/tracks?limit=100`);
+      return NextResponse.json({ tracks: withPreview(json.data) });
+    }
+    const pq = params.get('playlistSearch');
+    if (pq) {
+      const json = await deezer(`/search/playlist?q=${encodeURIComponent(pq)}&limit=20`);
+      const lists = (json.data ?? []).map((p: any) => ({ id: p.id, title: p.title, nbTracks: p.nb_tracks ?? 0, picture: p.picture_medium ?? '' }));
+      return NextResponse.json({ lists });
+    }
+    if (numeric(params.get('playlist'))) {
+      return NextResponse.json({ tracks: withPreview(await playlistTracks(params.get('playlist')!)) });
+    }
+    const aq = params.get('artistSearch');
+    if (aq) {
+      const json = await deezer(`/search/artist?q=${encodeURIComponent(aq)}&limit=12`);
+      const lists = (json.data ?? []).map((a: any) => ({ id: a.id, title: a.name, nbTracks: 0, picture: a.picture_medium ?? '' }));
+      return NextResponse.json({ lists });
+    }
+    if (numeric(params.get('artistTop'))) {
+      const json = await deezer(`/artist/${params.get('artistTop')}/top?limit=50`);
+      return NextResponse.json({ tracks: withPreview(json.data) });
+    }
+    return NextResponse.json({ error: 'Paramètre manquant.' }, { status: 400 });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Deezer injoignable' }, { status: 502 });
   }
 }
 
-// POST /api/deezer { trackId, ask: 'artist' | 'title', categoryId, levelId } -> crée la question dans le pack « Blind test · <catégorie> »
+// Pack « Blind test · <catégorie> » (créé au besoin) : à ajouter à un profil dans Paramétrage
+async function ensurePack(supabaseAdmin: any, categoryId: string, levelId: string): Promise<{ packId?: string; packName: string; error?: string }> {
+  const { data: cat } = await supabaseAdmin.from('categories').select('name').eq('id', categoryId).single();
+  const packName = `Blind test · ${cat?.name ?? 'Musique'}`;
+  const { data: existing } = await supabaseAdmin
+    .from('question_packs')
+    .select('id')
+    .eq('name', packName)
+    .eq('level_id', levelId)
+    .eq('category_id', categoryId)
+    .limit(1);
+  if (existing?.[0]?.id) return { packId: existing[0].id, packName };
+  const { data: created, error } = await supabaseAdmin
+    .from('question_packs')
+    .insert({ name: packName, level_id: levelId, category_id: categoryId })
+    .select('id')
+    .single();
+  if (error || !created) return { packName, error: `Pack non créé : ${error?.message}` };
+  return { packId: created.id, packName };
+}
+
+const insertErrorMessage = (message: string) =>
+  `${message}.${/media_url/.test(message) ? " Exécute supabase/migration-015-media.sql dans l'éditeur SQL de Supabase." : ''}`;
+
+// POST /api/deezer
+//   { trackId, ask: 'artist' | 'title', categoryId, levelId }                      -> une question
+//   { action: 'bulk', tracks, pool: {artists, titles}, ask: 'artist'|'title'|'mix', categoryId, levelId } -> jusqu'à 30 questions
 export async function POST(req: NextRequest) {
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   try {
-    const { trackId, ask, categoryId, levelId } = (await req.json()) as {
-      trackId: number | string;
-      ask: AskKind;
-      categoryId: string;
-      levelId: string;
-    };
+    const body = await req.json();
+
+    // ---------- Import en masse : les mauvaises réponses viennent de la même liste (même époque, même style) ----------
+    if (body.action === 'bulk') {
+      const { tracks, pool, ask, categoryId, levelId } = body as {
+        tracks: DeezerTrack[];
+        pool: { artists: string[]; titles: string[] };
+        ask: AskKind | 'mix';
+        categoryId: string;
+        levelId: string;
+      };
+      if (!Array.isArray(tracks) || tracks.length === 0 || tracks.length > 30 || !categoryId || !levelId || !['artist', 'title', 'mix'].includes(ask)) {
+        return NextResponse.json({ error: 'Paramètres invalides.' }, { status: 400 });
+      }
+      const valid = tracks.filter((t) => t && Number.isFinite(Number(t.id)) && t.titleShort && t.artist?.name);
+      const { packId, packName, error: packError } = await ensurePack(supabaseAdmin, categoryId, levelId);
+      if (!packId) return NextResponse.json({ error: packError }, { status: 500 });
+
+      const urls = valid.map((t) => `https://www.deezer.com/track/${t.id}`);
+      // Un morceau déjà présent dans le pack est ignoré (quel que soit le type de question) : pas deux fois le même extrait
+      const { data: existing } = await supabaseAdmin.from('questions').select('media_url').eq('pack_id', packId).in('media_url', urls);
+      const known = new Set((existing ?? []).map((e: any) => e.media_url));
+
+      const rows: any[] = [];
+      let skipped = tracks.length - valid.length;
+      for (const t of valid) {
+        const kind: AskKind = ask === 'mix' ? (Math.random() < 0.5 ? 'artist' : 'title') : ask;
+        const correct = kind === 'artist' ? t.artist.name : t.titleShort;
+        const distractors = pickDistractors(correct, kind === 'artist' ? pool?.artists ?? [] : pool?.titles ?? [], 3);
+        if (distractors.length < 3) {
+          skipped++;
+          continue;
+        }
+        const q = buildQuestion({ ...t, album: t.album ?? { title: '', cover: '' } }, kind, distractors);
+        if (known.has(q.media_url)) {
+          skipped++;
+          continue;
+        }
+        rows.push({ ...q, category_id: categoryId, level_id: levelId, pack_id: packId, validated: true });
+      }
+      if (rows.length > 0) {
+        const { error: insertError } = await supabaseAdmin.from('questions').insert(rows);
+        if (insertError) return NextResponse.json({ error: insertErrorMessage(insertError.message) }, { status: 500 });
+      }
+      const { count } = await supabaseAdmin.from('questions').select('id', { count: 'exact', head: true }).eq('pack_id', packId);
+      return NextResponse.json({ ok: true, created: rows.length, skipped, packName, packCount: count ?? 0 });
+    }
+
+    // ---------- Une seule question ----------
+    const { trackId, ask, categoryId, levelId } = body as { trackId: number | string; ask: AskKind; categoryId: string; levelId: string };
     if (!trackId || !categoryId || !levelId || (ask !== 'artist' && ask !== 'title')) {
       return NextResponse.json({ error: 'Paramètres invalides.' }, { status: 400 });
     }
@@ -87,28 +200,8 @@ export async function POST(req: NextRequest) {
     if (distractors.length < 3) return NextResponse.json({ error: 'Impossible de trouver 3 mauvaises réponses.' }, { status: 422 });
 
     const q = buildQuestion(track, ask, distractors);
-
-    // Pack « Blind test · <catégorie> » (créé au besoin) : à ajouter à un profil dans Paramétrage
-    const { data: cat } = await supabaseAdmin.from('categories').select('name').eq('id', categoryId).single();
-    const packName = `Blind test · ${cat?.name ?? 'Musique'}`;
-    let packId: string | undefined;
-    const { data: existing } = await supabaseAdmin
-      .from('question_packs')
-      .select('id')
-      .eq('name', packName)
-      .eq('level_id', levelId)
-      .eq('category_id', categoryId)
-      .limit(1);
-    packId = existing?.[0]?.id;
-    if (!packId) {
-      const { data: created, error: packError } = await supabaseAdmin
-        .from('question_packs')
-        .insert({ name: packName, level_id: levelId, category_id: categoryId })
-        .select('id')
-        .single();
-      if (packError || !created) return NextResponse.json({ error: `Pack non créé : ${packError?.message}` }, { status: 500 });
-      packId = created.id;
-    }
+    const { packId, packName, error: packError } = await ensurePack(supabaseAdmin, categoryId, levelId);
+    if (!packId) return NextResponse.json({ error: packError }, { status: 500 });
 
     // Anti-doublon : même morceau, même type de question, même pack
     const { data: dup } = await supabaseAdmin
@@ -123,12 +216,7 @@ export async function POST(req: NextRequest) {
     const { error: insertError } = await supabaseAdmin
       .from('questions')
       .insert({ ...q, category_id: categoryId, level_id: levelId, pack_id: packId, validated: true });
-    if (insertError) {
-      const hint = /media_url/.test(insertError.message)
-        ? ' Exécute supabase/migration-015-media.sql dans l\'éditeur SQL de Supabase.'
-        : '';
-      return NextResponse.json({ error: `${insertError.message}.${hint}` }, { status: 500 });
-    }
+    if (insertError) return NextResponse.json({ error: insertErrorMessage(insertError.message) }, { status: 500 });
 
     const { count } = await supabaseAdmin.from('questions').select('id', { count: 'exact', head: true }).eq('pack_id', packId);
     return NextResponse.json({ ok: true, packName, packCount: count ?? 0, question: q });

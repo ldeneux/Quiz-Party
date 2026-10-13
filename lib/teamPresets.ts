@@ -78,3 +78,9 @@ export function getRandomPresets(theme: string, count: number): TeamPreset[] {
   const pool = TEAM_PRESETS[theme] ?? [];
   return pool.slice(0, count);
 }
+
+// Habillage « Défaut » (sans décor) : une équipe de chaque thème, avec son avatar et sa couleur
+for (const key of ['espace', 'jungle', 'marins', 'egypte', 'art', 'sciences', 'inventions', 'terre', 'fantasy', 'temps', 'mythologie', 'sucrerie']) {
+  const first = TEAM_PRESETS[key]?.[0];
+  if (first) (TEAM_PRESETS['defaut'] ??= []).push(first);
+}

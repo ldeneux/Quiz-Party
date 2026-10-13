@@ -36,6 +36,7 @@ export type FrameDef = { src: string; ratio: number; width: number /* en cqw */ 
 
 export type Theme = {
   id: ThemeId;
+  layout?: 'stage' | 'sober'; // 'sober' : disposition sobre sans décor (components/SoberConsole.tsx) ; sinon scène cockpit à zones
   label: string;
   emoji: string;
   description: string;
@@ -567,7 +568,7 @@ const fantasy: Theme = {
 };
 
 export const THEMES: Record<ThemeId, Theme> = { espace, jungle, marins, egypte, art, inventions, sciences, terre, fantasy };
-export const DEFAULT_THEME_ID: ThemeId = 'espace';
+export const DEFAULT_THEME_ID: ThemeId = 'defaut'; // habillage « Défaut » (sobre) : le premier du choix
 export const THEME_STORAGE_KEY = 'quiz-party-theme';
 
 // ── Habillages complémentaires et remplacements (lib/themes.extra.ts) ──

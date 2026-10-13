@@ -416,7 +416,15 @@ const sports: Theme = {
   } as unknown as Theme['plates'],
 };
 
-export const EXTRA_THEMES: Record<string, Theme> = { sucrerie, sports, temps, voyage, multivers, halloween, noel, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
+// Défaut : sobre, sans décor ni fond dans le jeu (console et équipes) ; seuls les avatars (modes, boutons, équipes) sont conservés.
+// Pas de scène à zones : la page d'accueil utilise components/SoberConsole.tsx (menu des modes à gauche, équipes et QR à droite).
+const defaut: Theme = {
+  ...emptyTheme('defaut', 'Défaut', '🧭', "Sobre, sans décor : menu des modes à gauche, équipes et QR à droite. Idéal pour jouer entre adultes."),
+  layout: 'sober',
+  stage: { src: '/themes/defaut/stage.webp', ratio: 1672 / 941, bg: '#f5f2ea' },
+};
+
+export const EXTRA_THEMES: Record<string, Theme> = { defaut, sucrerie, sports, temps, voyage, multivers, halloween, noel, peche, aventure, medieval, mythologie, astronomie, civilisations, iles };
 
 // ── Remplacements de décor ──
 // Espace : nouveau poste de pilotage (l'astronaute). Les boutons et icônes existants sont conservés.
@@ -451,7 +459,7 @@ export const THEME_OVERRIDES: Record<string, Omit<Partial<Theme>, 'zones'> & { z
 };
 
 export const THEME_ORDER: string[] = [
-  'sucrerie', 'multivers', 'halloween', 'noel', 'espace', 'art', 'marins', 'jungle', 'egypte', 'sports',
+  'defaut', 'sucrerie', 'multivers', 'halloween', 'noel', 'espace', 'art', 'marins', 'jungle', 'egypte', 'sports',
   'terre', 'temps', 'voyage', 'peche', 'aventure', 'medieval',
   'mythologie', 'fantasy', 'astronomie', 'sciences', 'inventions', 'civilisations', 'iles',
 ];

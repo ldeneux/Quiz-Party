@@ -14,6 +14,7 @@ import ModeIcon from '@/components/ModeIcon';
 import { useTheme } from '@/lib/useTheme';
 import MascotPortal from '@/components/MascotPortal';
 import CockpitQR from '@/components/CockpitQR';
+import SoberConsole, { SoberDialog } from '@/components/SoberConsole';
 
 const MODES = [
   {
@@ -522,7 +523,236 @@ export default function ConsolePage() {
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
   const eligibleProfiles = activeMode === 'camembert' ? profiles.filter((p) => p.isTrivialEligible) : profiles;
 
+  // Fenêtres communes aux deux dispositions (statistiques, invitation)
+  const sharedModals = (
+    <>
+      {/* Fenêtre statistiques */}
+      {showStats && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 32,
+              maxWidth: 640,
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <button
+              onClick={() => setShowStats(false)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                border: 'none',
+                background: '#f4f6fb',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                fontSize: 14,
+                cursor: 'pointer',
+                color: '#7a819c',
+              }}
+            >
+              ✕
+            </button>
+
+            <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 18 }}>📊 Réponses par équipe et par catégorie</h2>
+
+            {Object.keys(statsData).length === 0 ? (
+              <p style={{ color: '#7a819c', fontSize: 13.5 }}>Aucune réponse enregistrée pour l'instant.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {Object.entries(statsData).map(
+                  ([
+                    teamId,
+                    data,
+                  ]: [
+                    string,
+                    { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }
+                  ]) => (
+                    <div key={teamId}>
+                      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
+                        <TeamAvatar avatar={data.teamAvatar} /> {data.teamName}
+                      </div>
+                      {Object.keys(data.categories).length === 0 ? (
+                        <p style={{ color: '#7a819c', fontSize: 12.5, marginLeft: 8 }}>Pas encore de réponse.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {Object.entries(data.categories).map(([catName, counts]: [string, { correct: number; wrong: number }]) => (
+                            <div
+                              key={catName}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: 13,
+                                background: '#f4f6fb',
+                                borderRadius: 10,
+                                padding: '6px 12px',
+                              }}
+                            >
+                              <span>{catName}</span>
+                              <span>
+                                <span style={{ color: '#35c2a3', fontWeight: 700 }}>{counts.correct} ✓</span>
+                                {'  '}
+                                <span style={{ color: '#ff7a68', fontWeight: 700 }}>{counts.wrong} ✕</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Fenêtre d'invitation */}
+      {showInvite && joinCode && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31,36,64,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              padding: 36,
+              maxWidth: 420,
+              width: '90%',
+              textAlign: 'center',
+              position: 'relative',
+              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
+            }}
+          >
+            <button
+              onClick={() => setShowInvite(false)}
+              title="Fermer"
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                border: 'none',
+                background: '#f4f6fb',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                fontSize: 14,
+                cursor: 'pointer',
+                color: '#7a819c',
+              }}
+            >
+              ✕
+            </button>
+
+            <p style={{ color: '#7a819c', marginBottom: 8 }}>En attente de l'équipe…</p>
+            <div style={{ color: '#7a819c', fontSize: 13, marginBottom: 16 }}>
+              Rejoindre sur : <strong>{origin}/join</strong>
+            </div>
+            <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: 8, color: '#6c7bf7' }}>{joinCode}</div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   if (!mounted) return <main style={{ minHeight: '100vh', background: '#03040c' }} />;
+
+  // Habillage « Défaut » : disposition sobre (pas de scène cockpit, pas de portail d'intro)
+  if (theme.layout === 'sober') {
+    const startSober = async () => {
+      if (!gameId || gameStarted) return;
+      const ok = await updateGame({ mode: activeMode, profileId: selectedProfileId || null });
+      if (ok) setGameStarted(true);
+    };
+    return (
+      <>
+        <SoberConsole
+          modes={MODES}
+          activeMode={activeMode}
+          onSelectMode={selectMode}
+          teams={sortedTeams}
+          onTeamClick={(t) => setTeamAction(teams.find((x) => x.id === t.id) ?? null)}
+          joinCode={joinCode}
+          origin={origin}
+          copiedJoin={copiedJoin}
+          onCopyJoin={copyJoinUrl}
+          profiles={eligibleProfiles}
+          selectedProfileId={selectedProfileId}
+          onSelectProfile={selectProfile}
+          gameStarted={gameStarted}
+          canStart={!!gameId && teams.length > 0}
+          onStart={startSober}
+          onNewGame={() => setShowNewGameChoice(true)}
+          onStats={openStats}
+          onFullscreen={toggleFullscreen}
+          error={error}
+          notice={activeMode === 'camembert' && eligibleProfiles.length === 0 ? 'Aucun profil ne convient au Trivial Poursuit (il faut 10 catégories).' : null}
+        >
+          {gameId && <GameArea gameId={gameId} initialMode={activeMode} cockpit={false} onRestart={() => setShowNewGameChoice(true)} onClose={() => setGameStarted(false)} />}
+        </SoberConsole>
+
+        {teamAction && (
+          <SoberDialog
+            title={teamAction.name}
+            onClose={() => setTeamAction(null)}
+            actions={[
+              { label: copiedTeamId === teamAction.id ? 'Lien copié ✓' : 'Copier le lien de récupération', onClick: () => copyTeamLink(teamAction.id), kind: 'ghost' },
+              {
+                label: "Déconnecter l'équipe",
+                kind: 'danger',
+                onClick: async () => {
+                  await removeTeam(teamAction.id);
+                  setTeamAction(null);
+                },
+              },
+              { label: 'Fermer', onClick: () => setTeamAction(null), kind: 'ghost' },
+            ]}
+          >
+            <TeamAvatar avatar={teamAction.avatar} size={22} /> {teamAction.score ?? 0} point{(teamAction.score ?? 0) > 1 ? 's' : ''}
+          </SoberDialog>
+        )}
+
+        {showNewGameChoice && (
+          <SoberDialog
+            title="Nouvelle partie"
+            onClose={() => setShowNewGameChoice(false)}
+            actions={[
+              { label: 'Garder les mêmes équipes', onClick: restartSameTeams, kind: 'primary' },
+              { label: "Changer d'équipes (nouveau code)", onClick: fullReset, kind: 'ghost' },
+              { label: 'Annuler', onClick: () => setShowNewGameChoice(false), kind: 'ghost' },
+            ]}
+          >
+            Garder les mêmes équipes : même code, scores remis à zéro.
+          </SoberDialog>
+        )}
+        {sharedModals}
+      </>
+    );
+  }
 
   return (
     <main style={{ minHeight: '100vh', background: theme.stage.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif' }}>
@@ -812,156 +1042,7 @@ export default function ConsolePage() {
       </div>
       <LayoutPanels L={L} theme={theme} />
 
-      {/* Fenêtre statistiques */}
-      {showStats && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(31,36,64,0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 24,
-              padding: 32,
-              maxWidth: 640,
-              width: '90%',
-              maxHeight: '80vh',
-              overflowY: 'auto',
-              position: 'relative',
-              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
-            }}
-          >
-            <button
-              onClick={() => setShowStats(false)}
-              style={{
-                position: 'absolute',
-                top: 16,
-                right: 16,
-                border: 'none',
-                background: '#f4f6fb',
-                borderRadius: '50%',
-                width: 32,
-                height: 32,
-                fontSize: 14,
-                cursor: 'pointer',
-                color: '#7a819c',
-              }}
-            >
-              ✕
-            </button>
-
-            <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 18 }}>📊 Réponses par équipe et par catégorie</h2>
-
-            {Object.keys(statsData).length === 0 ? (
-              <p style={{ color: '#7a819c', fontSize: 13.5 }}>Aucune réponse enregistrée pour l'instant.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                {Object.entries(statsData).map(
-                  ([
-                    teamId,
-                    data,
-                  ]: [
-                    string,
-                    { teamName: string; teamAvatar: string; categories: Record<string, { correct: number; wrong: number }> }
-                  ]) => (
-                    <div key={teamId}>
-                      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
-                        <TeamAvatar avatar={data.teamAvatar} /> {data.teamName}
-                      </div>
-                      {Object.keys(data.categories).length === 0 ? (
-                        <p style={{ color: '#7a819c', fontSize: 12.5, marginLeft: 8 }}>Pas encore de réponse.</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          {Object.entries(data.categories).map(([catName, counts]: [string, { correct: number; wrong: number }]) => (
-                            <div
-                              key={catName}
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: 13,
-                                background: '#f4f6fb',
-                                borderRadius: 10,
-                                padding: '6px 12px',
-                              }}
-                            >
-                              <span>{catName}</span>
-                              <span>
-                                <span style={{ color: '#35c2a3', fontWeight: 700 }}>{counts.correct} ✓</span>
-                                {'  '}
-                                <span style={{ color: '#ff7a68', fontWeight: 700 }}>{counts.wrong} ✕</span>
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Fenêtre d'invitation */}
-      {showInvite && joinCode && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(31,36,64,0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 24,
-              padding: 36,
-              maxWidth: 420,
-              width: '90%',
-              textAlign: 'center',
-              position: 'relative',
-              boxShadow: '0 20px 50px -12px rgba(31,36,64,0.3)',
-            }}
-          >
-            <button
-              onClick={() => setShowInvite(false)}
-              title="Fermer"
-              style={{
-                position: 'absolute',
-                top: 16,
-                right: 16,
-                border: 'none',
-                background: '#f4f6fb',
-                borderRadius: '50%',
-                width: 32,
-                height: 32,
-                fontSize: 14,
-                cursor: 'pointer',
-                color: '#7a819c',
-              }}
-            >
-              ✕
-            </button>
-
-            <p style={{ color: '#7a819c', marginBottom: 8 }}>En attente de l'équipe…</p>
-            <div style={{ color: '#7a819c', fontSize: 13, marginBottom: 16 }}>
-              Rejoindre sur : <strong>{origin}/join</strong>
-            </div>
-            <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: 8, color: '#6c7bf7' }}>{joinCode}</div>
-          </div>
-        </div>
-      )}
+      {sharedModals}
     </main>
   );
 }

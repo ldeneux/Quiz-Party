@@ -662,7 +662,7 @@ export default function ParametragePage() {
                     <button type="button" onClick={() => setTheme(t.id)} disabled={selected} style={{ ...hoverBtn, background: '#6c7bf7', color: '#fff', opacity: selected ? 0.6 : 1, cursor: selected ? 'default' : 'pointer' }}>
                       {selected ? 'Utilisé' : 'Utiliser'}
                     </button>
-                    <button type="button" onClick={() => editLayout(t.id)} style={{ ...hoverBtn, background: '#fff', color: '#1f2440' }}>Modifier</button>
+                    {t.layout !== 'sober' && <button type="button" onClick={() => editLayout(t.id)} style={{ ...hoverBtn, background: '#fff', color: '#1f2440' }}>Modifier</button>}
                     <button type="button" onClick={() => { setHover(null); setTeamsFor(t.id); }} style={{ ...hoverBtn, background: 'transparent', color: '#fff', border: '1.5px solid #5b6080' }}>Équipes</button>
                   </div>
                 </div>
@@ -683,7 +683,8 @@ export default function ParametragePage() {
           <h2 style={sectionTitle}>Créer des packs de questions</h2>
           <p style={{ color: '#7a819c', fontSize: 13, marginBottom: 16 }}>
             Un pack est créé pour chaque case cochée (catégorie × niveau) et rempli via Gemini. Le coût estimé est toujours affiché avant de lancer.{' '}
-            <a href="/blindtest" style={{ color: '#6c7bf7', fontWeight: 700, textDecoration: 'none' }}>🎵 Ajouter des questions blind test (Deezer)</a>
+            <a href="/blindtest" style={{ color: '#6c7bf7', fontWeight: 700, textDecoration: 'none' }}>🎵 Ajouter des questions blind test (Deezer)</a>{' · '}
+            <a href="/medias" style={{ color: '#6c7bf7', fontWeight: 700, textDecoration: 'none' }}>🎬 Bandes-annonces et vidéos</a>
           </p>
 
           {!hasLevelCols && (

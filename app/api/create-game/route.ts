@@ -19,7 +19,7 @@ function generateJoinCode(): string {
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
-  const visualTheme = body.visualTheme ?? 'espace';
+  const visualTheme = body.visualTheme ?? 'defaut';
   const levelIds = body.levelIds ?? ['CM1'];
   const categoryIds = body.categoryIds ?? [];
   const mode = body.mode ?? 'classique';

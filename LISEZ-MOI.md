@@ -50,4 +50,15 @@ Les nouvelles parties utilisent directement les noms de `lib/teamPresets.ts`. Le
 ## Blind test (Deezer)
 - Une question peut porter un lien de morceau Deezer (colonne `questions.media_url`, migration `supabase/migration-015-media.sql`) : rien n'est stocké à part ce lien.
 - Page `/blindtest` (lien dans Paramétrage) : recherche d'un morceau, écoute de l'extrait de 30 s, création de la question (3 mauvaises réponses prises chez des artistes proches ou dans les autres titres de l'artiste). Les questions vont dans le pack « Blind test · <catégorie> » à ajouter à un profil.
+- « Importer en masse » (même page) : charge un classement du moment (par genre), une playlist Deezer (ex. « années 80 ») ou les titres d'un artiste, trie par popularité, limite à 2 titres par artiste et crée jusqu'à 300 questions par lots de 25, avec barre de progression. Les mauvaises réponses viennent de la même liste ; les morceaux déjà présents dans le pack sont ignorés.
 - L'extrait est joué sur l'écran de l'hôte (composant `DeezerClip` de `components/GameArea.tsx`) ; le lien d'aperçu est redemandé à Deezer à chaque lecture (`/api/deezer`).
+
+## Films (TMDB) et vidéos YouTube (page /medias)
+- **Films :** classement des mieux notés, populaires, à l'affiche, tendances ou par décennie ; la bande-annonce YouTube, le réalisateur et l'année viennent de TMDB. Il faut une clé gratuite : variable `TMDB_API_KEY` dans `.env.local` et dans les variables Vercel (usage non commercial, mention TMDB affichée sur la page).
+- **Liens collés (pubs, extraits, clips) :** une ligne par vidéo, `lien ; bonne réponse ; autre1 | autre2 | autre3` (les autres réponses sont facultatives). « Vérifier les liens » écarte les vidéos introuvables ou non intégrables. Début/fin dans le lien (`&start=12&end=40`).
+- La vidéo est jouée sur l'écran de l'hôte par `MediaClip` (`components/GameArea.tsx`) : seul le lien est enregistré (`questions.media_url`).
+
+## Habillage « Défaut » (sobre, par défaut)
+- Premier de la liste et thème par défaut (`lib/themes.ts`, `lib/themes.extra.ts`). Disposition sans décor : barre du haut (icône, Démarrer / Nouvelle partie / Plein écran, paramétrage, statistiques, profil), menu des 5 modes à gauche, équipes puis QR à droite (`components/SoberConsole.tsx`, branché dans `app/page.tsx`).
+- Aucun fond dans la console ni sur l'écran des équipes ; seuls les avatars (modes et équipes) sont conservés. Équipes : une équipe de chaque thème (`lib/teamPresets.ts`).
+- Pour l'appliquer sur un appareil : Paramétrage, carrousel des habillages, « Défaut », « Utiliser ». Pas d'éditeur de zones (« Modifier ») pour ce thème.

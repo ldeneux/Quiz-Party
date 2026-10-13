@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
 import { deezerTrackId, type DeezerTrack } from '@/lib/deezer';
+import { youtubeInfo, type YouTubeInfo } from '@/lib/media';
 import { useTheme } from '@/lib/useTheme';
 import TeamAvatar from '@/components/TeamAvatar';
 import CategoryBadge from '@/components/CategoryBadge';
@@ -51,7 +52,7 @@ type Question = {
   category_id?: string;
   category_name?: string;
   category_emoji?: string;
-  media_url?: string | null; // lien d'un morceau Deezer (blind test) : l'extrait de 30 s est joué sur l'écran de l'hôte
+  media_url?: string | null; // lien d'un morceau Deezer (blind test) ou d'une vidéo YouTube : joué sur l'écran de l'hôte
 };
 
 type RevealInfo = { choice: string | null; timeMs: number | null };
@@ -1162,7 +1163,7 @@ export default function GameArea({
             {phase === 'question' && <div style={styles.timer}>{secondsLeft}s</div>}
           </div>
           <div style={styles.questionText}>{question.prompt}</div>
-          {question.media_url && <DeezerClip key={question.id} mediaUrl={question.media_url} revealed={phase === 'revealed'} cockpit={cockpit} />}
+          {question.media_url && <MediaClip key={question.id} mediaUrl={question.media_url} revealed={phase === 'revealed'} cockpit={cockpit} />}
 
           <div style={styles.choices} key={question.id}>
             {(['a', 'b', 'c', 'd'] as const).map((letter) => (
@@ -1243,7 +1244,7 @@ export default function GameArea({
                 <p style={{ color: '#ff7a68', fontSize: 14, marginBottom: 12 }}>{loadError}</p>
               )}
               {!cockpit && (
-                <button style={styles.startBtn} onClick={goToNextQuestion} disabled={pendingJokerTeamIds.length > 0}>
+                <button id="ck-fusee" style={styles.startBtn} onClick={goToNextQuestion} disabled={pendingJokerTeamIds.length > 0}>
                   Question suivante
                 </button>
               )}
@@ -1562,6 +1563,79 @@ function DeezerClip({ mediaUrl, revealed, cockpit }: { mediaUrl: string; reveale
       </div>
     </div>
   );
+}
+
+// Vidéo YouTube d'une question (bande-annonce, pub, extrait) : lecteur officiel, visible, joué sur l'écran de l'hôte uniquement.
+// Début/fin viennent du lien. Si la vidéo ne peut pas être intégrée, on le dit pour passer à la question suivante.
+declare global {
+  interface Window {
+    YT?: any;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+let youTubeApi: Promise<any> | null = null;
+function loadYouTubeApi(): Promise<any> {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (!youTubeApi) {
+    youTubeApi = new Promise((resolve) => {
+      const previous = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previous?.();
+        resolve(window.YT);
+      };
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(script);
+    });
+  }
+  return youTubeApi;
+}
+
+function YouTubeClip({ info, cockpit }: { info: YouTubeInfo; cockpit: boolean }) {
+  const holderRef = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let player: any;
+    let cancelled = false;
+    setFailed(false);
+    loadYouTubeApi()
+      .then((YT) => {
+        if (cancelled || !holderRef.current) return;
+        holderRef.current.innerHTML = '';
+        const el = document.createElement('div');
+        holderRef.current.appendChild(el);
+        player = new YT.Player(el, {
+          width: '100%',
+          height: '100%',
+          videoId: info.id,
+          playerVars: { autoplay: 1, rel: 0, modestbranding: 1, playsinline: 1, ...(info.start !== undefined ? { start: info.start } : {}), ...(info.end !== undefined ? { end: info.end } : {}) },
+          events: { onError: () => setFailed(true) },
+        });
+      })
+      .catch(() => setFailed(true));
+    return () => {
+      cancelled = true;
+      try {
+        player?.destroy();
+      } catch {
+        /* lecteur déjà retiré */
+      }
+    };
+  }, [info.id, info.start, info.end]);
+
+  return (
+    <div style={{ margin: '10px 0 14px' }}>
+      <div ref={holderRef} style={{ width: cockpit ? '38cqw' : 'min(560px, 100%)', aspectRatio: '16 / 9', background: '#000', borderRadius: cockpit ? '1cqw' : 12, overflow: 'hidden' }} />
+      {failed && <div style={{ color: '#ff9a9a', fontWeight: 700, fontSize: cockpit ? '1.4cqw' : 14, marginTop: 6 }}>Vidéo indisponible : passe à la question suivante.</div>}
+    </div>
+  );
+}
+
+// Extrait d'une question : morceau Deezer (blind test) ou vidéo YouTube
+function MediaClip({ mediaUrl, revealed, cockpit }: { mediaUrl: string; revealed: boolean; cockpit: boolean }) {
+  const yt = youtubeInfo(mediaUrl);
+  return yt ? <YouTubeClip info={yt} cockpit={cockpit} /> : <DeezerClip mediaUrl={mediaUrl} revealed={revealed} cockpit={cockpit} />;
 }
 
 const baseStyles: Record<string, React.CSSProperties> = {

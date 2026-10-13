@@ -10,6 +10,7 @@ export type DeezerTrack = {
   artist: { id: number; name: string };
   album: { title: string; cover: string };
   year?: string;
+  rank?: number; // popularité Deezer (plus grand = plus écouté)
 };
 
 export type AskKind = 'artist' | 'title';
