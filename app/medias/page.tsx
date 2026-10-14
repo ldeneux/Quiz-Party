@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { youtubeInfo } from '@/lib/media';
+import { probeYouTube, youtubeErrorLabel, youtubeInfo } from '@/lib/media';
 
 // Questions « vidéo » : bandes-annonces de films (TMDB) et liens YouTube collés (pubs, extraits…).
 // Rien n'est stocké à part le lien de la vidéo.
@@ -11,7 +11,7 @@ type Level = { id: string; label: string; sort_order: number; is_hidden?: boolea
 type Movie = { id: number; title: string; year: string; poster: string; votes: number };
 type Source = 'top_rated' | 'popular' | 'now_playing' | 'trending' | 'decade';
 type Ask = 'mix' | 'title' | 'director' | 'year';
-type LinkItem = { raw: string; url: string; answer: string; others: string[]; valid: boolean; check?: 'ok' | 'ko' | 'pending'; title?: string };
+type LinkItem = { raw: string; url: string; answer: string; others: string[]; valid: boolean; check?: 'ok' | 'ko' | 'warn' | 'pending'; title?: string; reason?: string };
 
 const FONT: React.CSSProperties = { fontFamily: 'Inter, sans-serif' };
 const card: React.CSSProperties = { background: '#fff', borderRadius: 20, padding: 24, marginBottom: 20, maxWidth: 860, boxShadow: '0 10px 30px -16px rgba(31,36,64,0.15)', ...FONT };
@@ -71,6 +71,7 @@ export default function MediasPage() {
   const [text, setText] = useState('');
   const [prompt, setPrompt] = useState(PROMPTS[0]);
   const [items, setItems] = useState<LinkItem[]>([]);
+  const probeRef = useRef<HTMLDivElement>(null); // petits lecteurs de test (retirés dès le verdict)
 
   useEffect(() => {
     (async () => {
@@ -150,24 +151,45 @@ export default function MediasPage() {
     }
   };
 
+  // Vérification en deux temps : la vidéo existe et peut être intégrée (oEmbed), puis elle SE LIT vraiment depuis ce navigateur
+  // (mini-lecteur YouTube : vidéo privée, supprimée, bloquée dans ton pays, intégration interdite…).
   const checkLinks = async () => {
     setMessage(null);
     const todo = items.map((it, i) => ({ it, i })).filter(({ it }) => it.valid);
-    setItems((prev) => prev.map((it) => (it.valid ? { ...it, check: 'pending' } : it)));
-    setProgress({ label: 'Vérification', done: 0, total: todo.length });
+    setItems((prev) => prev.map((it) => (it.valid ? { ...it, check: 'pending', reason: undefined } : it)));
+    setProgress({ label: 'Test de lecture', done: 0, total: todo.length });
     let done = 0;
-    for (let k = 0; k < todo.length; k += 4) {
+    for (let k = 0; k < todo.length; k += 3) {
       await Promise.all(
-        todo.slice(k, k + 4).map(async ({ it, i }) => {
+        todo.slice(k, k + 3).map(async ({ it, i }) => {
+          let check: LinkItem['check'] = 'ok';
+          let title: string | undefined;
+          let reason: string | undefined;
           try {
             const res = await fetch(`/api/media?oembed=${encodeURIComponent(it.url)}`);
             const json = await res.json();
-            setItems((prev) => prev.map((x, j) => (j === i ? { ...x, check: res.ok ? 'ok' : 'ko', title: json.title } : x)));
+            title = json.title;
+            if (!res.ok) {
+              check = 'ko';
+              reason = 'introuvable ou intégration interdite';
+            }
           } catch {
-            setItems((prev) => prev.map((x, j) => (j === i ? { ...x, check: 'ko' } : x)));
+            /* oEmbed injoignable : le test de lecture tranchera */
           }
+          const info = youtubeInfo(it.url);
+          if (check === 'ok' && info && probeRef.current) {
+            const r = await probeYouTube(info.id, probeRef.current);
+            if (!r.ok && !r.unknown) {
+              check = 'ko';
+              reason = youtubeErrorLabel(r.code);
+            } else if (r.unknown) {
+              check = 'warn';
+              reason = 'lecture non vérifiée (lecteur YouTube injoignable)';
+            }
+          }
+          setItems((prev) => prev.map((x, j) => (j === i ? { ...x, check, title, reason } : x)));
           done++;
-          setProgress({ label: 'Vérification', done, total: todo.length });
+          setProgress({ label: 'Test de lecture', done, total: todo.length });
         })
       );
     }
@@ -359,15 +381,19 @@ export default function MediasPage() {
           <div style={{ marginTop: 12 }}>
             {items.map((it, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '4px 0', fontSize: 13, borderTop: '1px solid #f1f3fa' }}>
-                <span style={{ width: 22 }}>{!it.valid ? '⚠️' : it.check === 'ok' ? '✅' : it.check === 'ko' ? '❌' : it.check === 'pending' ? '⏳' : '•'}</span>
+                <span style={{ width: 22 }}>{!it.valid ? '⚠️' : it.check === 'ok' ? '✅' : it.check === 'ko' ? '❌' : it.check === 'warn' ? '❔' : it.check === 'pending' ? '⏳' : '•'}</span>
                 <span style={{ fontWeight: 700, color: '#1f2440' }}>{it.answer || '(réponse manquante)'}</span>
                 <span style={{ color: '#7a819c', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {!it.valid ? (youtubeInfo(it.url) ? 'réponse manquante' : 'lien YouTube non reconnu') : it.check === 'ko' ? 'introuvable ou intégration interdite' : it.title ?? it.url}
+                  {!it.valid ? (youtubeInfo(it.url) ? 'réponse manquante' : 'lien YouTube non reconnu') : it.reason ?? it.title ?? it.url}
                 </span>
               </div>
             ))}
           </div>
         )}
+        <div ref={probeRef} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }} />
+        <p style={{ color: '#7a819c', fontSize: 12.5, margin: '10px 0 0' }}>
+          « Vérifier les liens » joue un instant chaque vidéo dans un mini-lecteur pour s'assurer qu'elle est lisible chez toi ; les vidéos en ❌ ne sont pas importées.
+        </p>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           <button type="button" disabled={!!progress || items.filter((it) => it.valid).length === 0} onClick={checkLinks} style={ghostBtn}>Vérifier les liens</button>
           <button type="button" disabled={!!progress || usable.length === 0} onClick={createLinks} style={actionBtn}>

@@ -102,7 +102,7 @@ export default function SoberConsole(p: Props) {
         <div>
           <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.08em', color: MUTED, marginBottom: 6 }}>PARTIE</div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Pill id="ck-fusee" label="▶ Démarrer" color={ACCENT} onClick={p.onStart} disabled={!p.canStart || p.gameStarted} />
+            <Pill id={p.gameStarted ? undefined : 'ck-fusee'} label="▶ Démarrer" color={ACCENT} onClick={p.onStart} disabled={!p.canStart || p.gameStarted} />
             <Pill label="Nouvelle partie" color="#92d3e1" onClick={p.onNewGame} />
             <Pill id="ck-plein" label="Plein écran" color="#bcd9a0" onClick={p.onFullscreen} />
           </div>

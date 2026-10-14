@@ -1,41 +1,37 @@
-Crée une planche éducative de vocabulaire français composée de **20 cartes illustrées**, disposées en grille de 5 colonnes et 4 rangées, sur un fond entièrement blanc.
+	Crée une planche éducative de vocabulaire français composée de **20 cartes illustrées**, disposées en grille de 5 colonnes et 4 rangées, sur un fond entièrement blanc.
 
-**Style visuel :** illustrations 3D de qualité, style dessin animé réaliste et chaleureux, adaptées aux enfants et à l’apprentissage du français. Chaque carte possède un contour fin gris clair, des coins arrondis et une zone de texte blanche en bas. Aucun fond noir, aucun cadre noir épais, aucune ombre excessive. Le rendu doit être propre, lumineux, homogène et adapté à l’impression.
+	**Style visuel :** illustrations 3D de qualité, style dessin animé réaliste et chaleureux, adaptées aux enfants et à l’apprentissage du français. Chaque carte possède un contour fin gris clair, des coins arrondis et une zone de texte blanche en bas. Aucun fond noir, aucun cadre noir épais, aucune ombre excessive. Le rendu doit être propre, lumineux, homogène et adapté à l’impression.
 
-**Personnages :** varier les enfants d’une carte à l’autre : filles et garçons, différentes couleurs de peau, coiffures, couleurs de cheveux et tenues. Conserver un style graphique cohérent, des expressions naturelles et joyeuses. Chaque enfant doit représenter clairement l’action associée au mot, avec une posture expressive et des accessoires si nécessaire.
+	**Personnages :** varier les enfants d’une carte à l’autre : filles et garçons, différentes couleurs de peau, coiffures, couleurs de cheveux et tenues. Conserver un style graphique cohérent, des expressions naturelles et joyeuses. Chaque enfant doit représenter clairement l’action associée au mot, avec une posture expressive et des accessoires si nécessaire.
 
-**Mise en page :**
-- 20 cartes de dimensions identiques, bien alignées et espacées.
-- Une seule illustration par carte, centrée et entièrement visible.
-- Le mot correspondant sous chaque illustration, en français, avec une typographie sans sérif noire, grande, nette et facile à lire.
-- Respecter exactement l’orthographe et les accents des mots.
-- Ne pas ajouter de titre, de numérotation, de décoration ou de texte supplémentaire.
+	**Mise en page :**
+	- 20 cartes de dimensions identiques, bien alignées et espacées.
+	- Une seule illustration par carte, centrée et entièrement visible.
+	- Le mot correspondant sous chaque illustration, en français, avec une typographie sans sérif noire, grande, nette et facile à lire.
+	- Respecter exactement l’orthographe et les accents des mots.
+	- Ne pas ajouter de titre, de numérotation, de décoration ou de texte supplémentaire.
 
-**Les 20 mots à illustrer, dans cet ordre :**
-
-le manteau
-la minuit
-la tête
-le Wi-Fi
-un concert
-le point de repère
-le couteau
-passer la nuit
-artistique
-soudainement
-une heure
-quelle direction
-bon
-la santé
-le week-end
-la recommandation
-une seconde
-une semaine
-une carte cadeau
-la leçon
-
+	**Les 20 mots à illustrer, dans cet ordre je suis de retour               
+ le réfrigérateur                
+ oui                             
+ je t'en prie                    
+ une maison                      
+ une carotte                     
+ l'entreprise                    
+ s'entendre bien                 
+ la baignoire                    
+ bon retour                      
+ le billet aller-retour          
+ la nièce                        
+ une présentation                
+ un jouet                        
+ le calendrier                   
+ la valeur                       
+ la voiture de location          
+ une photo                       
+ économique                      
+ l'affection                     
+ la touche                       
 
 
-
-
-**Résultat attendu :** une planche pédagogique harmonieuse, en haute résolution, avec un fond blanc pur, des illustrations expressives, des personnages diversifiés et des mots parfaitement lisibles. La présentation doit rester fidèle au style d’une fiche de vocabulaire illustrée, simple et élégante.
+	**Résultat attendu :** une planche pédagogique harmonieuse, en haute résolution, avec un fond blanc pur, des illustrations expressives, des personnages diversifiés et des mots parfaitement lisibles. La présentation doit rester fidèle au style d’une fiche de vocabulaire illustrée, simple et élégante.

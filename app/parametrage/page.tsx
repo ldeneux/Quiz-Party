@@ -388,6 +388,22 @@ export default function ParametragePage() {
     });
   };
 
+  // Libère les questions d'un pack avant sa suppression : une partie peut la garder comme « question en cours » et les réponses
+  // données y sont rattachées (clés étrangères). La migration 016 règle cela côté base ; ceci fonctionne même sans elle.
+  const releaseQuestionRefs = async (packIds: string[]) => {
+    const ids: string[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data } = await supabase.from('questions').select('id').in('pack_id', packIds).order('id').range(from, from + 999);
+      ids.push(...(data ?? []).map((q: { id: string }) => q.id));
+      if (!data || data.length < 1000) break;
+    }
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      await supabase.from('games').update({ current_question_id: null }).in('current_question_id', chunk);
+      await supabase.from('answers').delete().in('question_id', chunk);
+    }
+  };
+
   const deletePack = (key: string) => {
     const list = packsByPair[key] ?? [];
     if (!list.length) return;
@@ -398,6 +414,7 @@ export default function ParametragePage() {
       message: `Le pack « ${levelLabelOf(levelId)} · ${categoryNameOf(categoryId)} » et ses ${counts[key] ?? 0} question(s) seront supprimés, ainsi que sa présence dans les profils.`,
       label: 'Supprimer',
       onConfirm: async () => {
+        await releaseQuestionRefs(list.map((p) => p.id));
         const { error } = await supabase.from('question_packs').delete().in('id', list.map((p) => p.id));
         setNotice(error ? { kind: 'error', text: `Suppression du pack impossible : ${error.message}` } : { kind: 'ok', text: 'Pack supprimé.' });
         loadAll();

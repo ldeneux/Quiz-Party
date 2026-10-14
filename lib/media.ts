@@ -77,3 +77,82 @@ export function yearDistractors(year: number, now = new Date().getFullYear()): s
   }
   return out.map(String);
 }
+
+// ---- Lecteur YouTube (navigateur uniquement) ----
+declare global {
+  interface Window {
+    YT?: any;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let youTubeApi: Promise<any> | null = null;
+/** Charge l'API « IFrame Player » de YouTube une seule fois. */
+export function loadYouTubeApi(): Promise<any> {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (!youTubeApi) {
+    youTubeApi = new Promise((resolve) => {
+      const previous = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previous?.();
+        resolve(window.YT);
+      };
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(script);
+    });
+  }
+  return youTubeApi;
+}
+
+export type ProbeResult = { ok: boolean; code?: number; unknown?: boolean };
+
+/**
+ * Teste qu'une vidéo se lit VRAIMENT depuis ce navigateur (vidéo existante, intégration autorisée, disponible dans ton pays) :
+ * on crée un petit lecteur YouTube (200×200, taille minimale exigée), on attend une éventuelle erreur, puis on le retire.
+ */
+export async function probeYouTube(id: string, host: HTMLElement, timeoutMs = 9000): Promise<ProbeResult> {
+  let YT: any;
+  try {
+    YT = await Promise.race([loadYouTubeApi(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs))]);
+  } catch {
+    return { ok: false, unknown: true };
+  }
+  return new Promise((resolve) => {
+    const el = document.createElement('div');
+    host.appendChild(el);
+    let player: any;
+    let done = false;
+    const finish = (r: ProbeResult) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        player?.destroy();
+      } catch {
+        /* déjà retiré */
+      }
+      el.remove();
+      resolve(r);
+    };
+    const timer = setTimeout(() => finish({ ok: false, unknown: true }), timeoutMs);
+    player = new YT.Player(el, {
+      width: 200,
+      height: 200,
+      videoId: id,
+      playerVars: { rel: 0, playsinline: 1 },
+      events: {
+        onReady: () => setTimeout(() => finish({ ok: true }), 1500), // une vidéo indisponible signale son erreur juste après
+        onError: (e: { data: number }) => finish({ ok: false, code: e.data }),
+      },
+    });
+  });
+}
+
+/** Explication lisible d'un code d'erreur du lecteur YouTube. */
+export function youtubeErrorLabel(code?: number): string {
+  if (code === 100) return 'vidéo introuvable ou privée';
+  if (code === 101 || code === 150) return "intégration interdite ou vidéo indisponible dans ton pays";
+  if (code === 2) return 'identifiant de vidéo invalide';
+  return 'vidéo indisponible';
+}

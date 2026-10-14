@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { ckKeyPrimary, ckKeyDanger } from '@/lib/cockpitUi';
 import { deezerTrackId, type DeezerTrack } from '@/lib/deezer';
-import { youtubeInfo, type YouTubeInfo } from '@/lib/media';
+import { loadYouTubeApi, youtubeInfo, type YouTubeInfo } from '@/lib/media';
 import { useTheme } from '@/lib/useTheme';
 import TeamAvatar from '@/components/TeamAvatar';
 import CategoryBadge from '@/components/CategoryBadge';
@@ -532,6 +532,31 @@ export default function GameArea({
       previousQuestionIdsRef.current
     );
   }, [mode, pickNextChallenger, pickNextParticipatifTurn, finishParticipatif, startCategoryChoice, beginCamembertSetup, gameId, startQuestion]);
+
+  // Média illisible : on abandonne la question en cours (aucun point, pas de révélation) et on en tire une autre.
+  // On ne consomme pas le tour de l'équipe (Défi, Participatif) et, en Trivial Poursuit, on garde la catégorie choisie.
+  const skipQuestion = useCallback(() => {
+    if (phase !== 'question') return;
+    setLoadError(null);
+    loadNextQuestion(
+      gameId,
+      startQuestion,
+      setLoadError,
+      (info) => {
+        setExhaustedInfo(info);
+        setPhase('finished');
+      },
+      askedQuestionIdsRef.current,
+      previousQuestionIdsRef.current,
+      mode === 'camembert' ? camembertCategoryRef.current?.id : undefined
+    );
+  }, [phase, gameId, startQuestion, mode]);
+
+  // Idem, et la question est retirée du jeu pour de bon (validated = false) : elle ne reviendra pas dans les parties suivantes.
+  const disableAndSkip = useCallback(async () => {
+    if (question) await supabase.from('questions').update({ validated: false }).eq('id', question.id);
+    skipQuestion();
+  }, [question, skipQuestion]);
 
   // Le parent masque le QR code tant que l'explication de la réponse occupe l'écran droit
   const explainVisible = cockpit && phase === 'revealed' && !!question?.explanation;
@@ -1163,7 +1188,16 @@ export default function GameArea({
             {phase === 'question' && <div style={styles.timer}>{secondsLeft}s</div>}
           </div>
           <div style={styles.questionText}>{question.prompt}</div>
-          {question.media_url && <MediaClip key={question.id} mediaUrl={question.media_url} revealed={phase === 'revealed'} cockpit={cockpit} />}
+          {question.media_url && (
+            <MediaClip
+              key={`media-${question.id}`}
+              mediaUrl={question.media_url}
+              revealed={phase === 'revealed'}
+              cockpit={cockpit}
+              onSkip={phase === 'question' ? skipQuestion : undefined}
+              onDisable={phase === 'question' ? disableAndSkip : undefined}
+            />
+          )}
 
           <div style={styles.choices} key={question.id}>
             {(['a', 'b', 'c', 'd'] as const).map((letter) => (
@@ -1486,7 +1520,7 @@ async function loadNextQuestion(
 // Extrait Deezer d'une question « blind test » : joué sur l'écran de l'hôte uniquement (les téléphones ne font que répondre).
 // Le lien d'aperçu est demandé à Deezer au moment de jouer (il expire : on ne le stocke jamais). Titre et pochette n'apparaissent
 // qu'à la révélation de la réponse.
-function DeezerClip({ mediaUrl, revealed, cockpit }: { mediaUrl: string; revealed: boolean; cockpit: boolean }) {
+function DeezerClip({ mediaUrl, revealed, cockpit, onSkip, onDisable }: { mediaUrl: string; revealed: boolean; cockpit: boolean; onSkip?: () => void; onDisable?: () => void }) {
   const trackId = deezerTrackId(mediaUrl);
   const [track, setTrack] = useState<DeezerTrack | null>(null);
   const [failed, setFailed] = useState(false);
@@ -1550,7 +1584,7 @@ function DeezerClip({ mediaUrl, revealed, cockpit }: { mediaUrl: string; reveale
       )}
       <div style={{ minWidth: 0 }}>
         {failed ? (
-          <span style={{ color: '#ff9a9a' }}>Extrait indisponible : passe à la question suivante.</span>
+          <ClipFailure text="Extrait indisponible." cockpit={cockpit} onSkip={onSkip} onDisable={onDisable} />
         ) : revealed && track ? (
           <>
             <div style={{ fontSize: u(16), fontWeight: 800 }}>« {track.titleShort} »</div>
@@ -1566,32 +1600,27 @@ function DeezerClip({ mediaUrl, revealed, cockpit }: { mediaUrl: string; reveale
 }
 
 // Vidéo YouTube d'une question (bande-annonce, pub, extrait) : lecteur officiel, visible, joué sur l'écran de l'hôte uniquement.
-// Début/fin viennent du lien. Si la vidéo ne peut pas être intégrée, on le dit pour passer à la question suivante.
-declare global {
-  interface Window {
-    YT?: any;
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-let youTubeApi: Promise<any> | null = null;
-function loadYouTubeApi(): Promise<any> {
-  if (window.YT?.Player) return Promise.resolve(window.YT);
-  if (!youTubeApi) {
-    youTubeApi = new Promise((resolve) => {
-      const previous = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => {
-        previous?.();
-        resolve(window.YT);
-      };
-      const script = document.createElement('script');
-      script.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(script);
-    });
-  }
-  return youTubeApi;
+// Début/fin viennent du lien. Si la vidéo ne peut pas être lue, l'hôte peut passer la question (ou la retirer du jeu).
+// Média illisible : l'hôte peut passer la question (le chrono n'a plus de raison de tourner) ou la retirer définitivement du jeu
+function ClipFailure({ text, cockpit, onSkip, onDisable }: { text: string; cockpit: boolean; onSkip?: () => void; onDisable?: () => void }) {
+  const u = (px: number) => (cockpit ? `${(px / 10).toFixed(2)}cqw` : `${px}px`);
+  const button: React.CSSProperties = { border: 'none', borderRadius: 999, padding: `${u(8)} ${u(16)}`, fontWeight: 800, fontSize: u(14), cursor: 'pointer', fontFamily: 'inherit' };
+  return (
+    <div style={{ marginTop: u(8), color: cockpit ? '#ff9a9a' : '#c0392b', fontWeight: 700, fontSize: u(14) }}>
+      {text}
+      {onSkip && (
+        <div style={{ display: 'flex', gap: u(10), marginTop: u(8), flexWrap: 'wrap' }}>
+          <button type="button" onClick={onSkip} style={{ ...button, background: '#6c7bf7', color: '#fff' }}>Passer cette question</button>
+          {onDisable && (
+            <button type="button" onClick={onDisable} style={{ ...button, background: '#eef0f8', color: '#1f2440' }}>Retirer du jeu et passer</button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
-function YouTubeClip({ info, cockpit }: { info: YouTubeInfo; cockpit: boolean }) {
+function YouTubeClip({ info, cockpit, onSkip, onDisable }: { info: YouTubeInfo; cockpit: boolean; onSkip?: () => void; onDisable?: () => void }) {
   const holderRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
 
@@ -1627,15 +1656,19 @@ function YouTubeClip({ info, cockpit }: { info: YouTubeInfo; cockpit: boolean })
   return (
     <div style={{ margin: '10px 0 14px' }}>
       <div ref={holderRef} style={{ width: cockpit ? '38cqw' : 'min(560px, 100%)', aspectRatio: '16 / 9', background: '#000', borderRadius: cockpit ? '1cqw' : 12, overflow: 'hidden' }} />
-      {failed && <div style={{ color: '#ff9a9a', fontWeight: 700, fontSize: cockpit ? '1.4cqw' : 14, marginTop: 6 }}>Vidéo indisponible : passe à la question suivante.</div>}
+      {failed && <ClipFailure text="Vidéo indisponible." cockpit={cockpit} onSkip={onSkip} onDisable={onDisable} />}
     </div>
   );
 }
 
 // Extrait d'une question : morceau Deezer (blind test) ou vidéo YouTube
-function MediaClip({ mediaUrl, revealed, cockpit }: { mediaUrl: string; revealed: boolean; cockpit: boolean }) {
+function MediaClip({ mediaUrl, revealed, cockpit, onSkip, onDisable }: { mediaUrl: string; revealed: boolean; cockpit: boolean; onSkip?: () => void; onDisable?: () => void }) {
   const yt = youtubeInfo(mediaUrl);
-  return yt ? <YouTubeClip info={yt} cockpit={cockpit} /> : <DeezerClip mediaUrl={mediaUrl} revealed={revealed} cockpit={cockpit} />;
+  return yt ? (
+    <YouTubeClip info={yt} cockpit={cockpit} onSkip={onSkip} onDisable={onDisable} />
+  ) : (
+    <DeezerClip mediaUrl={mediaUrl} revealed={revealed} cockpit={cockpit} onSkip={onSkip} onDisable={onDisable} />
+  );
 }
 
 const baseStyles: Record<string, React.CSSProperties> = {

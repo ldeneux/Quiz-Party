@@ -62,3 +62,8 @@ Les nouvelles parties utilisent directement les noms de `lib/teamPresets.ts`. Le
 - Premier de la liste et thème par défaut (`lib/themes.ts`, `lib/themes.extra.ts`). Disposition sans décor : barre du haut (icône, Démarrer / Nouvelle partie / Plein écran, paramétrage, statistiques, profil), menu des 5 modes à gauche, équipes puis QR à droite (`components/SoberConsole.tsx`, branché dans `app/page.tsx`).
 - Aucun fond dans la console ni sur l'écran des équipes ; seuls les avatars (modes et équipes) sont conservés. Équipes : une équipe de chaque thème (`lib/teamPresets.ts`).
 - Pour l'appliquer sur un appareil : Paramétrage, carrousel des habillages, « Défaut », « Utiliser ». Pas d'éditeur de zones (« Modifier ») pour ce thème.
+
+## Vidéo illisible, suppression de packs
+- **« Vérifier les liens »** (page /medias) joue un instant chaque vidéo dans un mini-lecteur YouTube : privée, supprimée, intégration interdite ou bloquée dans ton pays → ❌, non importée.
+- **En partie**, si une vidéo (ou un extrait Deezer) ne se lit pas, l'écran de l'hôte propose « Passer cette question » (aucun point, même tour, même catégorie en Trivial) ou « Retirer du jeu et passer » (`validated = false`).
+- **Suppression d'un pack déjà joué** : exécuter `supabase/migration-016-delete-questions.sql` (une partie qui avait la question « en cours » et les réponses données ne bloquent plus la suppression). L'appli libère aussi ces références avant de supprimer, même sans la migration.
