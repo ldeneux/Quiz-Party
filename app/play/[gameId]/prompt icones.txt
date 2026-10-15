@@ -13,30 +13,25 @@
 
 	**Les 20 mots à illustrer, dans cet ordre je suis de retour               
 
- une connexion Wi-Fi             
- venteux                         
- un horaire                      
- j'adore                         
- la voisine                      
- la matière                      
- le champignon                   
- le courrier électronique        
- des escaliers                   
- la jambe                        
- le prix                         
- un port                         
- les prévisions météo            
- un ascenseur                    
- le jour                         
- le voyage                       
- en panne                        
- la sortie                       
- un frère                        
- le vin                          
-          
-                   
-            
+ le distributeur automatique     
+ le message                      
+ un thé                          
+ le futon                        
+ une épicerie                    
+ le parapluie                    
+ le départ                       
+ un sac                          
+ froid                           
+ un petit ami                    
+ un cousin                       
+ la grand-mère                   
+ une hôtesse                     
+ un contrôle                     
+ la note                         
+ meublé                          
+ le cuisinier                    
+ un match                        
+ la professeure                  
+ bonne soirée                    
 
-
-
-	**Résultat attendu :** une planche pédagogique harmonieuse, en haute résolution, avec un fond blanc pur, des illustrations expressives, des personnages diversifiés et des mots parfaitement lisibles. La présentation doit rester fidèle au style d’une fiche de vocabulaire illustrée, simple et élégante.
+ 	**Résultat attendu :** une planche pédagogique harmonieuse, en haute résolution, avec un fond blanc pur, des illustrations expressives, des personnages diversifiés et des mots parfaitement lisibles. La présentation doit rester fidèle au style d’une fiche de vocabulaire illustrée, simple et élégante.
